@@ -1,0 +1,39 @@
+[package]
+name = "aq-treesitter"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+aq-core = { path = "../aq-core" }
+thiserror = { workspace = true }
+tree-sitter = { workspace = true }
+
+# Language grammars — add more as needed
+tree-sitter-rust = { workspace = true }
+tree-sitter-javascript = { workspace = true }
+tree-sitter-typescript = { workspace = true }
+tree-sitter-python = { workspace = true }
+tree-sitter-json = { workspace = true }
+tree-sitter-go = { workspace = true }
+tree-sitter-java = { workspace = true }
+tree-sitter-c = { workspace = true }
+tree-sitter-cpp = { workspace = true }
+tree-sitter-dart = { workspace = true }
+tree-sitter-swift = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = ["rust", "javascript", "typescript", "python", "json", "go", "java", "c", "cpp", "dart", "swift"]
+rust = []
+javascript = []
+typescript = []
+python = []
+json = []
+go = []
+java = []
+c = []
+cpp = []
+dart = []
+swift = []

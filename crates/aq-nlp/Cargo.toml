@@ -1,0 +1,16 @@
+[package]
+name = "aq-nlp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aq-core = { path = "../aq-core" }
+oq = { path = "../oq" }
+serde = { workspace = true }
+glob = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

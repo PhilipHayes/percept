@@ -1,0 +1,5 @@
+[2026-03-11 10:00:00] INFO server: listening on :8080
+[2026-03-11 10:00:01] ERROR db: connection refused
+[2026-03-11 10:00:02] INFO api: request handled
+[2026-03-11 10:00:03] WARN memory: usage at 85%
+[2026-03-11 10:00:04] ERROR storage: disk full

@@ -1,0 +1,5 @@
+{"timestamp":"2026-03-11T10:00:00Z","level":"info","msg":"server started","port":8080}
+{"timestamp":"2026-03-11T10:00:01Z","level":"error","msg":"connection refused","service":"db"}
+{"timestamp":"2026-03-11T10:00:02Z","level":"info","msg":"request handled","path":"/api/health"}
+{"timestamp":"2026-03-11T10:00:03Z","level":"error","msg":"disk full","service":"storage"}
+{"timestamp":"2026-03-11T10:00:04Z","level":"warn","msg":"high memory usage","percent":85}

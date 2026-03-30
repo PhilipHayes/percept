@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="4" failures="1" errors="0" time="0.123">
+  <testsuite name="math" tests="4" failures="1" errors="0" skipped="1">
+    <testcase name="test_add" classname="math" time="0.01"/>
+    <testcase name="test_sub" classname="math" time="0.02"/>
+    <testcase name="test_div" classname="math" time="0.05">
+      <failure message="division by zero">
+        expected: 0, got: ZeroDivisionError
+      </failure>
+    </testcase>
+    <testcase name="test_pending" classname="math">
+      <skipped/>
+    </testcase>
+  </testsuite>
+</testsuites>

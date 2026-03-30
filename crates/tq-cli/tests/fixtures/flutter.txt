@@ -1,0 +1,5 @@
+00:00 +0: loading /test/widget_test.dart
+00:02 +1: counter increments
+00:03 +2: counter decrements
+00:04 +2 -1: widget renders
+00:04 +2 -1: Some tests failed.

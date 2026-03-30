@@ -1,0 +1,8 @@
+{ "type": "suite", "event": "started", "test_count": 3 }
+{ "type": "test", "event": "started", "name": "math::test_add" }
+{ "type": "test", "event": "started", "name": "math::test_sub" }
+{ "type": "test", "event": "started", "name": "math::test_div" }
+{ "type": "test", "name": "math::test_add", "event": "ok", "exec_time": 0.001 }
+{ "type": "test", "name": "math::test_sub", "event": "ok", "exec_time": 0.002 }
+{ "type": "test", "name": "math::test_div", "event": "failed", "exec_time": 0.003, "stdout": "thread 'math::test_div' panicked at 'assertion failed: 1/0 == 0'" }
+{ "type": "suite", "event": "failed", "passed": 2, "failed": 1, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.006 }

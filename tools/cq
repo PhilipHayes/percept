@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+# cq — Correlate Query: relational joins across APL tool JSON outputs
+# Part of the Agent Perception Layer (*q tool family)
+#
+# Usage:
+#   cq join   LEFT RIGHT -l EXPR -r EXPR [-t inner|left|anti|semi]
+#   cq lookup LEFT RIGHT -l EXPR -r EXPR [-d DEFAULT]
+#   cq group  FILE -k EXPR [-v EXPR]
+#   cq diff   LEFT RIGHT -l EXPR -r EXPR
+#
+# LEFT, RIGHT, FILE can be file paths or "-" for stdin.
+# EXPR is a jq expression applied to each element to extract the join key.
+# All output is JSON arrays.
+#
+# Examples:
+#   # Inner join aq skeletons with gq churn by file path
+#   cq join <(aq --skeleton src/) <(gq --churn) -l '.source_path' -r '.file'
+#
+#   # Files changed recently but NOT covered by tests (anti-join)
+#   cq join <(gq --changed-since '1 week') <(test-list) -l '.file' -r '.file' -t anti
+#
+#   # Enrich declarations with blame info (lookup)
+#   cq lookup <(aq --signatures f.rs) <(gq --blame f.rs) -l '.line_start' -r '.line_number'
+#
+#   # Group declarations by kind
+#   cq group <(aq --skeleton src/) -k '.kind'
+
+set -euo pipefail
+
+VERSION="0.1.0"
+
+# ─── Helpers ───
+
+die() { echo "{\"error\": $(jq -Rs '.' <<< "$1")}" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+cq — Correlate Query: relational joins across JSON streams
+
+SUBCOMMANDS
+  cq join   LEFT RIGHT -l EXPR -r EXPR [-t inner|left|anti|semi]
+  cq lookup LEFT RIGHT -l EXPR -r EXPR [-d DEFAULT]
+  cq group  FILE -k EXPR [-v EXPR]
+  cq diff   LEFT RIGHT -l EXPR -r EXPR
+
+OPTIONS
+  -l, --left-key EXPR    jq expression for left join key
+  -r, --right-key EXPR   jq expression for right join key
+  -k, --key EXPR         jq expression for group key
+  -v, --value EXPR       jq expression for group value projection
+  -t, --type TYPE        join type: inner (default), left, anti, semi
+  -d, --default VALUE    default JSON value for lookup misses
+  --version              print version
+  -h, --help             show this help
+
+ARGUMENTS
+  LEFT, RIGHT, FILE      file path or "-" for stdin. Expects JSON arrays.
+
+EXAMPLES
+  # Find functions in code not mentioned in docs
+  cq join <(aq --skeleton src/) <(mdq '# API' README.md | jq -R '[{name:.}]') \
+    -l '.name' -r '.name' -t anti
+
+  # Enrich aq output with git churn data
+  cq lookup <(aq --skeleton src/) <(gq --churn) \
+    -l '.source_path' -r '.file'
+
+  # Group declarations by language
+  cq group <(aq --skeleton src/) -k '.language'
+EOF
+  exit 0
+}
+
+# Read input: file path or "-" for stdin
+read_input() {
+  local path="$1"
+  if [[ "$path" == "-" ]]; then
+    cat
+  elif [[ -f "$path" || "$path" == /dev/fd/* ]]; then
+    cat "$path"
+  else
+    die "file not found: $path"
+  fi
+}
+
+# Validate that input is a JSON array
+validate_array() {
+  local label="$1"
+  local data="$2"
+  local type
+  type=$(echo "$data" | jq -r 'type' 2>/dev/null) || die "$label: invalid JSON"
+  if [[ "$type" != "array" ]]; then
+    # Try to wrap non-array in array (single object → [object], or ndjson → array)
+    local wrapped
+    wrapped=$(echo "$data" | jq -s '.' 2>/dev/null) || die "$label: expected JSON array, got $type"
+    echo "$wrapped"
+    return
+  fi
+  echo "$data"
+}
+
+# ─── Subcommands ───
+
+cmd_join() {
+  local left_file="" right_file="" left_key="" right_key="" join_type="inner"
+
+  # Parse positional args first
+  if [[ $# -ge 2 && "${1:0:1}" != "-" ]]; then
+    left_file="$1"; shift
+  fi
+  if [[ $# -ge 1 && "${1:0:1}" != "-" ]]; then
+    right_file="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -l|--left-key)  left_key="$2"; shift 2 ;;
+      -r|--right-key) right_key="$2"; shift 2 ;;
+      -t|--type)      join_type="$2"; shift 2 ;;
+      *) die "join: unknown option: $1" ;;
+    esac
+  done
+
+  [[ -n "$left_file" ]]  || die "join: LEFT argument required"
+  [[ -n "$right_file" ]] || die "join: RIGHT argument required"
+  [[ -n "$left_key" ]]   || die "join: -l/--left-key required"
+  [[ -n "$right_key" ]]  || die "join: -r/--right-key required"
+
+  case "$join_type" in
+    inner|left|anti|semi) ;;
+    *) die "join: unknown type '$join_type'. Use: inner, left, anti, semi" ;;
+  esac
+
+  local left_data right_data
+  left_data=$(read_input "$left_file")
+  right_data=$(read_input "$right_file")
+
+  left_data=$(validate_array "LEFT" "$left_data")
+  right_data=$(validate_array "RIGHT" "$right_data")
+
+  case "$join_type" in
+    inner)
+      jq -n --argjson left "$left_data" --argjson right "$right_data" \
+        --arg lk "$left_key" --arg rk "$right_key" '
+        ($right | INDEX(.[]; (. | path('"$right_key"') as $p | getpath($p) | tostring))) as $idx |
+        [
+          $left[] |
+          (. | path('"$left_key"') as $p | getpath($p) | tostring) as $k |
+          select($idx[$k] != null) |
+          {_left: ., _right: $idx[$k]}
+        ]'
+      ;;
+    left)
+      jq -n --argjson left "$left_data" --argjson right "$right_data" \
+        --arg lk "$left_key" --arg rk "$right_key" '
+        ($right | INDEX(.[]; (. | path('"$right_key"') as $p | getpath($p) | tostring))) as $idx |
+        [
+          $left[] |
+          (. | path('"$left_key"') as $p | getpath($p) | tostring) as $k |
+          {_left: ., _right: ($idx[$k] // null)}
+        ]'
+      ;;
+    anti)
+      jq -n --argjson left "$left_data" --argjson right "$right_data" \
+        --arg lk "$left_key" --arg rk "$right_key" '
+        ($right | INDEX(.[]; (. | path('"$right_key"') as $p | getpath($p) | tostring))) as $idx |
+        [
+          $left[] |
+          (. | path('"$left_key"') as $p | getpath($p) | tostring) as $k |
+          select($idx[$k] == null)
+        ]'
+      ;;
+    semi)
+      jq -n --argjson left "$left_data" --argjson right "$right_data" \
+        --arg lk "$left_key" --arg rk "$right_key" '
+        ($right | INDEX(.[]; (. | path('"$right_key"') as $p | getpath($p) | tostring))) as $idx |
+        [
+          $left[] |
+          (. | path('"$left_key"') as $p | getpath($p) | tostring) as $k |
+          select($idx[$k] != null)
+        ]'
+      ;;
+  esac
+}
+
+cmd_lookup() {
+  local left_file="" right_file="" left_key="" right_key="" default="null"
+
+  if [[ $# -ge 2 && "${1:0:1}" != "-" ]]; then
+    left_file="$1"; shift
+  fi
+  if [[ $# -ge 1 && "${1:0:1}" != "-" ]]; then
+    right_file="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -l|--left-key)  left_key="$2"; shift 2 ;;
+      -r|--right-key) right_key="$2"; shift 2 ;;
+      -d|--default)   default="$2"; shift 2 ;;
+      *) die "lookup: unknown option: $1" ;;
+    esac
+  done
+
+  [[ -n "$left_file" ]]  || die "lookup: LEFT argument required"
+  [[ -n "$right_file" ]] || die "lookup: RIGHT argument required"
+  [[ -n "$left_key" ]]   || die "lookup: -l/--left-key required"
+  [[ -n "$right_key" ]]  || die "lookup: -r/--right-key required"
+
+  local left_data right_data
+  left_data=$(read_input "$left_file")
+  right_data=$(read_input "$right_file")
+
+  left_data=$(validate_array "LEFT" "$left_data")
+  right_data=$(validate_array "RIGHT" "$right_data")
+
+  jq -n --argjson left "$left_data" --argjson right "$right_data" \
+    --argjson default "$default" '
+    ($right | INDEX(.[]; (. | path('"$right_key"') as $p | getpath($p) | tostring))) as $idx |
+    [
+      $left[] |
+      (. | path('"$left_key"') as $p | getpath($p) | tostring) as $k |
+      . + {_lookup: ($idx[$k] // $default)}
+    ]'
+}
+
+cmd_group() {
+  local file="" key_expr="" value_expr=""
+
+  if [[ $# -ge 1 && "${1:0:1}" != "-" ]]; then
+    file="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -k|--key)   key_expr="$2"; shift 2 ;;
+      -v|--value) value_expr="$2"; shift 2 ;;
+      *) die "group: unknown option: $1" ;;
+    esac
+  done
+
+  [[ -n "$file" ]]     || die "group: FILE argument required"
+  [[ -n "$key_expr" ]] || die "group: -k/--key required"
+
+  local data
+  data=$(read_input "$file")
+  data=$(validate_array "FILE" "$data")
+
+  if [[ -n "$value_expr" ]]; then
+    jq -n --argjson data "$data" '
+      $data | group_by('"$key_expr"') |
+      map({
+        key: (.[0] | '"$key_expr"' | tostring),
+        count: length,
+        values: [.[] | '"$value_expr"']
+      })'
+  else
+    jq -n --argjson data "$data" '
+      $data | group_by('"$key_expr"') |
+      map({
+        key: (.[0] | '"$key_expr"' | tostring),
+        count: length,
+        items: .
+      })'
+  fi
+}
+
+cmd_diff() {
+  local left_file="" right_file="" left_key="" right_key=""
+
+  if [[ $# -ge 2 && "${1:0:1}" != "-" ]]; then
+    left_file="$1"; shift
+  fi
+  if [[ $# -ge 1 && "${1:0:1}" != "-" ]]; then
+    right_file="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -l|--left-key)  left_key="$2"; shift 2 ;;
+      -r|--right-key) right_key="$2"; shift 2 ;;
+      *) die "diff: unknown option: $1" ;;
+    esac
+  done
+
+  [[ -n "$left_file" ]]  || die "diff: LEFT argument required"
+  [[ -n "$right_file" ]] || die "diff: RIGHT argument required"
+  [[ -n "$left_key" ]]   || die "diff: -l/--left-key required"
+  [[ -n "$right_key" ]]  || die "diff: -r/--right-key required"
+
+  local left_data right_data
+  left_data=$(read_input "$left_file")
+  right_data=$(read_input "$right_file")
+
+  left_data=$(validate_array "LEFT" "$left_data")
+  right_data=$(validate_array "RIGHT" "$right_data")
+
+  jq -n --argjson left "$left_data" --argjson right "$right_data" '
+    ($left  | INDEX(.[]; (. | path('"$left_key"')  as $p | getpath($p) | tostring))) as $l_idx |
+    ($right | INDEX(.[]; (. | path('"$right_key"') as $p | getpath($p) | tostring))) as $r_idx |
+    {
+      only_left:  [$left[]  | (. | path('"$left_key"')  as $p | getpath($p) | tostring) as $k | select($r_idx[$k] == null)],
+      only_right: [$right[] | (. | path('"$right_key"') as $p | getpath($p) | tostring) as $k | select($l_idx[$k] == null)],
+      both:       [$left[]  | (. | path('"$left_key"')  as $p | getpath($p) | tostring) as $k | select($r_idx[$k] != null) | {_left: ., _right: $r_idx[$k]}]
+    }'
+}
+
+# ─── Main dispatch ───
+
+[[ $# -ge 1 ]] || { usage; }
+
+case "$1" in
+  join)      shift; cmd_join "$@" ;;
+  lookup)    shift; cmd_lookup "$@" ;;
+  group)     shift; cmd_group "$@" ;;
+  diff)      shift; cmd_diff "$@" ;;
+  --version) echo "cq $VERSION" ;;
+  -h|--help) usage ;;
+  *)         die "unknown subcommand: $1. Use: join, lookup, group, diff" ;;
+esac

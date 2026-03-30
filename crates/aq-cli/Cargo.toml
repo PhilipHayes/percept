@@ -1,0 +1,24 @@
+[package]
+name = "aq-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "aq"
+path = "src/main.rs"
+
+[[bin]]
+name = "nq"
+path = "src/main.rs"
+
+[dependencies]
+aq-core = { path = "../aq-core" }
+aq-treesitter = { path = "../aq-treesitter" }
+aq-nlp = { path = "../aq-nlp" }
+clap = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+glob = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

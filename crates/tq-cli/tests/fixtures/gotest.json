@@ -1,0 +1,6 @@
+{"Time":"2024-01-15T10:00:01.000Z","Action":"run","Package":"example.com/math","Test":"TestAdd"}
+{"Time":"2024-01-15T10:00:01.001Z","Action":"output","Package":"example.com/math","Test":"TestAdd","Output":"--- PASS: TestAdd (0.00s)\n"}
+{"Time":"2024-01-15T10:00:01.001Z","Action":"pass","Package":"example.com/math","Test":"TestAdd","Elapsed":0.001}
+{"Time":"2024-01-15T10:00:01.002Z","Action":"run","Package":"example.com/math","Test":"TestFail"}
+{"Time":"2024-01-15T10:00:01.003Z","Action":"output","Package":"example.com/math","Test":"TestFail","Output":"    fail_test.go:10: expected true\n"}
+{"Time":"2024-01-15T10:00:01.003Z","Action":"fail","Package":"example.com/math","Test":"TestFail","Elapsed":0.002}

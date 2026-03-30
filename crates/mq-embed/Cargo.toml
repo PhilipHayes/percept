@@ -1,0 +1,15 @@
+[package]
+name = "mq-embed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local embedding inference for mq (ONNX via fastembed)"
+
+[dependencies]
+fastembed = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

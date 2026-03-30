@@ -1,0 +1,24 @@
+ PASS src/utils/__tests__/math.test.js
+  Math utilities
+    ✓ adds two numbers (2 ms)
+    ✓ subtracts two numbers (1 ms)
+    ✕ multiplies two numbers (3 ms)
+    ○ skipped divides two numbers
+
+  ● Math utilities › multiplies two numbers
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 6
+    Received: 5
+
+      4 |   test('multiplies two numbers', () => {
+      5 |     expect(multiply(2, 3)).toBe(6);
+        |                            ^
+      6 |   });
+
+      at Object.<anonymous> (src/utils/__tests__/math.test.js:5:28)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 failed, 1 skipped, 2 passed, 4 total
+Time:        1.234 s

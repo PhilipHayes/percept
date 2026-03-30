@@ -1,0 +1,72 @@
+[workspace]
+resolver = "2"
+members = [
+    # aq — AST Query (includes nq natural-language query)
+    "crates/aq-core",
+    "crates/aq-treesitter",
+    "crates/aq-cli",
+    "crates/aq-nlp",
+    # gq — Git Query
+    "crates/gq",
+    # oq — Observation Cache
+    "crates/oq",
+    # lq — Log Query
+    "crates/lq-parse",
+    "crates/lq-core",
+    "crates/lq-cli",
+    # mq — Semantic Query
+    "crates/mq-embed",
+    "crates/mq-store",
+    "crates/mq-cli",
+    # tq — Test Results Query
+    "crates/tq-parse",
+    "crates/tq-core",
+    "crates/tq-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Philip Hayes"]
+repository = "https://github.com/PhilipHayes/percept"
+homepage = "https://github.com/PhilipHayes/percept"
+
+[workspace.dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+# Serialisation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Error handling
+anyhow = "1"
+thiserror = "2"
+# Git
+git2 = "0.19"
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+# Hashing
+sha2 = "0.10"
+# Filesystem
+dirs = "6"
+glob = "0.3"
+regex = "1"
+# Embeddings (mq)
+fastembed = "5"
+# Tree-sitter (aq)
+tree-sitter = "0.24"
+tree-sitter-rust = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-json = "0.24"
+tree-sitter-go = "0.23"
+tree-sitter-java = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
+tree-sitter-dart = "0.0.4"
+tree-sitter-swift = "0.6"
+# Test helpers
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"

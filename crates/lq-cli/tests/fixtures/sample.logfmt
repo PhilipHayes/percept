@@ -1,0 +1,4 @@
+ts=2026-03-11T10:00:00Z level=info msg="server started" port=8080
+ts=2026-03-11T10:00:01Z level=error msg="connection refused" service=db
+ts=2026-03-11T10:00:02Z level=info msg="request handled" path=/api/health
+ts=2026-03-11T10:00:03Z level=warn msg="high memory" percent=85

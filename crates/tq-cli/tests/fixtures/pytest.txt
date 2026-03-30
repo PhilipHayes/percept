@@ -1,0 +1,16 @@
+test_math.py::test_add PASSED
+test_math.py::test_sub PASSED
+test_math.py::test_mul PASSED
+test_math.py::test_div FAILED
+
+=================================== FAILURES ===================================
+___________________________________ test_div ___________________________________
+
+    def test_div():
+>       assert 1 / 0 == 0
+E       ZeroDivisionError: division by zero
+
+test_math.py:10: ZeroDivisionError
+=========================== short test summary info ============================
+FAILED test_math.py::test_div - ZeroDivisionError: division by zero
+========================= 1 failed, 3 passed in 0.12s =========================

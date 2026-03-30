@@ -1,0 +1,13 @@
+=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+=== RUN   TestSubtract
+--- PASS: TestSubtract (0.01s)
+=== RUN   TestMultiply
+    multiply_test.go:12: expected 6, got 5
+--- FAIL: TestMultiply (0.00s)
+=== RUN   TestDivide
+--- SKIP: TestDivide (0.00s)
+    divide_test.go:8: skipping slow test
+FAIL
+exit status 1
+FAIL	example.com/math	0.023s

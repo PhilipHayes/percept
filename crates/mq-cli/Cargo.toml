@@ -1,0 +1,21 @@
+[package]
+name = "mq-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI binary for mq — semantic query tool"
+
+[[bin]]
+name = "mq"
+path = "src/main.rs"
+
+[dependencies]
+mq-embed = { path = "../mq-embed" }
+mq-store = { path = "../mq-store" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

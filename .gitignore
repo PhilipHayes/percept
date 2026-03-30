@@ -1,0 +1,17 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# fastembed model cache — large binary, not for version control
+.fastembed_cache/
+
+# Environment
+.env

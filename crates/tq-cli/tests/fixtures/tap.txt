@@ -1,0 +1,10 @@
+TAP version 13
+1..4
+ok 1 - addition works
+ok 2 - subtraction works
+not ok 3 - multiplication broken
+  ---
+  message: expected 6, got 5
+  severity: fail
+  ...
+ok 4 - division works # SKIP slow test

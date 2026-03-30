@@ -1,0 +1,19 @@
+[package]
+name = "lq-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "lq"
+path = "src/main.rs"
+
+[dependencies]
+lq-core = { path = "../lq-core" }
+lq-parse = { path = "../lq-parse" }
+clap = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+serde_json = { workspace = true }
