@@ -5,7 +5,6 @@ pub mod renumber;
 
 pub use merge::{merge_trees, CorpusMetadata};
 pub use renumber::{renumber_global, LineMapping};
-pub(crate) use coref::{merge_coref_chains, build_rescue_map};
 
 use aq_core::OwnedNode;
 use std::collections::HashMap;
@@ -14,9 +13,7 @@ use std::collections::HashMap;
 /// graft narrative nodes (arcs, conflicts, summary) into the result.
 ///
 /// Returns `(merged_tree, metadata)`.
-pub fn build_corpus(
-    file_trees: Vec<(OwnedNode, String)>,
-) -> (OwnedNode, CorpusMetadata) {
+pub fn build_corpus(file_trees: Vec<(OwnedNode, String)>) -> (OwnedNode, CorpusMetadata) {
     let file_line_counts: Vec<(String, usize)> = file_trees
         .iter()
         .map(|(tree, path)| (path.clone(), tree.end_line))
@@ -26,8 +23,7 @@ pub fn build_corpus(
     renumber_global(&mut tree, &file_line_counts);
 
     // Cross-file scene detection + arcs/conflicts/summary.
-    let (_scenes, arcs, conflicts, summary) =
-        analysis::compute_corpus_narrative(&tree, &[]);
+    let (_scenes, arcs, conflicts, summary) = analysis::compute_corpus_narrative(&tree, &[]);
 
     // Graft narrative analysis into the tree.
     graft_narrative_nodes(&mut tree, &arcs, &conflicts, &summary);
@@ -163,8 +159,14 @@ mod tests {
     #[test]
     fn test_build_corpus_grafts_summary() {
         let trees = vec![
-            (simple_doc("First paragraph.", "a.txt", 5), "a.txt".to_string()),
-            (simple_doc("Second paragraph.", "b.txt", 5), "b.txt".to_string()),
+            (
+                simple_doc("First paragraph.", "a.txt", 5),
+                "a.txt".to_string(),
+            ),
+            (
+                simple_doc("Second paragraph.", "b.txt", 5),
+                "b.txt".to_string(),
+            ),
         ];
         let (tree, meta) = build_corpus(trees);
 

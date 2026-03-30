@@ -1,19 +1,18 @@
-use crate::spacy::{SpacyDoc, SpacySentence, SpacyToken as SpacyTokenData, SpacyEntity as SpacyEntityData};
-use crate::roles::{classify_roles, RoleAnnotation, ThematicRole, VerbClass};
 use crate::coref::{
-    CoreferenceChain, Gender,
-    extract_appositives_from_sentence, resolve_same_sentence_pronouns,
-    resolve_cross_sentence_pronouns, build_coreference_chains,
-    update_gender_map, update_topic_entities, CoreferenceData,
+    build_coreference_chains, extract_appositives_from_sentence, resolve_cross_sentence_pronouns,
+    resolve_same_sentence_pronouns, update_gender_map, update_topic_entities, CoreferenceChain,
+    CoreferenceData, Gender,
 };
-use crate::discourse::{SentenceInfo, detect_discourse_relations, DiscourseRelationData};
+use crate::discourse::{detect_discourse_relations, DiscourseRelationData, SentenceInfo};
 use crate::narrative::{
-    ParagraphEntityData, detect_scene_boundaries, SceneBoundary,
-    EntityInteractionProfile, compute_character_arcs, CharacterArc,
-    OpposingInteraction, build_conflict_graph, ConflictEdge,
-    NarrativeIssue,
-    detect_setup_payoff, detect_foreshadowing, detect_consistency_issues,
-    NarrativeSummary, build_narrative_summary,
+    build_conflict_graph, build_narrative_summary, compute_character_arcs,
+    detect_consistency_issues, detect_foreshadowing, detect_scene_boundaries, detect_setup_payoff,
+    CharacterArc, ConflictEdge, EntityInteractionProfile, NarrativeIssue, NarrativeSummary,
+    OpposingInteraction, ParagraphEntityData, SceneBoundary,
+};
+use crate::roles::{classify_roles, RoleAnnotation, ThematicRole, VerbClass};
+use crate::spacy::{
+    SpacyDoc, SpacyEntity as SpacyEntityData, SpacySentence, SpacyToken as SpacyTokenData,
 };
 use aq_core::OwnedNode;
 use std::collections::{HashMap, HashSet};
@@ -52,11 +51,17 @@ fn detect_paragraphs(source_text: &str) -> Vec<ParaRange> {
     for chunk in source_text.split("\n\n") {
         let start = offset;
         let end = offset + chunk.len();
-        ranges.push(ParaRange { start_char: start, end_char: end });
+        ranges.push(ParaRange {
+            start_char: start,
+            end_char: end,
+        });
         offset = end + 2; // skip the "\n\n" separator
     }
     if ranges.is_empty() {
-        ranges.push(ParaRange { start_char: 0, end_char: source_text.len() });
+        ranges.push(ParaRange {
+            start_char: 0,
+            end_char: source_text.len(),
+        });
     }
     ranges
 }
@@ -178,8 +183,7 @@ fn build_entity_nodes(
             let first = mentions[0];
             let label = &first.label;
             let first_line = offset_to_line(first.start_char, line_starts);
-            let last_line =
-                offset_to_line(mentions.last().unwrap().start_char, line_starts);
+            let last_line = offset_to_line(mentions.last().unwrap().start_char, line_starts);
 
             let mut children = Vec::new();
 
@@ -203,15 +207,15 @@ fn build_entity_nodes(
             let mut field_indices = HashMap::new();
             field_indices.insert("type".to_string(), vec![0]);
             if num_locations > 0 {
-                field_indices.insert(
-                    "locations".to_string(),
-                    (1..1 + num_locations).collect(),
-                );
+                field_indices.insert("locations".to_string(), (1..1 + num_locations).collect());
             }
 
             // Look up coref chain for this entity
             let entity_lower = first.text.to_lowercase();
-            if let Some(chain) = coref_chains.iter().find(|c| c.canonical.to_lowercase() == entity_lower) {
+            if let Some(chain) = coref_chains
+                .iter()
+                .find(|c| c.canonical.to_lowercase() == entity_lower)
+            {
                 // Compute total mention count: direct NER mentions + coref mentions
                 let direct_mentions = mentions.len();
                 let alias_mentions = chain.total_mention_count;
@@ -243,7 +247,8 @@ fn build_entity_nodes(
                 }
 
                 // mention_count leaf
-                let mut mc_node = OwnedNode::leaf("mention_count", &total_mention_count.to_string(), first_line);
+                let mut mc_node =
+                    OwnedNode::leaf("mention_count", total_mention_count.to_string(), first_line);
                 mc_node.source_file = source_file.clone();
                 field_indices.insert("mention_count".to_string(), vec![children.len()]);
                 children.push(mc_node);
@@ -253,13 +258,19 @@ fn build_entity_nodes(
                     let mut coref_children = Vec::new();
                     // Sort mentions by source_line then token_idx
                     let mut sorted_mentions = chain.mentions.clone();
-                    sorted_mentions.sort_by(|a, b| a.source_line.cmp(&b.source_line).then(a.token_idx.cmp(&b.token_idx)));
+                    sorted_mentions.sort_by(|a, b| {
+                        a.source_line
+                            .cmp(&b.source_line)
+                            .then(a.token_idx.cmp(&b.token_idx))
+                    });
 
                     for m in &sorted_mentions {
                         let coref_type_str = match m.coref_type {
                             crate::coref::CorefType::Appositive => "appositive",
                             crate::coref::CorefType::SameSentencePronoun => "same_sentence_pronoun",
-                            crate::coref::CorefType::CrossSentencePronoun => "cross_sentence_pronoun",
+                            crate::coref::CorefType::CrossSentencePronoun => {
+                                "cross_sentence_pronoun"
+                            }
                             crate::coref::CorefType::PossessivePronoun => "possessive_pronoun",
                         };
                         let mut mention_children = Vec::new();
@@ -270,12 +281,17 @@ fn build_entity_nodes(
                         mention_fi.insert("form".to_string(), vec![mention_children.len()]);
                         mention_children.push(form_node);
 
-                        let mut type_node = OwnedNode::leaf("coref_type", coref_type_str, m.source_line);
+                        let mut type_node =
+                            OwnedNode::leaf("coref_type", coref_type_str, m.source_line);
                         type_node.source_file = source_file.clone();
                         mention_fi.insert("coref_type".to_string(), vec![mention_children.len()]);
                         mention_children.push(type_node);
 
-                        let mut conf_node = OwnedNode::leaf("confidence", &format!("{:.2}", m.confidence), m.source_line);
+                        let mut conf_node = OwnedNode::leaf(
+                            "confidence",
+                            format!("{:.2}", m.confidence),
+                            m.source_line,
+                        );
                         conf_node.source_file = source_file.clone();
                         mention_fi.insert("confidence".to_string(), vec![mention_children.len()]);
                         mention_children.push(conf_node);
@@ -309,7 +325,10 @@ fn build_entity_nodes(
                         field_indices: chain_fi,
                         children: coref_children,
                         start_line: first_line,
-                        end_line: sorted_mentions.last().map(|m| m.source_line).unwrap_or(first_line),
+                        end_line: sorted_mentions
+                            .last()
+                            .map(|m| m.source_line)
+                            .unwrap_or(first_line),
                         source_file: source_file.clone(),
                     };
                     field_indices.insert("coreference_chain".to_string(), vec![children.len()]);
@@ -318,8 +337,10 @@ fn build_entity_nodes(
 
                 // avg_confidence leaf
                 if !chain.mentions.is_empty() {
-                    let avg: f32 = chain.mentions.iter().map(|m| m.confidence).sum::<f32>() / chain.mentions.len() as f32;
-                    let mut avg_node = OwnedNode::leaf("avg_confidence", &format!("{:.2}", avg), first_line);
+                    let avg: f32 = chain.mentions.iter().map(|m| m.confidence).sum::<f32>()
+                        / chain.mentions.len() as f32;
+                    let mut avg_node =
+                        OwnedNode::leaf("avg_confidence", format!("{:.2}", avg), first_line);
                     avg_node.source_file = source_file.clone();
                     field_indices.insert("avg_confidence".to_string(), vec![children.len()]);
                     children.push(avg_node);
@@ -329,23 +350,38 @@ fn build_entity_nodes(
             // interaction_count: count document-level interactions referencing this entity
             {
                 let mut names_to_match: Vec<String> = vec![first.text.to_lowercase()];
-                if let Some(chain) = coref_chains.iter().find(|c| c.canonical.to_lowercase() == entity_lower) {
+                if let Some(chain) = coref_chains
+                    .iter()
+                    .find(|c| c.canonical.to_lowercase() == entity_lower)
+                {
                     for alias in &chain.aliases {
                         names_to_match.push(alias.to_lowercase());
                     }
                 }
-                let count = all_interactions.iter().filter(|idata| {
-                    let agent_match = idata.agent.as_deref().map(|a| {
-                        let a_lower = a.to_lowercase();
-                        names_to_match.iter().any(|n| a_lower.contains(n.as_str()))
-                    }).unwrap_or(false);
-                    let patient_match = idata.patient.as_deref().map(|p| {
-                        let p_lower = p.to_lowercase();
-                        names_to_match.iter().any(|n| p_lower.contains(n.as_str()))
-                    }).unwrap_or(false);
-                    agent_match || patient_match
-                }).count();
-                let mut ic_node = OwnedNode::leaf("interaction_count", &count.to_string(), first_line);
+                let count = all_interactions
+                    .iter()
+                    .filter(|idata| {
+                        let agent_match = idata
+                            .agent
+                            .as_deref()
+                            .map(|a| {
+                                let a_lower = a.to_lowercase();
+                                names_to_match.iter().any(|n| a_lower.contains(n.as_str()))
+                            })
+                            .unwrap_or(false);
+                        let patient_match = idata
+                            .patient
+                            .as_deref()
+                            .map(|p| {
+                                let p_lower = p.to_lowercase();
+                                names_to_match.iter().any(|n| p_lower.contains(n.as_str()))
+                            })
+                            .unwrap_or(false);
+                        agent_match || patient_match
+                    })
+                    .count();
+                let mut ic_node =
+                    OwnedNode::leaf("interaction_count", count.to_string(), first_line);
                 ic_node.source_file = source_file.clone();
                 field_indices.insert("interaction_count".to_string(), vec![children.len()]);
                 children.push(ic_node);
@@ -404,7 +440,11 @@ pub(crate) fn collect_span_text(token_idx: usize, tokens: &[SpacyTokenData]) -> 
         }
     }
     indices.sort_unstable();
-    indices.iter().map(|&i| tokens[i].text.as_str()).collect::<Vec<_>>().join(" ")
+    indices
+        .iter()
+        .map(|&i| tokens[i].text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn find_pobj_text(prep_idx: usize, tokens: &[SpacyTokenData]) -> Option<String> {
@@ -468,9 +508,8 @@ pub(crate) fn extract_interactions_from_sentence(
                     // Check for compound subjects via conj
                     let conj_parts = collect_conj_parts(dep_idx, tokens);
                     if !conj_parts.is_empty() {
-                        let parts: Vec<String> = std::iter::once(agent_text)
-                            .chain(conj_parts)
-                            .collect();
+                        let parts: Vec<String> =
+                            std::iter::once(agent_text).chain(conj_parts).collect();
                         agent_text = parts.join(" and ");
                     }
                     data.agent = Some(agent_text);
@@ -528,10 +567,18 @@ pub(crate) fn extract_interactions_from_sentence(
         data.verb_class = role_annotations.first().and_then(|r| r.verb_class);
         for ann in &role_annotations {
             match ann.thematic_role {
-                ThematicRole::Beneficiary => { data.beneficiary = Some(ann.participant.clone()); }
-                ThematicRole::Goal => { data.goal = Some(ann.participant.clone()); }
-                ThematicRole::Source => { data.source = Some(ann.participant.clone()); }
-                ThematicRole::Location => { data.location = Some(ann.participant.clone()); }
+                ThematicRole::Beneficiary => {
+                    data.beneficiary = Some(ann.participant.clone());
+                }
+                ThematicRole::Goal => {
+                    data.goal = Some(ann.participant.clone());
+                }
+                ThematicRole::Source => {
+                    data.source = Some(ann.participant.clone());
+                }
+                ThematicRole::Location => {
+                    data.location = Some(ann.participant.clone());
+                }
                 _ => {}
             }
         }
@@ -590,7 +637,11 @@ fn build_verb_phrase_node(
     }
 
     // voice indicator
-    let voice = if interaction.is_passive { "passive" } else { "active" };
+    let voice = if interaction.is_passive {
+        "passive"
+    } else {
+        "active"
+    };
     let mut voice_node = OwnedNode::leaf("voice", voice, line);
     voice_node.source_file = source_file.clone();
     field_indices.insert("voice".to_string(), vec![children.len()]);
@@ -600,8 +651,12 @@ fn build_verb_phrase_node(
 
     // agent_role
     if interaction.agent.is_some() {
-        if let Some(ann) = interaction.roles.iter().find(|r| r.syntactic_role == "agent") {
-            let mut node = OwnedNode::leaf("agent_role", &ann.thematic_role.to_string(), line);
+        if let Some(ann) = interaction
+            .roles
+            .iter()
+            .find(|r| r.syntactic_role == "agent")
+        {
+            let mut node = OwnedNode::leaf("agent_role", ann.thematic_role.to_string(), line);
             node.source_file = source_file.clone();
             field_indices.insert("agent_role".to_string(), vec![children.len()]);
             children.push(node);
@@ -610,8 +665,12 @@ fn build_verb_phrase_node(
 
     // patient_role
     if interaction.patient.is_some() {
-        if let Some(ann) = interaction.roles.iter().find(|r| r.syntactic_role == "patient") {
-            let mut node = OwnedNode::leaf("patient_role", &ann.thematic_role.to_string(), line);
+        if let Some(ann) = interaction
+            .roles
+            .iter()
+            .find(|r| r.syntactic_role == "patient")
+        {
+            let mut node = OwnedNode::leaf("patient_role", ann.thematic_role.to_string(), line);
             node.source_file = source_file.clone();
             field_indices.insert("patient_role".to_string(), vec![children.len()]);
             children.push(node);
@@ -628,8 +687,12 @@ fn build_verb_phrase_node(
 
     // recipient_role
     if interaction.recipient.is_some() {
-        if let Some(ann) = interaction.roles.iter().find(|r| r.syntactic_role == "recipient") {
-            let mut node = OwnedNode::leaf("recipient_role", &ann.thematic_role.to_string(), line);
+        if let Some(ann) = interaction
+            .roles
+            .iter()
+            .find(|r| r.syntactic_role == "recipient")
+        {
+            let mut node = OwnedNode::leaf("recipient_role", ann.thematic_role.to_string(), line);
             node.source_file = source_file.clone();
             field_indices.insert("recipient_role".to_string(), vec![children.len()]);
             children.push(node);
@@ -637,7 +700,10 @@ fn build_verb_phrase_node(
     }
 
     // verb_class
-    let vc_text = interaction.verb_class.map(|c| format!("{:?}", c).to_lowercase()).unwrap_or_else(|| "unknown".to_string());
+    let vc_text = interaction
+        .verb_class
+        .map(|c| format!("{:?}", c).to_lowercase())
+        .unwrap_or_else(|| "unknown".to_string());
     let mut vc_node = OwnedNode::leaf("verb_class", &vc_text, line);
     vc_node.source_file = source_file.clone();
     field_indices.insert("verb_class".to_string(), vec![children.len()]);
@@ -676,7 +742,7 @@ fn build_verb_phrase_node(
     let mut role_indices = Vec::new();
     for ann in &interaction.roles {
         if ann.thematic_role != ThematicRole::Unknown {
-            let mut role_node = OwnedNode::leaf("role", &ann.thematic_role.to_string(), line);
+            let mut role_node = OwnedNode::leaf("role", ann.thematic_role.to_string(), line);
             role_node.source_file = source_file.clone();
             role_indices.push(children.len());
             children.push(role_node);
@@ -688,8 +754,12 @@ fn build_verb_phrase_node(
 
     // role_confidence: minimum confidence across all roles
     if !interaction.roles.is_empty() {
-        let min_conf = interaction.roles.iter().map(|r| r.confidence).fold(f32::INFINITY, f32::min);
-        let mut conf_node = OwnedNode::leaf("role_confidence", &format!("{:.2}", min_conf), line);
+        let min_conf = interaction
+            .roles
+            .iter()
+            .map(|r| r.confidence)
+            .fold(f32::INFINITY, f32::min);
+        let mut conf_node = OwnedNode::leaf("role_confidence", format!("{:.2}", min_conf), line);
         conf_node.source_file = source_file.clone();
         field_indices.insert("role_confidence".to_string(), vec![children.len()]);
         children.push(conf_node);
@@ -792,7 +862,11 @@ fn build_interaction_doc_nodes(
             }
 
             // voice
-            let voice = if first.is_passive { "passive" } else { "active" };
+            let voice = if first.is_passive {
+                "passive"
+            } else {
+                "active"
+            };
             let mut voice_node = OwnedNode::leaf("voice", voice, line);
             voice_node.source_file = source_file.clone();
             field_indices.insert("voice".to_string(), vec![children.len()]);
@@ -819,7 +893,8 @@ fn build_interaction_doc_nodes(
             // agent_role
             if first.agent.is_some() {
                 if let Some(ann) = first.roles.iter().find(|r| r.syntactic_role == "agent") {
-                    let mut node = OwnedNode::leaf("agent_role", &ann.thematic_role.to_string(), line);
+                    let mut node =
+                        OwnedNode::leaf("agent_role", ann.thematic_role.to_string(), line);
                     node.source_file = source_file.clone();
                     field_indices.insert("agent_role".to_string(), vec![children.len()]);
                     children.push(node);
@@ -829,7 +904,8 @@ fn build_interaction_doc_nodes(
             // patient_role
             if first.patient.is_some() {
                 if let Some(ann) = first.roles.iter().find(|r| r.syntactic_role == "patient") {
-                    let mut node = OwnedNode::leaf("patient_role", &ann.thematic_role.to_string(), line);
+                    let mut node =
+                        OwnedNode::leaf("patient_role", ann.thematic_role.to_string(), line);
                     node.source_file = source_file.clone();
                     field_indices.insert("patient_role".to_string(), vec![children.len()]);
                     children.push(node);
@@ -847,7 +923,8 @@ fn build_interaction_doc_nodes(
             // recipient_role
             if first.recipient.is_some() {
                 if let Some(ann) = first.roles.iter().find(|r| r.syntactic_role == "recipient") {
-                    let mut node = OwnedNode::leaf("recipient_role", &ann.thematic_role.to_string(), line);
+                    let mut node =
+                        OwnedNode::leaf("recipient_role", ann.thematic_role.to_string(), line);
                     node.source_file = source_file.clone();
                     field_indices.insert("recipient_role".to_string(), vec![children.len()]);
                     children.push(node);
@@ -855,7 +932,10 @@ fn build_interaction_doc_nodes(
             }
 
             // verb_class
-            let vc_text = first.verb_class.map(|c| format!("{:?}", c).to_lowercase()).unwrap_or_else(|| "unknown".to_string());
+            let vc_text = first
+                .verb_class
+                .map(|c| format!("{:?}", c).to_lowercase())
+                .unwrap_or_else(|| "unknown".to_string());
             let mut vc_node = OwnedNode::leaf("verb_class", &vc_text, line);
             vc_node.source_file = source_file.clone();
             field_indices.insert("verb_class".to_string(), vec![children.len()]);
@@ -894,7 +974,8 @@ fn build_interaction_doc_nodes(
             let mut role_indices = Vec::new();
             for ann in &first.roles {
                 if ann.thematic_role != ThematicRole::Unknown {
-                    let mut role_node = OwnedNode::leaf("role", &ann.thematic_role.to_string(), line);
+                    let mut role_node =
+                        OwnedNode::leaf("role", ann.thematic_role.to_string(), line);
                     role_node.source_file = source_file.clone();
                     role_indices.push(children.len());
                     children.push(role_node);
@@ -906,8 +987,13 @@ fn build_interaction_doc_nodes(
 
             // role_confidence: minimum confidence
             if !first.roles.is_empty() {
-                let min_conf = first.roles.iter().map(|r| r.confidence).fold(f32::INFINITY, f32::min);
-                let mut conf_node = OwnedNode::leaf("role_confidence", &format!("{:.2}", min_conf), line);
+                let min_conf = first
+                    .roles
+                    .iter()
+                    .map(|r| r.confidence)
+                    .fold(f32::INFINITY, f32::min);
+                let mut conf_node =
+                    OwnedNode::leaf("role_confidence", format!("{:.2}", min_conf), line);
                 conf_node.source_file = source_file.clone();
                 field_indices.insert("role_confidence".to_string(), vec![children.len()]);
                 children.push(conf_node);
@@ -943,7 +1029,10 @@ fn build_interaction_doc_nodes(
                 field_indices,
                 children,
                 start_line: first.source_line,
-                end_line: mentions.last().map(|m| m.source_line).unwrap_or(first.source_line),
+                end_line: mentions
+                    .last()
+                    .map(|m| m.source_line)
+                    .unwrap_or(first.source_line),
                 source_file: source_file.clone(),
             }
         })
@@ -961,7 +1050,8 @@ fn build_discourse_nodes(
             let mut field_indices = HashMap::new();
 
             // type
-            let mut type_node = OwnedNode::leaf("type", &rel.relation.to_string(), rel.satellite_line);
+            let mut type_node =
+                OwnedNode::leaf("type", rel.relation.to_string(), rel.satellite_line);
             type_node.source_file = source_file.clone();
             field_indices.insert("type".to_string(), vec![children.len()]);
             children.push(type_node);
@@ -975,43 +1065,65 @@ fn build_discourse_nodes(
             }
 
             // confidence
-            let mut conf_node = OwnedNode::leaf("confidence", &format!("{:.2}", rel.confidence), rel.satellite_line);
+            let mut conf_node = OwnedNode::leaf(
+                "confidence",
+                format!("{:.2}", rel.confidence),
+                rel.satellite_line,
+            );
             conf_node.source_file = source_file.clone();
             field_indices.insert("confidence".to_string(), vec![children.len()]);
             children.push(conf_node);
 
             // nucleus (full text)
-            let mut nuc_node = OwnedNode::leaf("nucleus", &rel.nucleus_text.clone(), rel.nucleus_line);
+            let mut nuc_node =
+                OwnedNode::leaf("nucleus", rel.nucleus_text.clone(), rel.nucleus_line);
             nuc_node.source_file = source_file.clone();
             field_indices.insert("nucleus".to_string(), vec![children.len()]);
             children.push(nuc_node);
 
             // satellite (full text)
-            let mut sat_node = OwnedNode::leaf("satellite", &rel.satellite_text.clone(), rel.satellite_line);
+            let mut sat_node =
+                OwnedNode::leaf("satellite", rel.satellite_text.clone(), rel.satellite_line);
             sat_node.source_file = source_file.clone();
             field_indices.insert("satellite".to_string(), vec![children.len()]);
             children.push(sat_node);
 
             // nucleus_line
-            let mut nl_node = OwnedNode::leaf("nucleus_line", &rel.nucleus_line.to_string(), rel.nucleus_line);
+            let mut nl_node = OwnedNode::leaf(
+                "nucleus_line",
+                rel.nucleus_line.to_string(),
+                rel.nucleus_line,
+            );
             nl_node.source_file = source_file.clone();
             field_indices.insert("nucleus_line".to_string(), vec![children.len()]);
             children.push(nl_node);
 
             // satellite_line
-            let mut sl_node = OwnedNode::leaf("satellite_line", &rel.satellite_line.to_string(), rel.satellite_line);
+            let mut sl_node = OwnedNode::leaf(
+                "satellite_line",
+                rel.satellite_line.to_string(),
+                rel.satellite_line,
+            );
             sl_node.source_file = source_file.clone();
             field_indices.insert("satellite_line".to_string(), vec![children.len()]);
             children.push(sl_node);
 
             // nucleus_para
-            let mut np_node = OwnedNode::leaf("nucleus_para", &rel.nucleus_para_idx.to_string(), rel.nucleus_line);
+            let mut np_node = OwnedNode::leaf(
+                "nucleus_para",
+                rel.nucleus_para_idx.to_string(),
+                rel.nucleus_line,
+            );
             np_node.source_file = source_file.clone();
             field_indices.insert("nucleus_para".to_string(), vec![children.len()]);
             children.push(np_node);
 
             // satellite_para
-            let mut sp_node = OwnedNode::leaf("satellite_para", &rel.satellite_para_idx.to_string(), rel.satellite_line);
+            let mut sp_node = OwnedNode::leaf(
+                "satellite_para",
+                rel.satellite_para_idx.to_string(),
+                rel.satellite_line,
+            );
             sp_node.source_file = source_file.clone();
             field_indices.insert("satellite_para".to_string(), vec![children.len()]);
             children.push(sp_node);
@@ -1053,11 +1165,7 @@ fn build_discourse_nodes(
             } else {
                 sat_summary
             };
-            let summary = format!("{}: {} \u{2194} {}",
-                rel.relation,
-                nuc_display,
-                sat_display,
-            );
+            let summary = format!("{}: {} \u{2194} {}", rel.relation, nuc_display, sat_display,);
 
             let start_line = rel.nucleus_line.min(rel.satellite_line);
             let end_line = rel.nucleus_line.max(rel.satellite_line);
@@ -1076,267 +1184,318 @@ fn build_discourse_nodes(
         .collect()
 }
 
-fn build_scene_nodes(
-    scenes: &[SceneBoundary],
-    source_file: &Option<String>,
-) -> Vec<OwnedNode> {
-    scenes.iter().map(|scene| {
-        let mut children = Vec::new();
-        let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
+fn build_scene_nodes(scenes: &[SceneBoundary], source_file: &Option<String>) -> Vec<OwnedNode> {
+    scenes
+        .iter()
+        .map(|scene| {
+            let mut children = Vec::new();
+            let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
 
-        let mut idx_node = OwnedNode::leaf("index", &scene.scene_index.to_string(), scene.start_line);
-        idx_node.source_file = source_file.clone();
-        field_indices.insert("index".to_string(), vec![children.len()]);
-        children.push(idx_node);
+            let mut idx_node =
+                OwnedNode::leaf("index", scene.scene_index.to_string(), scene.start_line);
+            idx_node.source_file = source_file.clone();
+            field_indices.insert("index".to_string(), vec![children.len()]);
+            children.push(idx_node);
 
-        let mut sp_node = OwnedNode::leaf("start_para", &scene.start_para_idx.to_string(), scene.start_line);
-        sp_node.source_file = source_file.clone();
-        field_indices.insert("start_para".to_string(), vec![children.len()]);
-        children.push(sp_node);
+            let mut sp_node = OwnedNode::leaf(
+                "start_para",
+                scene.start_para_idx.to_string(),
+                scene.start_line,
+            );
+            sp_node.source_file = source_file.clone();
+            field_indices.insert("start_para".to_string(), vec![children.len()]);
+            children.push(sp_node);
 
-        let mut ep_node = OwnedNode::leaf("end_para", &scene.end_para_idx.to_string(), scene.start_line);
-        ep_node.source_file = source_file.clone();
-        field_indices.insert("end_para".to_string(), vec![children.len()]);
-        children.push(ep_node);
+            let mut ep_node =
+                OwnedNode::leaf("end_para", scene.end_para_idx.to_string(), scene.start_line);
+            ep_node.source_file = source_file.clone();
+            field_indices.insert("end_para".to_string(), vec![children.len()]);
+            children.push(ep_node);
 
-        if let Some(ref loc) = scene.location {
-            let mut loc_node = OwnedNode::leaf("location", loc, scene.start_line);
-            loc_node.source_file = source_file.clone();
-            field_indices.insert("location".to_string(), vec![children.len()]);
-            children.push(loc_node);
-        }
-        if let Some(ref tm) = scene.temporal_marker {
-            let mut tm_node = OwnedNode::leaf("temporal_marker", tm, scene.start_line);
-            tm_node.source_file = source_file.clone();
-            field_indices.insert("temporal_marker".to_string(), vec![children.len()]);
-            children.push(tm_node);
-        }
-        if !scene.entity_names.is_empty() {
-            let mut ent_node = OwnedNode::leaf("entities", &scene.entity_names.join(", "), scene.start_line);
+            if let Some(ref loc) = scene.location {
+                let mut loc_node = OwnedNode::leaf("location", loc, scene.start_line);
+                loc_node.source_file = source_file.clone();
+                field_indices.insert("location".to_string(), vec![children.len()]);
+                children.push(loc_node);
+            }
+            if let Some(ref tm) = scene.temporal_marker {
+                let mut tm_node = OwnedNode::leaf("temporal_marker", tm, scene.start_line);
+                tm_node.source_file = source_file.clone();
+                field_indices.insert("temporal_marker".to_string(), vec![children.len()]);
+                children.push(tm_node);
+            }
+            if !scene.entity_names.is_empty() {
+                let mut ent_node =
+                    OwnedNode::leaf("entities", scene.entity_names.join(", "), scene.start_line);
+                ent_node.source_file = source_file.clone();
+                field_indices.insert("entities".to_string(), vec![children.len()]);
+                children.push(ent_node);
+            }
+            if !scene.boundary_signals.is_empty() {
+                let sigs: Vec<String> = scene
+                    .boundary_signals
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                let mut sig_node =
+                    OwnedNode::leaf("boundary_signals", sigs.join(", "), scene.start_line);
+                sig_node.source_file = source_file.clone();
+                field_indices.insert("boundary_signals".to_string(), vec![children.len()]);
+                children.push(sig_node);
+            }
+
+            let loc_str = scene.location.as_deref().unwrap_or("unknown");
+            let text = format!(
+                "Scene {}: {} (paras {}-{})",
+                scene.scene_index, loc_str, scene.start_para_idx, scene.end_para_idx
+            );
+
+            OwnedNode {
+                node_type: "scene".to_string(),
+                text: Some(text),
+                subtree_text: None,
+                field_indices,
+                children,
+                start_line: scene.start_line,
+                end_line: scene.end_line,
+                source_file: source_file.clone(),
+            }
+        })
+        .collect()
+}
+
+fn build_arc_nodes(arcs: &[CharacterArc], source_file: &Option<String>) -> Vec<OwnedNode> {
+    arcs.iter()
+        .map(|arc| {
+            let mut children = Vec::new();
+            let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
+            let line = 1usize;
+
+            let mut ent_node = OwnedNode::leaf("entity", &arc.entity_name, line);
             ent_node.source_file = source_file.clone();
-            field_indices.insert("entities".to_string(), vec![children.len()]);
+            field_indices.insert("entity".to_string(), vec![children.len()]);
             children.push(ent_node);
-        }
-        if !scene.boundary_signals.is_empty() {
-            let sigs: Vec<String> = scene.boundary_signals.iter().map(|s| s.to_string()).collect();
-            let mut sig_node = OwnedNode::leaf("boundary_signals", &sigs.join(", "), scene.start_line);
-            sig_node.source_file = source_file.clone();
-            field_indices.insert("boundary_signals".to_string(), vec![children.len()]);
-            children.push(sig_node);
-        }
 
-        let loc_str = scene.location.as_deref().unwrap_or("unknown");
-        let text = format!("Scene {}: {} (paras {}-{})", scene.scene_index, loc_str, scene.start_para_idx, scene.end_para_idx);
+            let mut shape_node = OwnedNode::leaf("shape", arc.arc_shape.to_string(), line);
+            shape_node.source_file = source_file.clone();
+            field_indices.insert("shape".to_string(), vec![children.len()]);
+            children.push(shape_node);
 
-        OwnedNode {
-            node_type: "scene".to_string(),
-            text: Some(text),
-            subtree_text: None,
-            field_indices,
-            children,
-            start_line: scene.start_line,
-            end_line: scene.end_line,
-            source_file: source_file.clone(),
-        }
-    }).collect()
+            let mut tm_node =
+                OwnedNode::leaf("total_mentions", arc.total_mentions.to_string(), line);
+            tm_node.source_file = source_file.clone();
+            field_indices.insert("total_mentions".to_string(), vec![children.len()]);
+            children.push(tm_node);
+
+            let mut ti_node = OwnedNode::leaf(
+                "total_interactions",
+                arc.total_interactions.to_string(),
+                line,
+            );
+            ti_node.source_file = source_file.clone();
+            field_indices.insert("total_interactions".to_string(), vec![children.len()]);
+            children.push(ti_node);
+
+            let mut fm_node = OwnedNode::leaf(
+                "first_mention",
+                format!("{:.2}", arc.first_mention_position),
+                line,
+            );
+            fm_node.source_file = source_file.clone();
+            field_indices.insert("first_mention".to_string(), vec![children.len()]);
+            children.push(fm_node);
+
+            let mut lm_node = OwnedNode::leaf(
+                "last_mention",
+                format!("{:.2}", arc.last_mention_position),
+                line,
+            );
+            lm_node.source_file = source_file.clone();
+            field_indices.insert("last_mention".to_string(), vec![children.len()]);
+            children.push(lm_node);
+
+            let mut pp_node =
+                OwnedNode::leaf("peak_position", format!("{:.2}", arc.peak_position), line);
+            pp_node.source_file = source_file.clone();
+            field_indices.insert("peak_position".to_string(), vec![children.len()]);
+            children.push(pp_node);
+
+            let mut conf_node =
+                OwnedNode::leaf("confidence", format!("{:.2}", arc.confidence), line);
+            conf_node.source_file = source_file.clone();
+            field_indices.insert("confidence".to_string(), vec![children.len()]);
+            children.push(conf_node);
+
+            if !arc.role_distribution.is_empty() {
+                let roles: Vec<String> = arc
+                    .role_distribution
+                    .iter()
+                    .map(|(k, v)| format!("{}:{}", k, v))
+                    .collect();
+                let mut roles_node = OwnedNode::leaf("roles", roles.join(", "), line);
+                roles_node.source_file = source_file.clone();
+                field_indices.insert("roles".to_string(), vec![children.len()]);
+                children.push(roles_node);
+            }
+
+            let text = format!("Arc: {} \u{2014} {}", arc.entity_name, arc.arc_shape);
+
+            OwnedNode {
+                node_type: "arc".to_string(),
+                text: Some(text),
+                subtree_text: None,
+                field_indices,
+                children,
+                start_line: 1,
+                end_line: 1,
+                source_file: source_file.clone(),
+            }
+        })
+        .collect()
 }
 
-fn build_arc_nodes(
-    arcs: &[CharacterArc],
-    source_file: &Option<String>,
-) -> Vec<OwnedNode> {
-    arcs.iter().map(|arc| {
-        let mut children = Vec::new();
-        let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
-        let line = 1usize;
+fn build_conflict_nodes(edges: &[ConflictEdge], source_file: &Option<String>) -> Vec<OwnedNode> {
+    edges
+        .iter()
+        .map(|edge| {
+            let mut children = Vec::new();
+            let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
+            let line = 1usize;
 
-        let mut ent_node = OwnedNode::leaf("entity", &arc.entity_name, line);
-        ent_node.source_file = source_file.clone();
-        field_indices.insert("entity".to_string(), vec![children.len()]);
-        children.push(ent_node);
+            let mut ea_node = OwnedNode::leaf("entity_a", &edge.entity_a, line);
+            ea_node.source_file = source_file.clone();
+            field_indices.insert("entity_a".to_string(), vec![children.len()]);
+            children.push(ea_node);
 
-        let mut shape_node = OwnedNode::leaf("shape", &arc.arc_shape.to_string(), line);
-        shape_node.source_file = source_file.clone();
-        field_indices.insert("shape".to_string(), vec![children.len()]);
-        children.push(shape_node);
+            let mut eb_node = OwnedNode::leaf("entity_b", &edge.entity_b, line);
+            eb_node.source_file = source_file.clone();
+            field_indices.insert("entity_b".to_string(), vec![children.len()]);
+            children.push(eb_node);
 
-        let mut tm_node = OwnedNode::leaf("total_mentions", &arc.total_mentions.to_string(), line);
-        tm_node.source_file = source_file.clone();
-        field_indices.insert("total_mentions".to_string(), vec![children.len()]);
-        children.push(tm_node);
+            let mut ic_node = OwnedNode::leaf(
+                "interaction_count",
+                edge.interaction_count.to_string(),
+                line,
+            );
+            ic_node.source_file = source_file.clone();
+            field_indices.insert("interaction_count".to_string(), vec![children.len()]);
+            children.push(ic_node);
 
-        let mut ti_node = OwnedNode::leaf("total_interactions", &arc.total_interactions.to_string(), line);
-        ti_node.source_file = source_file.clone();
-        field_indices.insert("total_interactions".to_string(), vec![children.len()]);
-        children.push(ti_node);
+            let mut trend_node = OwnedNode::leaf("trend", edge.trend.to_string(), line);
+            trend_node.source_file = source_file.clone();
+            field_indices.insert("trend".to_string(), vec![children.len()]);
+            children.push(trend_node);
 
-        let mut fm_node = OwnedNode::leaf("first_mention", &format!("{:.2}", arc.first_mention_position), line);
-        fm_node.source_file = source_file.clone();
-        field_indices.insert("first_mention".to_string(), vec![children.len()]);
-        children.push(fm_node);
+            let mut fp_node = OwnedNode::leaf(
+                "first_position",
+                format!("{:.2}", edge.first_position),
+                line,
+            );
+            fp_node.source_file = source_file.clone();
+            field_indices.insert("first_position".to_string(), vec![children.len()]);
+            children.push(fp_node);
 
-        let mut lm_node = OwnedNode::leaf("last_mention", &format!("{:.2}", arc.last_mention_position), line);
-        lm_node.source_file = source_file.clone();
-        field_indices.insert("last_mention".to_string(), vec![children.len()]);
-        children.push(lm_node);
+            let mut lp_node =
+                OwnedNode::leaf("last_position", format!("{:.2}", edge.last_position), line);
+            lp_node.source_file = source_file.clone();
+            field_indices.insert("last_position".to_string(), vec![children.len()]);
+            children.push(lp_node);
 
-        let mut pp_node = OwnedNode::leaf("peak_position", &format!("{:.2}", arc.peak_position), line);
-        pp_node.source_file = source_file.clone();
-        field_indices.insert("peak_position".to_string(), vec![children.len()]);
-        children.push(pp_node);
+            if !edge.sample_verbs.is_empty() {
+                let mut sv_node =
+                    OwnedNode::leaf("sample_verbs", edge.sample_verbs.join(", "), line);
+                sv_node.source_file = source_file.clone();
+                field_indices.insert("sample_verbs".to_string(), vec![children.len()]);
+                children.push(sv_node);
+            }
 
-        let mut conf_node = OwnedNode::leaf("confidence", &format!("{:.2}", arc.confidence), line);
-        conf_node.source_file = source_file.clone();
-        field_indices.insert("confidence".to_string(), vec![children.len()]);
-        children.push(conf_node);
+            let text = format!(
+                "Conflict: {} \u{2194} {} ({})",
+                edge.entity_a, edge.entity_b, edge.trend
+            );
 
-        if !arc.role_distribution.is_empty() {
-            let roles: Vec<String> = arc.role_distribution.iter()
-                .map(|(k, v)| format!("{}:{}", k, v))
-                .collect();
-            let mut roles_node = OwnedNode::leaf("roles", &roles.join(", "), line);
-            roles_node.source_file = source_file.clone();
-            field_indices.insert("roles".to_string(), vec![children.len()]);
-            children.push(roles_node);
-        }
-
-        let text = format!("Arc: {} \u{2014} {}", arc.entity_name, arc.arc_shape);
-
-        OwnedNode {
-            node_type: "arc".to_string(),
-            text: Some(text),
-            subtree_text: None,
-            field_indices,
-            children,
-            start_line: 1,
-            end_line: 1,
-            source_file: source_file.clone(),
-        }
-    }).collect()
-}
-
-fn build_conflict_nodes(
-    edges: &[ConflictEdge],
-    source_file: &Option<String>,
-) -> Vec<OwnedNode> {
-    edges.iter().map(|edge| {
-        let mut children = Vec::new();
-        let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
-        let line = 1usize;
-
-        let mut ea_node = OwnedNode::leaf("entity_a", &edge.entity_a, line);
-        ea_node.source_file = source_file.clone();
-        field_indices.insert("entity_a".to_string(), vec![children.len()]);
-        children.push(ea_node);
-
-        let mut eb_node = OwnedNode::leaf("entity_b", &edge.entity_b, line);
-        eb_node.source_file = source_file.clone();
-        field_indices.insert("entity_b".to_string(), vec![children.len()]);
-        children.push(eb_node);
-
-        let mut ic_node = OwnedNode::leaf("interaction_count", &edge.interaction_count.to_string(), line);
-        ic_node.source_file = source_file.clone();
-        field_indices.insert("interaction_count".to_string(), vec![children.len()]);
-        children.push(ic_node);
-
-        let mut trend_node = OwnedNode::leaf("trend", &edge.trend.to_string(), line);
-        trend_node.source_file = source_file.clone();
-        field_indices.insert("trend".to_string(), vec![children.len()]);
-        children.push(trend_node);
-
-        let mut fp_node = OwnedNode::leaf("first_position", &format!("{:.2}", edge.first_position), line);
-        fp_node.source_file = source_file.clone();
-        field_indices.insert("first_position".to_string(), vec![children.len()]);
-        children.push(fp_node);
-
-        let mut lp_node = OwnedNode::leaf("last_position", &format!("{:.2}", edge.last_position), line);
-        lp_node.source_file = source_file.clone();
-        field_indices.insert("last_position".to_string(), vec![children.len()]);
-        children.push(lp_node);
-
-        if !edge.sample_verbs.is_empty() {
-            let mut sv_node = OwnedNode::leaf("sample_verbs", &edge.sample_verbs.join(", "), line);
-            sv_node.source_file = source_file.clone();
-            field_indices.insert("sample_verbs".to_string(), vec![children.len()]);
-            children.push(sv_node);
-        }
-
-        let text = format!("Conflict: {} \u{2194} {} ({})", edge.entity_a, edge.entity_b, edge.trend);
-
-        OwnedNode {
-            node_type: "conflict".to_string(),
-            text: Some(text),
-            subtree_text: None,
-            field_indices,
-            children,
-            start_line: 1,
-            end_line: 1,
-            source_file: source_file.clone(),
-        }
-    }).collect()
+            OwnedNode {
+                node_type: "conflict".to_string(),
+                text: Some(text),
+                subtree_text: None,
+                field_indices,
+                children,
+                start_line: 1,
+                end_line: 1,
+                source_file: source_file.clone(),
+            }
+        })
+        .collect()
 }
 
 fn build_narrative_issue_nodes(
     issues: &[NarrativeIssue],
     source_file: &Option<String>,
 ) -> Vec<OwnedNode> {
-    issues.iter().map(|issue| {
-        let mut children = Vec::new();
-        let mut field_indices = HashMap::new();
-        let idx = |children: &Vec<OwnedNode>| children.len();
+    issues
+        .iter()
+        .map(|issue| {
+            let mut children = Vec::new();
+            let mut field_indices = HashMap::new();
+            let idx = |children: &Vec<OwnedNode>| children.len();
 
-        let mut type_node = OwnedNode::leaf("type", &issue.issue_type.to_string(), 1);
-        type_node.source_file = source_file.clone();
-        field_indices.insert("type".to_string(), vec![idx(&children)]);
-        children.push(type_node);
+            let mut type_node = OwnedNode::leaf("type", issue.issue_type.to_string(), 1);
+            type_node.source_file = source_file.clone();
+            field_indices.insert("type".to_string(), vec![idx(&children)]);
+            children.push(type_node);
 
-        let mut entity_node = OwnedNode::leaf("entity", &issue.entity_name, 1);
-        entity_node.source_file = source_file.clone();
-        field_indices.insert("entity".to_string(), vec![idx(&children)]);
-        children.push(entity_node);
+            let mut entity_node = OwnedNode::leaf("entity", &issue.entity_name, 1);
+            entity_node.source_file = source_file.clone();
+            field_indices.insert("entity".to_string(), vec![idx(&children)]);
+            children.push(entity_node);
 
-        let mut desc_node = OwnedNode::leaf("description", &issue.description, 1);
-        desc_node.source_file = source_file.clone();
-        field_indices.insert("description".to_string(), vec![idx(&children)]);
-        children.push(desc_node);
+            let mut desc_node = OwnedNode::leaf("description", &issue.description, 1);
+            desc_node.source_file = source_file.clone();
+            field_indices.insert("description".to_string(), vec![idx(&children)]);
+            children.push(desc_node);
 
-        let mut conf_node = OwnedNode::leaf("confidence", &format!("{:.2}", issue.confidence), 1);
-        conf_node.source_file = source_file.clone();
-        field_indices.insert("confidence".to_string(), vec![idx(&children)]);
-        children.push(conf_node);
+            let mut conf_node =
+                OwnedNode::leaf("confidence", format!("{:.2}", issue.confidence), 1);
+            conf_node.source_file = source_file.clone();
+            field_indices.insert("confidence".to_string(), vec![idx(&children)]);
+            children.push(conf_node);
 
-        if let Some(ref attr) = issue.attribute {
-            let mut attr_node = OwnedNode::leaf("attribute", attr, 1);
-            attr_node.source_file = source_file.clone();
-            field_indices.insert("attribute".to_string(), vec![idx(&children)]);
-            children.push(attr_node);
-        }
-        if let Some(ref expected) = issue.expected {
-            let mut exp_node = OwnedNode::leaf("expected", expected, 1);
-            exp_node.source_file = source_file.clone();
-            field_indices.insert("expected".to_string(), vec![idx(&children)]);
-            children.push(exp_node);
-        }
-        if let Some(ref actual) = issue.actual {
-            let mut act_node = OwnedNode::leaf("actual", actual, 1);
-            act_node.source_file = source_file.clone();
-            field_indices.insert("actual".to_string(), vec![idx(&children)]);
-            children.push(act_node);
-        }
+            if let Some(ref attr) = issue.attribute {
+                let mut attr_node = OwnedNode::leaf("attribute", attr, 1);
+                attr_node.source_file = source_file.clone();
+                field_indices.insert("attribute".to_string(), vec![idx(&children)]);
+                children.push(attr_node);
+            }
+            if let Some(ref expected) = issue.expected {
+                let mut exp_node = OwnedNode::leaf("expected", expected, 1);
+                exp_node.source_file = source_file.clone();
+                field_indices.insert("expected".to_string(), vec![idx(&children)]);
+                children.push(exp_node);
+            }
+            if let Some(ref actual) = issue.actual {
+                let mut act_node = OwnedNode::leaf("actual", actual, 1);
+                act_node.source_file = source_file.clone();
+                field_indices.insert("actual".to_string(), vec![idx(&children)]);
+                children.push(act_node);
+            }
 
-        let text = format!("{}: {} \u{2014} {}", issue.issue_type, issue.entity_name, issue.description);
+            let text = format!(
+                "{}: {} \u{2014} {}",
+                issue.issue_type, issue.entity_name, issue.description
+            );
 
-        OwnedNode {
-            node_type: "narrative_issue".to_string(),
-            text: Some(text),
-            subtree_text: None,
-            field_indices,
-            children,
-            start_line: 1,
-            end_line: 1,
-            source_file: source_file.clone(),
-        }
-    }).collect()
+            OwnedNode {
+                node_type: "narrative_issue".to_string(),
+                text: Some(text),
+                subtree_text: None,
+                field_indices,
+                children,
+                start_line: 1,
+                end_line: 1,
+                source_file: source_file.clone(),
+            }
+        })
+        .collect()
 }
 
 fn build_narrative_summary_node(
@@ -1347,12 +1506,12 @@ fn build_narrative_summary_node(
     let mut field_indices = HashMap::new();
     let idx = |ch: &Vec<OwnedNode>| ch.len();
 
-    let mut scene_node = OwnedNode::leaf("scene_count", &summary.scene_count.to_string(), 1);
+    let mut scene_node = OwnedNode::leaf("scene_count", summary.scene_count.to_string(), 1);
     scene_node.source_file = source_file.clone();
     field_indices.insert("scene_count".to_string(), vec![idx(&children)]);
     children.push(scene_node);
 
-    let mut char_node = OwnedNode::leaf("character_count", &summary.character_count.to_string(), 1);
+    let mut char_node = OwnedNode::leaf("character_count", summary.character_count.to_string(), 1);
     char_node.source_file = source_file.clone();
     field_indices.insert("character_count".to_string(), vec![idx(&children)]);
     children.push(char_node);
@@ -1366,26 +1525,33 @@ fn build_narrative_summary_node(
     field_indices.insert("central_conflict".to_string(), vec![idx(&children)]);
     children.push(central_node);
 
-    let mut conflict_node = OwnedNode::leaf("conflict_count", &summary.conflict_count.to_string(), 1);
+    let mut conflict_node =
+        OwnedNode::leaf("conflict_count", summary.conflict_count.to_string(), 1);
     conflict_node.source_file = source_file.clone();
     field_indices.insert("conflict_count".to_string(), vec![idx(&children)]);
     children.push(conflict_node);
 
-    let mut issue_node = OwnedNode::leaf("issue_count", &summary.issue_count.to_string(), 1);
+    let mut issue_node = OwnedNode::leaf("issue_count", summary.issue_count.to_string(), 1);
     issue_node.source_file = source_file.clone();
     field_indices.insert("issue_count".to_string(), vec![idx(&children)]);
     children.push(issue_node);
 
-    let mut unresolved_node = OwnedNode::leaf("unresolved_conflicts", &summary.unresolved_conflicts.to_string(), 1);
+    let mut unresolved_node = OwnedNode::leaf(
+        "unresolved_conflicts",
+        summary.unresolved_conflicts.to_string(),
+        1,
+    );
     unresolved_node.source_file = source_file.clone();
     field_indices.insert("unresolved_conflicts".to_string(), vec![idx(&children)]);
     children.push(unresolved_node);
 
-    let mut arc_parts: Vec<String> = summary.arc_shape_distribution.iter()
+    let mut arc_parts: Vec<String> = summary
+        .arc_shape_distribution
+        .iter()
         .map(|(k, v)| format!("{}:{}", k, v))
         .collect();
     arc_parts.sort();
-    let mut arc_node = OwnedNode::leaf("arc_distribution", &arc_parts.join(", "), 1);
+    let mut arc_node = OwnedNode::leaf("arc_distribution", arc_parts.join(", "), 1);
     arc_node.source_file = source_file.clone();
     field_indices.insert("arc_distribution".to_string(), vec![idx(&children)]);
     children.push(arc_node);
@@ -1500,8 +1666,7 @@ fn build_requirement_nodes(
         .map(|req| {
             let mut modal_node = OwnedNode::leaf("modal", &req.modal, req.source_line);
             modal_node.source_file = source_file.clone();
-            let mut strength_node =
-                OwnedNode::leaf("strength", &req.strength, req.source_line);
+            let mut strength_node = OwnedNode::leaf("strength", &req.strength, req.source_line);
             strength_node.source_file = source_file.clone();
 
             let mut field_indices = HashMap::new();
@@ -1539,7 +1704,10 @@ fn detect_questions(doc: &SpacyDoc, line_starts: &[usize]) -> Vec<QuestionData> 
         let end_line = offset_to_line(sentence.end.saturating_sub(1), line_starts);
 
         // Check if sentence ends with '?'
-        let ends_with_question = sentence.tokens.iter().rev()
+        let ends_with_question = sentence
+            .tokens
+            .iter()
+            .rev()
             .find(|t| !t.text.trim().is_empty())
             .map(|t| t.text == "?")
             .unwrap_or_else(|| sentence.text.trim_end().ends_with('?'));
@@ -1549,18 +1717,18 @@ fn detect_questions(doc: &SpacyDoc, line_starts: &[usize]) -> Vec<QuestionData> 
         }
 
         // Classify by first content-word token (skip leading punctuation)
-        let question_type = sentence.tokens.iter()
+        let question_type = sentence
+            .tokens
+            .iter()
             .find(|t| !t.text.trim().is_empty() && t.pos != "PUNCT" && t.pos != "SPACE")
-            .map(|t| {
-                match t.text.to_lowercase().as_str() {
-                    "who" | "whom" | "whose" => "who",
-                    "what" | "which" => "what",
-                    "when" => "when",
-                    "where" => "where",
-                    "why" => "why",
-                    "how" => "how",
-                    _ => "yes-no",
-                }
+            .map(|t| match t.text.to_lowercase().as_str() {
+                "who" | "whom" | "whose" => "who",
+                "what" | "which" => "what",
+                "when" => "when",
+                "where" => "where",
+                "why" => "why",
+                "how" => "how",
+                _ => "yes-no",
             })
             .unwrap_or("yes-no")
             .to_string();
@@ -1618,16 +1786,13 @@ pub fn spacy_doc_to_owned_tree(
     let para_ranges = detect_paragraphs(source_text);
 
     // Bucket sentences into paragraphs, collecting interactions.
-    let mut para_sentence_nodes: Vec<Vec<OwnedNode>> =
-        vec![Vec::new(); para_ranges.len()];
+    let mut para_sentence_nodes: Vec<Vec<OwnedNode>> = vec![Vec::new(); para_ranges.len()];
     let mut all_interactions: Vec<InteractionData> = Vec::new();
 
     for sentence in &doc.sentences {
         let para_idx = para_ranges
             .iter()
-            .position(|r| {
-                sentence.start >= r.start_char && sentence.start <= r.end_char
-            })
+            .position(|r| sentence.start >= r.start_char && sentence.start <= r.end_char)
             .unwrap_or(0);
         let (sent_node, interactions) = build_sentence_node(sentence, &line_starts, &source_file);
         para_sentence_nodes[para_idx].push(sent_node);
@@ -1637,7 +1802,7 @@ pub fn spacy_doc_to_owned_tree(
     // Build paragraph nodes, omitting empty ones.
     let paragraph_nodes: Vec<OwnedNode> = para_ranges
         .iter()
-        .zip(para_sentence_nodes.into_iter())
+        .zip(para_sentence_nodes)
         .filter(|(_, sentences)| !sentences.is_empty())
         .map(|(range, sentences)| {
             let para_start_line = offset_to_line(range.start_char, &line_starts);
@@ -1692,7 +1857,7 @@ pub fn spacy_doc_to_owned_tree(
         all_corefs.extend(same_sentence.iter().cloned());
 
         // Phase 3: Cross-sentence pronoun resolution
-        let same_paragraph = prev_para_idx.map_or(false, |prev_p| prev_p == para_idx);
+        let same_paragraph = prev_para_idx == Some(para_idx);
         let cross_sentence = resolve_cross_sentence_pronouns(
             sentence,
             sent_idx,
@@ -1705,12 +1870,18 @@ pub fn spacy_doc_to_owned_tree(
         );
 
         // Update gender map and topic entities
-        let all_sentence_resolutions: Vec<CoreferenceData> = same_sentence.iter()
+        let all_sentence_resolutions: Vec<CoreferenceData> = same_sentence
+            .iter()
             .chain(cross_sentence.iter())
             .cloned()
             .collect();
         update_gender_map(&all_sentence_resolutions, &mut entity_gender_map);
-        update_topic_entities(sentence, &all_sentence_resolutions, &entity_gender_map, &mut topic_entities);
+        update_topic_entities(
+            sentence,
+            &all_sentence_resolutions,
+            &entity_gender_map,
+            &mut topic_entities,
+        );
 
         all_corefs.extend(cross_sentence);
 
@@ -1722,18 +1893,22 @@ pub fn spacy_doc_to_owned_tree(
     let coref_chains = build_coreference_chains(&all_corefs, &entity_type_map);
 
     // ── Discourse relation pipeline ────────────────────────────────────────
-    let sentence_infos: Vec<SentenceInfo> = doc.sentences.iter().map(|sentence| {
-        let para_idx = para_ranges
-            .iter()
-            .position(|r| sentence.start >= r.start_char && sentence.start <= r.end_char)
-            .unwrap_or(0);
-        let line = offset_to_line(sentence.start, &line_starts);
-        SentenceInfo {
-            text: sentence.text.clone(),
-            para_idx,
-            line,
-        }
-    }).collect();
+    let sentence_infos: Vec<SentenceInfo> = doc
+        .sentences
+        .iter()
+        .map(|sentence| {
+            let para_idx = para_ranges
+                .iter()
+                .position(|r| sentence.start >= r.start_char && sentence.start <= r.end_char)
+                .unwrap_or(0);
+            let line = offset_to_line(sentence.start, &line_starts);
+            SentenceInfo {
+                text: sentence.text.clone(),
+                para_idx,
+                line,
+            }
+        })
+        .collect();
     let discourse_relations = detect_discourse_relations(&sentence_infos);
 
     // ── Narrative analysis pipeline (multi-paragraph documents only) ────────
@@ -1743,39 +1918,43 @@ pub fn spacy_doc_to_owned_tree(
             let doc_len = source_text.len().max(1) as f64;
 
             // Build per-paragraph entity data for scene detection
-            let para_entity_data: Vec<ParagraphEntityData> = para_ranges.iter().enumerate().map(|(idx, pr)| {
-                let mut entity_names = Vec::new();
-                let mut location_entities = Vec::new();
-                let mut temporal_entities = Vec::new();
-                for ent in &doc.entities {
-                    if ent.start_char >= pr.start_char && ent.start_char <= pr.end_char {
-                        if !entity_names.contains(&ent.text) {
-                            entity_names.push(ent.text.clone());
-                        }
-                        match ent.label.as_str() {
-                            "LOC" | "GPE" => {
-                                if !location_entities.contains(&ent.text) {
-                                    location_entities.push(ent.text.clone());
-                                }
+            let para_entity_data: Vec<ParagraphEntityData> = para_ranges
+                .iter()
+                .enumerate()
+                .map(|(idx, pr)| {
+                    let mut entity_names = Vec::new();
+                    let mut location_entities = Vec::new();
+                    let mut temporal_entities = Vec::new();
+                    for ent in &doc.entities {
+                        if ent.start_char >= pr.start_char && ent.start_char <= pr.end_char {
+                            if !entity_names.contains(&ent.text) {
+                                entity_names.push(ent.text.clone());
                             }
-                            "DATE" | "TIME" => {
-                                if !temporal_entities.contains(&ent.text) {
-                                    temporal_entities.push(ent.text.clone());
+                            match ent.label.as_str() {
+                                "LOC" | "GPE" => {
+                                    if !location_entities.contains(&ent.text) {
+                                        location_entities.push(ent.text.clone());
+                                    }
                                 }
+                                "DATE" | "TIME" => {
+                                    if !temporal_entities.contains(&ent.text) {
+                                        temporal_entities.push(ent.text.clone());
+                                    }
+                                }
+                                _ => {}
                             }
-                            _ => {}
                         }
                     }
-                }
-                ParagraphEntityData {
-                    para_idx: idx,
-                    start_line: offset_to_line(pr.start_char, &line_starts),
-                    end_line: offset_to_line(pr.end_char.saturating_sub(1), &line_starts),
-                    entity_names,
-                    location_entities,
-                    temporal_entities,
-                }
-            }).collect();
+                    ParagraphEntityData {
+                        para_idx: idx,
+                        start_line: offset_to_line(pr.start_char, &line_starts),
+                        end_line: offset_to_line(pr.end_char.saturating_sub(1), &line_starts),
+                        entity_names,
+                        location_entities,
+                        temporal_entities,
+                    }
+                })
+                .collect();
 
             let scenes = detect_scene_boundaries(&para_entity_data, &discourse_relations);
 
@@ -1794,13 +1973,17 @@ pub fn spacy_doc_to_owned_tree(
                         .unwrap_or(false);
                     if canonical_is_person {
                         for alias in &chain.aliases {
-                            let alias_type = entity_type_map.get(&alias.to_lowercase()).map(|s| s.as_str());
+                            let alias_type = entity_type_map
+                                .get(&alias.to_lowercase())
+                                .map(|s| s.as_str());
                             if matches!(alias_type, Some("GPE" | "LOC")) {
                                 set.insert(alias.clone());
                             }
                         }
                         for mention in &chain.mentions {
-                            let ref_type = entity_type_map.get(&mention.referent.to_lowercase()).map(|s| s.as_str());
+                            let ref_type = entity_type_map
+                                .get(&mention.referent.to_lowercase())
+                                .map(|s| s.as_str());
                             if matches!(ref_type, Some("GPE" | "LOC")) {
                                 set.insert(mention.referent.clone());
                             }
@@ -1815,7 +1998,10 @@ pub fn spacy_doc_to_owned_tree(
             // (plus GPE/LOC entities that are aliased to PERSON entities via coref)
             let mut entity_profiles: HashMap<String, EntityInteractionProfile> = HashMap::new();
             for ent in &doc.entities {
-                let label = entity_type_map.get(&ent.text.to_lowercase()).map(|s| s.as_str()).unwrap_or("");
+                let label = entity_type_map
+                    .get(&ent.text.to_lowercase())
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
                 if !is_narrative_entity(label) && !person_aliased_gpe.contains(&ent.text) {
                     continue;
                 }
@@ -1854,7 +2040,10 @@ pub fn spacy_doc_to_owned_tree(
                     if let Some(profile) = entity_profiles.get_mut(&patient) {
                         profile.interaction_positions.push(pos);
                         profile.interaction_roles.push((pos, "patient".to_string()));
-                        *profile.role_counts.entry("patient".to_string()).or_default() += 1;
+                        *profile
+                            .role_counts
+                            .entry("patient".to_string())
+                            .or_default() += 1;
                     }
                 }
                 for role_ann in &inter.roles {
@@ -1867,30 +2056,33 @@ pub fn spacy_doc_to_owned_tree(
                     }
                 }
             }
-            let profiles: Vec<EntityInteractionProfile> = entity_profiles.into_iter().map(|(_, v)| v).collect();
+            let profiles: Vec<EntityInteractionProfile> = entity_profiles.into_values().collect();
             let arcs = compute_character_arcs(&profiles);
 
             // Build opposing interactions for conflict graph
             // Fix 2: resolve pronouns in agent/patient before building edges
-            let opposing: Vec<OpposingInteraction> = all_interactions.iter().filter_map(|inter| {
-                let agent_raw = inter.agent.as_ref()?;
-                let patient_raw = inter.patient.as_ref()?;
-                let agent = mention_to_canonical
-                    .get(&agent_raw.to_lowercase())
-                    .cloned()
-                    .unwrap_or_else(|| agent_raw.clone());
-                let patient = mention_to_canonical
-                    .get(&patient_raw.to_lowercase())
-                    .cloned()
-                    .unwrap_or_else(|| patient_raw.clone());
-                let pos = inter.source_line as f64 / (line_starts.len().max(1) as f64);
-                Some(OpposingInteraction {
-                    agent,
-                    patient,
-                    verb: inter.verb.clone(),
-                    position: pos,
+            let opposing: Vec<OpposingInteraction> = all_interactions
+                .iter()
+                .filter_map(|inter| {
+                    let agent_raw = inter.agent.as_ref()?;
+                    let patient_raw = inter.patient.as_ref()?;
+                    let agent = mention_to_canonical
+                        .get(&agent_raw.to_lowercase())
+                        .cloned()
+                        .unwrap_or_else(|| agent_raw.clone());
+                    let patient = mention_to_canonical
+                        .get(&patient_raw.to_lowercase())
+                        .cloned()
+                        .unwrap_or_else(|| patient_raw.clone());
+                    let pos = inter.source_line as f64 / (line_starts.len().max(1) as f64);
+                    Some(OpposingInteraction {
+                        agent,
+                        patient,
+                        verb: inter.verb.clone(),
+                        position: pos,
+                    })
                 })
-            }).collect();
+                .collect();
             let conflict_edges = build_conflict_graph(&opposing);
 
             // ── Narrative issue detection ────────────────────────────────────────
@@ -1912,23 +2104,48 @@ pub fn spacy_doc_to_owned_tree(
 
             // Build movement interactions set — interactions with movement verbs
             // between entities in consecutive scenes
-            let movement_verbs: HashSet<&str> = ["went", "walked", "drove", "ran", "moved",
-                "traveled", "flew", "returned", "came"].iter().copied().collect();
+            let movement_verbs: HashSet<&str> = [
+                "went", "walked", "drove", "ran", "moved", "traveled", "flew", "returned", "came",
+            ]
+            .iter()
+            .copied()
+            .collect();
             // Causative motion verbs where the PATIENT also relocates (Fix 2 P2)
-            let patient_movement_verbs: HashSet<&str> = ["brought", "carried", "took", "sent",
-                "led", "dragged", "transported", "delivered"].iter().copied().collect();
+            let patient_movement_verbs: HashSet<&str> = [
+                "brought",
+                "carried",
+                "took",
+                "sent",
+                "led",
+                "dragged",
+                "transported",
+                "delivered",
+            ]
+            .iter()
+            .copied()
+            .collect();
             let mut movement_interactions: HashSet<(String, usize, usize)> = HashSet::new();
             for inter in &all_interactions {
-                if movement_verbs.contains(inter.verb.as_str()) || movement_verbs.contains(inter.verb_lemma.as_str()) {
+                if movement_verbs.contains(inter.verb.as_str())
+                    || movement_verbs.contains(inter.verb_lemma.as_str())
+                {
                     if let Some(ref agent) = inter.agent {
                         let line = inter.source_line;
                         for (scene_idx, scene) in scenes.iter().enumerate() {
                             if line >= scene.start_line && line <= scene.end_line {
                                 if scene_idx + 1 < scenes.len() {
-                                    movement_interactions.insert((agent.clone(), scene_idx, scene_idx + 1));
+                                    movement_interactions.insert((
+                                        agent.clone(),
+                                        scene_idx,
+                                        scene_idx + 1,
+                                    ));
                                 }
                                 if scene_idx > 0 {
-                                    movement_interactions.insert((agent.clone(), scene_idx - 1, scene_idx));
+                                    movement_interactions.insert((
+                                        agent.clone(),
+                                        scene_idx - 1,
+                                        scene_idx,
+                                    ));
                                 }
                                 break;
                             }
@@ -1936,16 +2153,26 @@ pub fn spacy_doc_to_owned_tree(
                     }
                 }
                 // Also track patient movement for causative motion verbs (Fix 2 P2)
-                if patient_movement_verbs.contains(inter.verb.as_str()) || patient_movement_verbs.contains(inter.verb_lemma.as_str()) {
+                if patient_movement_verbs.contains(inter.verb.as_str())
+                    || patient_movement_verbs.contains(inter.verb_lemma.as_str())
+                {
                     if let Some(ref patient) = inter.patient {
                         let line = inter.source_line;
                         for (scene_idx, scene) in scenes.iter().enumerate() {
                             if line >= scene.start_line && line <= scene.end_line {
                                 if scene_idx + 1 < scenes.len() {
-                                    movement_interactions.insert((patient.clone(), scene_idx, scene_idx + 1));
+                                    movement_interactions.insert((
+                                        patient.clone(),
+                                        scene_idx,
+                                        scene_idx + 1,
+                                    ));
                                 }
                                 if scene_idx > 0 {
-                                    movement_interactions.insert((patient.clone(), scene_idx - 1, scene_idx));
+                                    movement_interactions.insert((
+                                        patient.clone(),
+                                        scene_idx - 1,
+                                        scene_idx,
+                                    ));
                                 }
                                 break;
                             }
@@ -1954,7 +2181,8 @@ pub fn spacy_doc_to_owned_tree(
                 }
             }
 
-            let consistency_issues = detect_consistency_issues(&scenes, &entity_scene_locations, &movement_interactions);
+            let consistency_issues =
+                detect_consistency_issues(&scenes, &entity_scene_locations, &movement_interactions);
 
             all_issues.extend(setup_payoff_issues);
             all_issues.extend(foreshadowing_issues);
@@ -1968,7 +2196,13 @@ pub fn spacy_doc_to_owned_tree(
     let narrative_summary = build_narrative_summary(&scenes, &arcs, &conflict_edges, &all_issues);
 
     // Build entity nodes (deduplicated).
-    let entity_nodes = build_entity_nodes(&doc.entities, &line_starts, &source_file, &coref_chains, &all_interactions);
+    let entity_nodes = build_entity_nodes(
+        &doc.entities,
+        &line_starts,
+        &source_file,
+        &coref_chains,
+        &all_interactions,
+    );
 
     // Build document-level interaction nodes.
     let interaction_nodes = build_interaction_doc_nodes(&all_interactions, &source_file);
@@ -2019,8 +2253,7 @@ pub fn spacy_doc_to_owned_tree(
 
     let mut doc_field_indices = HashMap::new();
     if num_paras > 0 {
-        doc_field_indices
-            .insert("paragraphs".to_string(), (0..num_paras).collect());
+        doc_field_indices.insert("paragraphs".to_string(), (0..num_paras).collect());
     }
     if num_entities > 0 {
         doc_field_indices.insert(
@@ -2057,37 +2290,56 @@ pub fn spacy_doc_to_owned_tree(
         );
     }
     if num_conflicts > 0 {
-        let conflicts_start = num_paras + num_entities + num_interactions + num_discourse + num_scenes + num_arcs;
+        let conflicts_start =
+            num_paras + num_entities + num_interactions + num_discourse + num_scenes + num_arcs;
         doc_field_indices.insert(
             "conflicts".to_string(),
             (conflicts_start..conflicts_start + num_conflicts).collect(),
         );
     }
     if num_narrative_issues > 0 {
-        let issues_start = num_paras + num_entities + num_interactions + num_discourse + num_scenes + num_arcs + num_conflicts;
+        let issues_start = num_paras
+            + num_entities
+            + num_interactions
+            + num_discourse
+            + num_scenes
+            + num_arcs
+            + num_conflicts;
         doc_field_indices.insert(
             "narrative_issues".to_string(),
             (issues_start..issues_start + num_narrative_issues).collect(),
         );
     }
     if num_requirements > 0 {
-        let req_start = num_paras + num_entities + num_interactions + num_discourse + num_scenes + num_arcs + num_conflicts + num_narrative_issues;
+        let req_start = num_paras
+            + num_entities
+            + num_interactions
+            + num_discourse
+            + num_scenes
+            + num_arcs
+            + num_conflicts
+            + num_narrative_issues;
         doc_field_indices.insert(
             "requirements".to_string(),
             (req_start..req_start + num_requirements).collect(),
         );
     }
     if num_questions > 0 {
-        let questions_start = num_paras + num_entities + num_interactions + num_discourse + num_scenes + num_arcs + num_conflicts + num_narrative_issues + num_requirements;
+        let questions_start = num_paras
+            + num_entities
+            + num_interactions
+            + num_discourse
+            + num_scenes
+            + num_arcs
+            + num_conflicts
+            + num_narrative_issues
+            + num_requirements;
         doc_field_indices.insert(
             "questions".to_string(),
             (questions_start..questions_start + num_questions).collect(),
         );
     }
-    doc_field_indices.insert(
-        "narrative_summary".to_string(),
-        vec![summary_start],
-    );
+    doc_field_indices.insert("narrative_summary".to_string(), vec![summary_start]);
 
     OwnedNode {
         node_type: "document".to_string(),
@@ -2106,7 +2358,9 @@ pub fn spacy_doc_to_owned_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spacy::{SpacyDoc, SpacySentence, SpacyToken as SpacyTokenData, SpacyEntity as SpacyEntityData};
+    use crate::spacy::{
+        SpacyDoc, SpacyEntity as SpacyEntityData, SpacySentence, SpacyToken as SpacyTokenData,
+    };
     use aq_core::AqNode;
 
     fn make_token(
@@ -2130,13 +2384,14 @@ mod tests {
         }
     }
 
-    fn make_sentence(
-        text: &str,
-        start: usize,
-        tokens: Vec<SpacyTokenData>,
-    ) -> SpacySentence {
+    fn make_sentence(text: &str, start: usize, tokens: Vec<SpacyTokenData>) -> SpacySentence {
         let end = start + text.len();
-        SpacySentence { text: text.to_string(), start, end, tokens }
+        SpacySentence {
+            text: text.to_string(),
+            start,
+            end,
+            tokens,
+        }
     }
 
     fn make_entity(text: &str, label: &str, start_char: usize) -> SpacyEntityData {
@@ -2168,7 +2423,11 @@ mod tests {
 
         assert_eq!(tree.node_type, "document");
         // 1 paragraph + 1 interaction node from "ran" + 1 narrative_summary
-        assert_eq!(tree.children.len(), 3, "one paragraph plus one interaction plus narrative_summary");
+        assert_eq!(
+            tree.children.len(),
+            3,
+            "one paragraph plus one interaction plus narrative_summary"
+        );
 
         let para = &tree.children[0];
         assert_eq!(para.node_type, "paragraph");
@@ -2233,18 +2492,26 @@ mod tests {
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![
-                make_sentence("I am happy.", 0, vec![
-                    make_token("I", "PRON", "nsubj", "", "O", 0),
-                ]),
-                make_sentence("She is sad.", 12, vec![
-                    make_token("She", "PRON", "nsubj", "", "O", 12),
-                ]),
+                make_sentence(
+                    "I am happy.",
+                    0,
+                    vec![make_token("I", "PRON", "nsubj", "", "O", 0)],
+                ),
+                make_sentence(
+                    "She is sad.",
+                    12,
+                    vec![make_token("She", "PRON", "nsubj", "", "O", 12)],
+                ),
             ],
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
 
-        assert_eq!(tree.children.len(), 2, "one paragraph plus narrative_summary");
+        assert_eq!(
+            tree.children.len(),
+            2,
+            "one paragraph plus narrative_summary"
+        );
         let para = &tree.children[0];
         assert_eq!(para.children.len(), 2, "two sentences");
     }
@@ -2257,12 +2524,16 @@ mod tests {
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![
-                make_sentence("First paragraph.", 0, vec![
-                    make_token("First", "ADJ", "amod", "", "O", 0),
-                ]),
-                make_sentence("Second paragraph.", 18, vec![
-                    make_token("Second", "ADJ", "amod", "", "O", 18),
-                ]),
+                make_sentence(
+                    "First paragraph.",
+                    0,
+                    vec![make_token("First", "ADJ", "amod", "", "O", 0)],
+                ),
+                make_sentence(
+                    "Second paragraph.",
+                    18,
+                    vec![make_token("Second", "ADJ", "amod", "", "O", 18)],
+                ),
             ],
             entities: vec![],
         };
@@ -2344,15 +2615,21 @@ mod tests {
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![
-                make_sentence("Line one.", 0, vec![
-                    make_token("Line", "NOUN", "nsubj", "", "O", 0),
-                ]),
-                make_sentence("Line two.", 10, vec![
-                    make_token("Line", "NOUN", "nsubj", "", "O", 10),
-                ]),
-                make_sentence("Line three.", 20, vec![
-                    make_token("Line", "NOUN", "nsubj", "", "O", 20),
-                ]),
+                make_sentence(
+                    "Line one.",
+                    0,
+                    vec![make_token("Line", "NOUN", "nsubj", "", "O", 0)],
+                ),
+                make_sentence(
+                    "Line two.",
+                    10,
+                    vec![make_token("Line", "NOUN", "nsubj", "", "O", 10)],
+                ),
+                make_sentence(
+                    "Line three.",
+                    20,
+                    vec![make_token("Line", "NOUN", "nsubj", "", "O", 20)],
+                ),
             ],
             entities: vec![],
         };
@@ -2417,7 +2694,8 @@ mod tests {
 
         assert_eq!(tree.node_type, "document");
         assert_eq!(
-            tree.children.len(), 1,
+            tree.children.len(),
+            1,
             "empty doc should have only narrative_summary, got {}",
             tree.children.len()
         );
@@ -2450,7 +2728,11 @@ mod tests {
             .iter()
             .filter(|c| c.node_type == "entity")
             .collect();
-        assert_eq!(entity_nodes.len(), 1, "two mentions should dedup to one entity");
+        assert_eq!(
+            entity_nodes.len(),
+            1,
+            "two mentions should dedup to one entity"
+        );
 
         let entity = entity_nodes[0];
         // First child is entity_type, remaining are locations.
@@ -2462,7 +2744,10 @@ mod tests {
         assert_eq!(location_nodes.len(), 2, "two location children expected");
 
         // field_indices for locations should cover both
-        let loc_indices = entity.field_indices.get("locations").expect("locations field missing");
+        let loc_indices = entity
+            .field_indices
+            .get("locations")
+            .expect("locations field missing");
         assert_eq!(loc_indices.len(), 2);
     }
 
@@ -2558,17 +2843,22 @@ mod tests {
             0,
             tokens,
         );
-        let line_starts = build_line_starts(
-            "David, punched by Jane, with so much force that it hurt him.",
-        );
+        let line_starts =
+            build_line_starts("David, punched by Jane, with so much force that it hurt him.");
         let interactions = extract_interactions_from_sentence(&sent, &line_starts);
         // Should find at least "punched" interaction
-        let punched = interactions.iter().find(|i| i.verb == "punched").expect("should find punched");
+        let punched = interactions
+            .iter()
+            .find(|i| i.verb == "punched")
+            .expect("should find punched");
         assert_eq!(punched.agent.as_deref(), Some("Jane"));
         assert_eq!(punched.patient.as_deref(), Some("David"));
         assert!(punched.is_passive);
         // Also should find "hurt" interaction
-        let hurt = interactions.iter().find(|i| i.verb == "hurt").expect("should find hurt");
+        let hurt = interactions
+            .iter()
+            .find(|i| i.verb == "hurt")
+            .expect("should find hurt");
         assert_eq!(hurt.agent.as_deref(), Some("it"));
         assert_eq!(hurt.patient.as_deref(), Some("him"));
     }
@@ -2981,17 +3271,20 @@ mod tests {
                     make_token_with_head("Paris", "PROPN", "pobj", "GPE", "B", 24, 4),
                 ],
             )],
-            entities: vec![SpacyEntityData {
-                text: "Sarah".to_string(),
-                label: "PERSON".to_string(),
-                start_char: 0,
-                end_char: 5,
-            }, SpacyEntityData {
-                text: "Paris".to_string(),
-                label: "GPE".to_string(),
-                start_char: 24,
-                end_char: 29,
-            }],
+            entities: vec![
+                SpacyEntityData {
+                    text: "Sarah".to_string(),
+                    label: "PERSON".to_string(),
+                    start_char: 0,
+                    end_char: 5,
+                },
+                SpacyEntityData {
+                    text: "Paris".to_string(),
+                    label: "GPE".to_string(),
+                    start_char: 24,
+                    end_char: 29,
+                },
+            ],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
 
@@ -3009,9 +3302,15 @@ mod tests {
         assert!(entity_max < interaction_min, "entities before interactions");
 
         // All children types at correct indices
-        for &i in para_range { assert_eq!(tree.children[i].node_type, "paragraph"); }
-        for &i in entity_range { assert_eq!(tree.children[i].node_type, "entity"); }
-        for &i in interaction_range { assert_eq!(tree.children[i].node_type, "interaction"); }
+        for &i in para_range {
+            assert_eq!(tree.children[i].node_type, "paragraph");
+        }
+        for &i in entity_range {
+            assert_eq!(tree.children[i].node_type, "entity");
+        }
+        for &i in interaction_range {
+            assert_eq!(tree.children[i].node_type, "interaction");
+        }
     }
 
     #[test]
@@ -3037,15 +3336,20 @@ mod tests {
             0,
             tokens,
         );
-        let line_starts = build_line_starts(
-            "The letter, written by Sarah and delivered by Tom, was important.",
-        );
+        let line_starts =
+            build_line_starts("The letter, written by Sarah and delivered by Tom, was important.");
         let interactions = extract_interactions_from_sentence(&sent, &line_starts);
-        let written = interactions.iter().find(|i| i.verb == "written").expect("should find written");
+        let written = interactions
+            .iter()
+            .find(|i| i.verb == "written")
+            .expect("should find written");
         assert_eq!(written.agent.as_deref(), Some("Sarah"));
         assert_eq!(written.patient.as_deref(), Some("The letter")); // acl → head = letter
         assert!(written.is_passive);
-        let delivered = interactions.iter().find(|i| i.verb == "delivered").expect("should find delivered");
+        let delivered = interactions
+            .iter()
+            .find(|i| i.verb == "delivered")
+            .expect("should find delivered");
         assert_eq!(delivered.agent.as_deref(), Some("Tom"));
         assert!(delivered.is_passive);
     }
@@ -3086,12 +3390,18 @@ mod tests {
         let entity_indices = tree.field_indices.get("entities").unwrap();
         let entity_node = &tree.children[entity_indices[0]];
 
-        assert!(entity_node.field_indices.contains_key("aliases"), "entity should have aliases field");
+        assert!(
+            entity_node.field_indices.contains_key("aliases"),
+            "entity should have aliases field"
+        );
         let aliases_idx = entity_node.field_indices["aliases"][0];
         let aliases_node = &entity_node.children[aliases_idx];
         assert_eq!(aliases_node.node_type, "aliases");
         assert!(
-            aliases_node.children.iter().any(|c| c.text.as_deref() == Some("the detective")),
+            aliases_node
+                .children
+                .iter()
+                .any(|c| c.text.as_deref() == Some("the detective")),
             "aliases should contain 'the detective'"
         );
     }
@@ -3127,10 +3437,22 @@ mod tests {
         let entity_indices = tree.field_indices.get("entities").unwrap();
         let entity_node = &tree.children[entity_indices[0]];
 
-        assert!(entity_node.field_indices.contains_key("type"), "entity should have type field");
-        assert!(entity_node.field_indices.contains_key("locations"), "entity should have locations field");
-        assert!(!entity_node.field_indices.contains_key("aliases"), "entity should NOT have aliases field");
-        assert!(!entity_node.field_indices.contains_key("coreference_chain"), "entity should NOT have coreference_chain field");
+        assert!(
+            entity_node.field_indices.contains_key("type"),
+            "entity should have type field"
+        );
+        assert!(
+            entity_node.field_indices.contains_key("locations"),
+            "entity should have locations field"
+        );
+        assert!(
+            !entity_node.field_indices.contains_key("aliases"),
+            "entity should NOT have aliases field"
+        );
+        assert!(
+            !entity_node.field_indices.contains_key("coreference_chain"),
+            "entity should NOT have coreference_chain field"
+        );
     }
 
     #[test]
@@ -3155,12 +3477,32 @@ mod tests {
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![
-                SpacySentence { text: "Sarah, the detective, arrived.".to_string(), start: 0, end: 30, tokens: tokens1 },
-                SpacySentence { text: "Sarah investigated.".to_string(), start: 31, end: 50, tokens: tokens2 },
+                SpacySentence {
+                    text: "Sarah, the detective, arrived.".to_string(),
+                    start: 0,
+                    end: 30,
+                    tokens: tokens1,
+                },
+                SpacySentence {
+                    text: "Sarah investigated.".to_string(),
+                    start: 31,
+                    end: 50,
+                    tokens: tokens2,
+                },
             ],
             entities: vec![
-                SpacyEntityData { text: "Sarah".to_string(), label: "PERSON".to_string(), start_char: 0, end_char: 5 },
-                SpacyEntityData { text: "Sarah".to_string(), label: "PERSON".to_string(), start_char: 31, end_char: 36 },
+                SpacyEntityData {
+                    text: "Sarah".to_string(),
+                    label: "PERSON".to_string(),
+                    start_char: 0,
+                    end_char: 5,
+                },
+                SpacyEntityData {
+                    text: "Sarah".to_string(),
+                    label: "PERSON".to_string(),
+                    start_char: 31,
+                    end_char: 36,
+                },
             ],
         };
 
@@ -3168,11 +3510,18 @@ mod tests {
         let entity_indices = tree.field_indices.get("entities").unwrap();
         let entity_node = &tree.children[entity_indices[0]];
 
-        assert!(entity_node.field_indices.contains_key("mention_count"), "entity should have mention_count field");
+        assert!(
+            entity_node.field_indices.contains_key("mention_count"),
+            "entity should have mention_count field"
+        );
         let mc_idx = entity_node.field_indices["mention_count"][0];
         let mc_node = &entity_node.children[mc_idx];
         // 2 direct NER mentions + 1 appositive coref mention = 3
-        assert_eq!(mc_node.text.as_deref(), Some("3"), "mention_count should be 3");
+        assert_eq!(
+            mc_node.text.as_deref(),
+            Some("3"),
+            "mention_count should be 3"
+        );
     }
 
     // ── Query integration tests ──────────────────────────────────────
@@ -3185,9 +3534,10 @@ mod tests {
             .into_iter()
             .map(|r| match r {
                 aq_core::EvalResult::Node(n) => n.text().unwrap_or(n.node_type()).to_string(),
-                aq_core::EvalResult::Value(v) => {
-                    v.as_str().map(|s| s.to_string()).unwrap_or_else(|| v.to_string())
-                }
+                aq_core::EvalResult::Value(v) => v
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| v.to_string()),
             })
             .collect()
     }
@@ -3224,10 +3574,19 @@ mod tests {
         assert_eq!(results[0], "Sarah");
 
         // Verify the entity node has an aliases field
-        let entity_indices = tree.field_indices.get("entities").expect("no entities field");
+        let entity_indices = tree
+            .field_indices
+            .get("entities")
+            .expect("no entities field");
         let entity_node = &tree.children[entity_indices[0]];
-        assert!(entity_node.field_indices.contains_key("aliases"), "entity should have aliases field");
-        assert!(entity_node.field_indices.contains_key("interaction_count"), "entity should have interaction_count field");
+        assert!(
+            entity_node.field_indices.contains_key("aliases"),
+            "entity should have aliases field"
+        );
+        assert!(
+            entity_node.field_indices.contains_key("interaction_count"),
+            "entity should have interaction_count field"
+        );
     }
 
     // Q2: desc:entity returns entity; mention_count accessible via tree query.
@@ -3252,23 +3611,53 @@ mod tests {
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![
-                SpacySentence { text: "Sarah, the detective, arrived.".to_string(), start: 0, end: 30, tokens: tokens1 },
-                SpacySentence { text: "Sarah investigated.".to_string(), start: 31, end: 50, tokens: tokens2 },
+                SpacySentence {
+                    text: "Sarah, the detective, arrived.".to_string(),
+                    start: 0,
+                    end: 30,
+                    tokens: tokens1,
+                },
+                SpacySentence {
+                    text: "Sarah investigated.".to_string(),
+                    start: 31,
+                    end: 50,
+                    tokens: tokens2,
+                },
             ],
             entities: vec![
-                SpacyEntityData { text: "Sarah".to_string(), label: "PERSON".to_string(), start_char: 0, end_char: 5 },
-                SpacyEntityData { text: "Sarah".to_string(), label: "PERSON".to_string(), start_char: 31, end_char: 36 },
+                SpacyEntityData {
+                    text: "Sarah".to_string(),
+                    label: "PERSON".to_string(),
+                    start_char: 0,
+                    end_char: 5,
+                },
+                SpacyEntityData {
+                    text: "Sarah".to_string(),
+                    label: "PERSON".to_string(),
+                    start_char: 31,
+                    end_char: 36,
+                },
             ],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
 
         // desc:entity returns 1 entity (deduplicated)
         let entity_results = run_tree_query(&tree, "desc:entity");
-        assert_eq!(entity_results.len(), 1, "expected 1 deduplicated entity, got: {:?}", entity_results);
+        assert_eq!(
+            entity_results.len(),
+            1,
+            "expected 1 deduplicated entity, got: {:?}",
+            entity_results
+        );
 
         // mention_count should be 3 (2 direct NER + 1 appositive)
         let mc_results = run_tree_query(&tree, "desc:mention_count");
-        assert_eq!(mc_results.len(), 1, "expected 1 mention_count node, got: {:?}", mc_results);
+        assert_eq!(
+            mc_results.len(),
+            1,
+            "expected 1 mention_count node, got: {:?}",
+            mc_results
+        );
         assert_eq!(mc_results[0], "3", "mention_count should be 3");
     }
 
@@ -3295,8 +3684,18 @@ mod tests {
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![
-                SpacySentence { text: "Sarah chased the cat.".to_string(), start: 0, end: 21, tokens: tokens1 },
-                SpacySentence { text: "Paris is beautiful.".to_string(), start: 22, end: 41, tokens: tokens2 },
+                SpacySentence {
+                    text: "Sarah chased the cat.".to_string(),
+                    start: 0,
+                    end: 21,
+                    tokens: tokens1,
+                },
+                SpacySentence {
+                    text: "Paris is beautiful.".to_string(),
+                    start: 22,
+                    end: 41,
+                    tokens: tokens2,
+                },
             ],
             entities: vec![
                 make_entity("Sarah", "PERSON", 0),
@@ -3308,7 +3707,12 @@ mod tests {
         // desc:interaction_count returns both entities' counts
         // Entities sorted by key: ("paris","GPE") before ("sarah","PERSON")
         let ic_results = run_tree_query(&tree, "desc:interaction_count");
-        assert_eq!(ic_results.len(), 2, "expected 2 interaction_count nodes, got: {:?}", ic_results);
+        assert_eq!(
+            ic_results.len(),
+            2,
+            "expected 2 interaction_count nodes, got: {:?}",
+            ic_results
+        );
         // Paris = 0 (first entity alphabetically), Sarah = 1
         assert_eq!(ic_results[0], "0", "Paris interaction_count should be 0");
         assert_eq!(ic_results[1], "1", "Sarah interaction_count should be 1");
@@ -3336,15 +3740,30 @@ mod tests {
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
 
         let entity_results = run_tree_query(&tree, "desc:entity");
-        assert_eq!(entity_results.len(), 2, "expected 2 entities, got: {:?}", entity_results);
+        assert_eq!(
+            entity_results.len(),
+            2,
+            "expected 2 entities, got: {:?}",
+            entity_results
+        );
         assert!(entity_results.contains(&"Sarah".to_string()));
         assert!(entity_results.contains(&"Paris".to_string()));
 
         let token_results = run_tree_query(&tree, "desc:token");
-        assert_eq!(token_results.len(), 5, "expected 5 tokens, got: {:?}", token_results);
+        assert_eq!(
+            token_results.len(),
+            5,
+            "expected 5 tokens, got: {:?}",
+            token_results
+        );
 
         let sentence_results = run_tree_query(&tree, "desc:sentence");
-        assert_eq!(sentence_results.len(), 1, "expected 1 sentence, got: {:?}", sentence_results);
+        assert_eq!(
+            sentence_results.len(),
+            1,
+            "expected 1 sentence, got: {:?}",
+            sentence_results
+        );
         assert_eq!(sentence_results[0], "Sarah went to Paris.");
     }
 
@@ -3367,7 +3786,12 @@ mod tests {
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
 
         let interaction_results = run_tree_query(&tree, "desc:interaction");
-        assert_eq!(interaction_results.len(), 1, "expected 1 interaction, got: {:?}", interaction_results);
+        assert_eq!(
+            interaction_results.len(),
+            1,
+            "expected 1 interaction, got: {:?}",
+            interaction_results
+        );
         assert_eq!(interaction_results[0], "Sarah chased the cat");
     }
 
@@ -3382,35 +3806,48 @@ mod tests {
         // This test documents the actual pipeline output.
         let text = "David, punched by Jane, with so much force that it hurt him.";
         let tokens = vec![
-            make_token_with_head("David",   "PROPN", "nsubjpass", "PERSON", "B", 0,  1),
-            make_token_with_head(",",       "PUNCT", "punct",     "",       "O", 5,  1),
-            make_token_with_head("punched", "VERB",  "ROOT",      "",       "O", 7,  2),
-            make_token_with_head("by",      "ADP",   "agent",     "",       "O", 15, 2),
-            make_token_with_head("Jane",    "PROPN", "pobj",      "PERSON", "B", 18, 3),
-            make_token_with_head(",",       "PUNCT", "punct",     "",       "O", 22, 2),
-            make_token_with_head("with",    "ADP",   "prep",      "",       "O", 24, 2),
-            make_token_with_head("so",      "ADV",   "advmod",    "",       "O", 29, 8),
-            make_token_with_head("much",    "ADJ",   "amod",      "",       "O", 32, 9),
-            make_token_with_head("force",   "NOUN",  "pobj",      "",       "O", 37, 6),
-            make_token_with_head("that",    "SCONJ", "mark",      "",       "O", 43, 11),
-            make_token_with_head("it",      "PRON",  "nsubj",     "",       "O", 48, 12),
-            make_token_with_head("hurt",    "VERB",  "relcl",     "",       "O", 51, 9),
-            make_token_with_head("him",     "PRON",  "dobj",      "",       "O", 56, 12),
-            make_token_with_head(".",       "PUNCT", "punct",     "",       "O", 59, 2),
+            make_token_with_head("David", "PROPN", "nsubjpass", "PERSON", "B", 0, 1),
+            make_token_with_head(",", "PUNCT", "punct", "", "O", 5, 1),
+            make_token_with_head("punched", "VERB", "ROOT", "", "O", 7, 2),
+            make_token_with_head("by", "ADP", "agent", "", "O", 15, 2),
+            make_token_with_head("Jane", "PROPN", "pobj", "PERSON", "B", 18, 3),
+            make_token_with_head(",", "PUNCT", "punct", "", "O", 22, 2),
+            make_token_with_head("with", "ADP", "prep", "", "O", 24, 2),
+            make_token_with_head("so", "ADV", "advmod", "", "O", 29, 8),
+            make_token_with_head("much", "ADJ", "amod", "", "O", 32, 9),
+            make_token_with_head("force", "NOUN", "pobj", "", "O", 37, 6),
+            make_token_with_head("that", "SCONJ", "mark", "", "O", 43, 11),
+            make_token_with_head("it", "PRON", "nsubj", "", "O", 48, 12),
+            make_token_with_head("hurt", "VERB", "relcl", "", "O", 51, 9),
+            make_token_with_head("him", "PRON", "dobj", "", "O", 56, 12),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", 59, 2),
         ];
-        let sentence = SpacySentence { text: text.to_string(), start: 0, end: 60, tokens };
+        let sentence = SpacySentence {
+            text: text.to_string(),
+            start: 0,
+            end: 60,
+            tokens,
+        };
         let entities = vec![
             make_entity("David", "PERSON", 0),
             make_entity("Jane", "PERSON", 18),
         ];
-        let doc = SpacyDoc { text: text.to_string(), sentences: vec![sentence], entities };
+        let doc = SpacyDoc {
+            text: text.to_string(),
+            sentences: vec![sentence],
+            entities,
+        };
         let tree = spacy_doc_to_owned_tree(&doc, text, None);
 
         // Both entities should be present
-        let entity_idxs = tree.field_indices.get("entities").expect("entities field missing");
+        let entity_idxs = tree
+            .field_indices
+            .get("entities")
+            .expect("entities field missing");
         assert_eq!(entity_idxs.len(), 2, "expected David and Jane entities");
 
-        let names: Vec<&str> = entity_idxs.iter()
+        let names: Vec<&str> = entity_idxs
+            .iter()
             .map(|&i| tree.children[i].text.as_deref().unwrap_or(""))
             .collect();
         assert!(names.contains(&"David"), "David entity not found");
@@ -3419,19 +3856,29 @@ mod tests {
         // The same-sentence resolver uses nearest-antecedent (highest token index
         // before the pronoun). "him" (token 13) resolves to Jane (token 4) since
         // Jane is the last PERSON before "him". Jane should have "him" as alias.
-        let jane = entity_idxs.iter()
+        let jane = entity_idxs
+            .iter()
             .map(|&i| &tree.children[i])
             .find(|e| e.text.as_deref() == Some("Jane"))
             .expect("Jane entity not found");
 
-        assert!(jane.field_indices.contains_key("aliases"),
+        assert!(
+            jane.field_indices.contains_key("aliases"),
             "Jane should have 'him' alias (nearest antecedent), keys: {:?}",
-            jane.field_indices.keys().collect::<Vec<_>>());
+            jane.field_indices.keys().collect::<Vec<_>>()
+        );
         let aliases_idx = jane.field_indices["aliases"][0];
         let aliases = &jane.children[aliases_idx];
-        let alias_texts: Vec<&str> = aliases.children.iter().filter_map(|c| c.text.as_deref()).collect();
-        assert!(alias_texts.contains(&"him"),
-            "Jane's aliases should include 'him' (nearest-antecedent resolution), got {:?}", alias_texts);
+        let alias_texts: Vec<&str> = aliases
+            .children
+            .iter()
+            .filter_map(|c| c.text.as_deref())
+            .collect();
+        assert!(
+            alias_texts.contains(&"him"),
+            "Jane's aliases should include 'him' (nearest-antecedent resolution), got {:?}",
+            alias_texts
+        );
     }
 
     #[test]
@@ -3440,42 +3887,52 @@ mod tests {
 
         // Sentence 1: "Jane came back to life with the help of Bob Markey."
         let s1_tokens = vec![
-            make_token_with_head("Jane",   "PROPN", "nsubj",    "PERSON", "B", 0,  1),
-            make_token_with_head("came",   "VERB",  "ROOT",     "",       "O", 5,  1),
-            make_token_with_head("back",   "ADV",   "advmod",   "",       "O", 10, 1),
-            make_token_with_head("to",     "ADP",   "prep",     "",       "O", 15, 1),
-            make_token_with_head("life",   "NOUN",  "pobj",     "",       "O", 18, 3),
-            make_token_with_head("with",   "ADP",   "prep",     "",       "O", 23, 1),
-            make_token_with_head("the",    "DET",   "det",      "",       "O", 28, 7),
-            make_token_with_head("help",   "NOUN",  "pobj",     "",       "O", 32, 5),
-            make_token_with_head("of",     "ADP",   "prep",     "",       "O", 37, 7),
-            make_token_with_head("Bob",    "PROPN", "compound", "PERSON", "B", 40, 10),
-            make_token_with_head("Markey", "PROPN", "pobj",     "PERSON", "I", 44, 8),
-            make_token_with_head(".",      "PUNCT", "punct",    "",       "O", 50, 1),
+            make_token_with_head("Jane", "PROPN", "nsubj", "PERSON", "B", 0, 1),
+            make_token_with_head("came", "VERB", "ROOT", "", "O", 5, 1),
+            make_token_with_head("back", "ADV", "advmod", "", "O", 10, 1),
+            make_token_with_head("to", "ADP", "prep", "", "O", 15, 1),
+            make_token_with_head("life", "NOUN", "pobj", "", "O", 18, 3),
+            make_token_with_head("with", "ADP", "prep", "", "O", 23, 1),
+            make_token_with_head("the", "DET", "det", "", "O", 28, 7),
+            make_token_with_head("help", "NOUN", "pobj", "", "O", 32, 5),
+            make_token_with_head("of", "ADP", "prep", "", "O", 37, 7),
+            make_token_with_head("Bob", "PROPN", "compound", "PERSON", "B", 40, 10),
+            make_token_with_head("Markey", "PROPN", "pobj", "PERSON", "I", 44, 8),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", 50, 1),
         ];
-        let s1 = SpacySentence { text: "Jane came back to life with the help of Bob Markey.".to_string(), start: 0, end: 51, tokens: s1_tokens };
+        let s1 = SpacySentence {
+            text: "Jane came back to life with the help of Bob Markey.".to_string(),
+            start: 0,
+            end: 51,
+            tokens: s1_tokens,
+        };
 
         // Sentence 2: "After Jane came back to life she ran away to her home in Azure."
         // Starts at offset 52 (after "\n")
         let s2_start = 52;
         let s2_tokens = vec![
-            make_token_with_head("After",  "ADP",   "prep",   "",       "O", s2_start + 0,  7),
-            make_token_with_head("Jane",   "PROPN", "nsubj",  "PERSON", "B", s2_start + 6,  2),
-            make_token_with_head("came",   "VERB",  "advcl",  "",       "O", s2_start + 11, 7),
-            make_token_with_head("back",   "ADV",   "advmod", "",       "O", s2_start + 16, 2),
-            make_token_with_head("to",     "ADP",   "prep",   "",       "O", s2_start + 21, 2),
-            make_token_with_head("life",   "NOUN",  "pobj",   "",       "O", s2_start + 24, 4),
-            make_token_with_head("she",    "PRON",  "nsubj",  "",       "O", s2_start + 29, 7),
-            make_token_with_head("ran",    "VERB",  "ROOT",   "",       "O", s2_start + 33, 7),
-            make_token_with_head("away",   "ADV",   "advmod", "",       "O", s2_start + 37, 7),
-            make_token_with_head("to",     "ADP",   "prep",   "",       "O", s2_start + 42, 7),
-            make_token_with_head("her",    "PRON",  "poss",   "",       "O", s2_start + 45, 11),
-            make_token_with_head("home",   "NOUN",  "pobj",   "",       "O", s2_start + 49, 9),
-            make_token_with_head("in",     "ADP",   "prep",   "",       "O", s2_start + 54, 11),
-            make_token_with_head("Azure",  "PROPN", "pobj",   "GPE",    "B", s2_start + 57, 12),
-            make_token_with_head(".",      "PUNCT", "punct",  "",       "O", s2_start + 62, 7),
+            make_token_with_head("After", "ADP", "prep", "", "O", s2_start + 0, 7),
+            make_token_with_head("Jane", "PROPN", "nsubj", "PERSON", "B", s2_start + 6, 2),
+            make_token_with_head("came", "VERB", "advcl", "", "O", s2_start + 11, 7),
+            make_token_with_head("back", "ADV", "advmod", "", "O", s2_start + 16, 2),
+            make_token_with_head("to", "ADP", "prep", "", "O", s2_start + 21, 2),
+            make_token_with_head("life", "NOUN", "pobj", "", "O", s2_start + 24, 4),
+            make_token_with_head("she", "PRON", "nsubj", "", "O", s2_start + 29, 7),
+            make_token_with_head("ran", "VERB", "ROOT", "", "O", s2_start + 33, 7),
+            make_token_with_head("away", "ADV", "advmod", "", "O", s2_start + 37, 7),
+            make_token_with_head("to", "ADP", "prep", "", "O", s2_start + 42, 7),
+            make_token_with_head("her", "PRON", "poss", "", "O", s2_start + 45, 11),
+            make_token_with_head("home", "NOUN", "pobj", "", "O", s2_start + 49, 9),
+            make_token_with_head("in", "ADP", "prep", "", "O", s2_start + 54, 11),
+            make_token_with_head("Azure", "PROPN", "pobj", "GPE", "B", s2_start + 57, 12),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", s2_start + 62, 7),
         ];
-        let s2 = SpacySentence { text: "After Jane came back to life she ran away to her home in Azure.".to_string(), start: s2_start, end: s2_start + 63, tokens: s2_tokens };
+        let s2 = SpacySentence {
+            text: "After Jane came back to life she ran away to her home in Azure.".to_string(),
+            start: s2_start,
+            end: s2_start + 63,
+            tokens: s2_tokens,
+        };
 
         let entities = vec![
             make_entity("Jane", "PERSON", 0),
@@ -3483,54 +3940,80 @@ mod tests {
             make_entity("Jane", "PERSON", s2_start + 6),
             make_entity("Azure", "GPE", s2_start + 57),
         ];
-        let doc = SpacyDoc { text: text.to_string(), sentences: vec![s1, s2], entities };
+        let doc = SpacyDoc {
+            text: text.to_string(),
+            sentences: vec![s1, s2],
+            entities,
+        };
         let tree = spacy_doc_to_owned_tree(&doc, text, None);
 
         // Find Jane entity (first/canonical one)
         let entity_idxs = tree.field_indices.get("entities").unwrap();
-        let jane = entity_idxs.iter()
+        let jane = entity_idxs
+            .iter()
             .map(|&i| &tree.children[i])
             .find(|e| e.text.as_deref() == Some("Jane"))
             .expect("Jane entity not found");
 
         // Jane should have aliases ("she" and/or "her" from sentence 2)
-        assert!(jane.field_indices.contains_key("aliases"),
-            "Jane should have aliases, keys: {:?}", jane.field_indices.keys().collect::<Vec<_>>());
+        assert!(
+            jane.field_indices.contains_key("aliases"),
+            "Jane should have aliases, keys: {:?}",
+            jane.field_indices.keys().collect::<Vec<_>>()
+        );
         let aliases_idx = jane.field_indices["aliases"][0];
         let aliases_node = &jane.children[aliases_idx];
-        let alias_texts: Vec<&str> = aliases_node.children.iter().filter_map(|c| c.text.as_deref()).collect();
-        assert!(!alias_texts.is_empty(), "Jane should have aliases, got empty");
+        let alias_texts: Vec<&str> = aliases_node
+            .children
+            .iter()
+            .filter_map(|c| c.text.as_deref())
+            .collect();
+        assert!(
+            !alias_texts.is_empty(),
+            "Jane should have aliases, got empty"
+        );
 
         // mention_count should be present
-        assert!(jane.field_indices.contains_key("mention_count"),
-            "Jane should have mention_count");
+        assert!(
+            jane.field_indices.contains_key("mention_count"),
+            "Jane should have mention_count"
+        );
     }
 
     #[test]
     fn contribute_joey_kristy_no_coref() {
         let text = "While in and around Lavender Town, Joey battled Kristy and won.";
         let tokens = vec![
-            make_token_with_head("While",    "SCONJ", "mark",     "",       "O", 0,  7),
-            make_token_with_head("in",       "ADP",   "prep",     "",       "O", 6,  0),
-            make_token_with_head("and",      "CCONJ", "cc",       "",       "O", 9,  3),
-            make_token_with_head("around",   "ADP",   "conj",     "",       "O", 13, 1),
-            make_token_with_head("Lavender", "PROPN", "compound", "GPE",    "B", 20, 5),
-            make_token_with_head("Town",     "PROPN", "pobj",     "GPE",    "I", 29, 1),
-            make_token_with_head(",",        "PUNCT", "punct",    "",       "O", 33, 7),
-            make_token_with_head("Joey",     "PROPN", "nsubj",    "PERSON", "B", 35, 8),
-            make_token_with_head("battled",  "VERB",  "ROOT",     "",       "O", 40, 8),
-            make_token_with_head("Kristy",   "PROPN", "dobj",     "PERSON", "B", 48, 8),
-            make_token_with_head("and",      "CCONJ", "cc",       "",       "O", 55, 8),
-            make_token_with_head("won",      "VERB",  "conj",     "",       "O", 59, 8),
-            make_token_with_head(".",        "PUNCT", "punct",    "",       "O", 62, 8),
+            make_token_with_head("While", "SCONJ", "mark", "", "O", 0, 7),
+            make_token_with_head("in", "ADP", "prep", "", "O", 6, 0),
+            make_token_with_head("and", "CCONJ", "cc", "", "O", 9, 3),
+            make_token_with_head("around", "ADP", "conj", "", "O", 13, 1),
+            make_token_with_head("Lavender", "PROPN", "compound", "GPE", "B", 20, 5),
+            make_token_with_head("Town", "PROPN", "pobj", "GPE", "I", 29, 1),
+            make_token_with_head(",", "PUNCT", "punct", "", "O", 33, 7),
+            make_token_with_head("Joey", "PROPN", "nsubj", "PERSON", "B", 35, 8),
+            make_token_with_head("battled", "VERB", "ROOT", "", "O", 40, 8),
+            make_token_with_head("Kristy", "PROPN", "dobj", "PERSON", "B", 48, 8),
+            make_token_with_head("and", "CCONJ", "cc", "", "O", 55, 8),
+            make_token_with_head("won", "VERB", "conj", "", "O", 59, 8),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", 62, 8),
         ];
-        let sentence = SpacySentence { text: text.to_string(), start: 0, end: 63, tokens };
+        let sentence = SpacySentence {
+            text: text.to_string(),
+            start: 0,
+            end: 63,
+            tokens,
+        };
         let entities = vec![
             make_entity("Lavender Town", "GPE", 20),
             make_entity("Joey", "PERSON", 35),
             make_entity("Kristy", "PERSON", 48),
         ];
-        let doc = SpacyDoc { text: text.to_string(), sentences: vec![sentence], entities };
+        let doc = SpacyDoc {
+            text: text.to_string(),
+            sentences: vec![sentence],
+            entities,
+        };
         let tree = spacy_doc_to_owned_tree(&doc, text, None);
 
         // Joey and Kristy should have NO aliases (no pronouns in sentence)
@@ -3539,8 +4022,11 @@ mod tests {
             let entity = &tree.children[idx];
             let name = entity.text.as_deref().unwrap_or("");
             if name == "Joey" || name == "Kristy" {
-                assert!(!entity.field_indices.contains_key("aliases"),
-                    "{} should not have aliases", name);
+                assert!(
+                    !entity.field_indices.contains_key("aliases"),
+                    "{} should not have aliases",
+                    name
+                );
             }
         }
     }
@@ -3551,82 +4037,126 @@ mod tests {
         // "She" should NOT resolve to David (wrong gender AND paragraph boundary)
         let text = "David was punched.\n\nShe arrived.";
         let s1_tokens = vec![
-            make_token_with_head("David",   "PROPN", "nsubjpass", "PERSON", "B", 0,  2),
-            make_token_with_head("was",     "AUX",   "auxpass",   "",       "O", 6,  2),
-            make_token_with_head("punched", "VERB",  "ROOT",      "",       "O", 10, 2),
-            make_token_with_head(".",       "PUNCT", "punct",     "",       "O", 17, 2),
+            make_token_with_head("David", "PROPN", "nsubjpass", "PERSON", "B", 0, 2),
+            make_token_with_head("was", "AUX", "auxpass", "", "O", 6, 2),
+            make_token_with_head("punched", "VERB", "ROOT", "", "O", 10, 2),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", 17, 2),
         ];
         let s2_start = 20; // after "David was punched.\n\n"
         let s2_tokens = vec![
-            make_token_with_head("She",     "PRON",  "nsubj", "",     "O", s2_start + 0,  1),
-            make_token_with_head("arrived", "VERB",  "ROOT",  "",     "O", s2_start + 4,  1),
-            make_token_with_head(".",       "PUNCT", "punct", "",     "O", s2_start + 11, 1),
+            make_token_with_head("She", "PRON", "nsubj", "", "O", s2_start + 0, 1),
+            make_token_with_head("arrived", "VERB", "ROOT", "", "O", s2_start + 4, 1),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", s2_start + 11, 1),
         ];
-        let s1 = SpacySentence { text: "David was punched.".to_string(), start: 0, end: 18, tokens: s1_tokens };
-        let s2 = SpacySentence { text: "She arrived.".to_string(), start: s2_start, end: s2_start + 12, tokens: s2_tokens };
+        let s1 = SpacySentence {
+            text: "David was punched.".to_string(),
+            start: 0,
+            end: 18,
+            tokens: s1_tokens,
+        };
+        let s2 = SpacySentence {
+            text: "She arrived.".to_string(),
+            start: s2_start,
+            end: s2_start + 12,
+            tokens: s2_tokens,
+        };
         let entities = vec![make_entity("David", "PERSON", 0)];
-        let doc = SpacyDoc { text: text.to_string(), sentences: vec![s1, s2], entities };
+        let doc = SpacyDoc {
+            text: text.to_string(),
+            sentences: vec![s1, s2],
+            entities,
+        };
         let tree = spacy_doc_to_owned_tree(&doc, text, None);
 
         // David should NOT have "She" as alias (paragraph boundary + gender mismatch)
         let entity_idxs = tree.field_indices.get("entities").unwrap();
         let david = &tree.children[entity_idxs[0]];
         assert_eq!(david.text.as_deref(), Some("David"));
-        assert!(!david.field_indices.contains_key("aliases"),
+        assert!(
+            !david.field_indices.contains_key("aliases"),
             "David should not have aliases across paragraph boundary, keys: {:?}",
-            david.field_indices.keys().collect::<Vec<_>>());
+            david.field_indices.keys().collect::<Vec<_>>()
+        );
     }
 
     #[test]
     fn adr_sarah_detective_aliases_query() {
         // "Sarah, the detective, arrived at the scene.\nShe examined the evidence carefully."
-        let text = "Sarah, the detective, arrived at the scene.\nShe examined the evidence carefully.";
+        let text =
+            "Sarah, the detective, arrived at the scene.\nShe examined the evidence carefully.";
 
         let s1_tokens = vec![
-            make_token_with_head("Sarah",     "PROPN", "nsubj", "PERSON", "B", 0,  5),
-            make_token_with_head(",",         "PUNCT", "punct", "",       "O", 5,  0),
-            make_token_with_head("the",       "DET",   "det",   "",       "O", 7,  3),
-            make_token_with_head("detective", "NOUN",  "appos", "",       "O", 11, 0),
-            make_token_with_head(",",         "PUNCT", "punct", "",       "O", 20, 0),
-            make_token_with_head("arrived",   "VERB",  "ROOT",  "",       "O", 22, 5),
-            make_token_with_head("at",        "ADP",   "prep",  "",       "O", 30, 5),
-            make_token_with_head("the",       "DET",   "det",   "",       "O", 33, 8),
-            make_token_with_head("scene",     "NOUN",  "pobj",  "",       "O", 37, 6),
-            make_token_with_head(".",         "PUNCT", "punct", "",       "O", 42, 5),
+            make_token_with_head("Sarah", "PROPN", "nsubj", "PERSON", "B", 0, 5),
+            make_token_with_head(",", "PUNCT", "punct", "", "O", 5, 0),
+            make_token_with_head("the", "DET", "det", "", "O", 7, 3),
+            make_token_with_head("detective", "NOUN", "appos", "", "O", 11, 0),
+            make_token_with_head(",", "PUNCT", "punct", "", "O", 20, 0),
+            make_token_with_head("arrived", "VERB", "ROOT", "", "O", 22, 5),
+            make_token_with_head("at", "ADP", "prep", "", "O", 30, 5),
+            make_token_with_head("the", "DET", "det", "", "O", 33, 8),
+            make_token_with_head("scene", "NOUN", "pobj", "", "O", 37, 6),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", 42, 5),
         ];
-        let s1 = SpacySentence { text: "Sarah, the detective, arrived at the scene.".to_string(), start: 0, end: 43, tokens: s1_tokens };
+        let s1 = SpacySentence {
+            text: "Sarah, the detective, arrived at the scene.".to_string(),
+            start: 0,
+            end: 43,
+            tokens: s1_tokens,
+        };
 
         let s2_start = 44; // after "\n"
         let s2_tokens = vec![
-            make_token_with_head("She",       "PRON",  "nsubj",  "",       "O", s2_start + 0,  1),
-            make_token_with_head("examined",  "VERB",  "ROOT",   "",       "O", s2_start + 4,  1),
-            make_token_with_head("the",       "DET",   "det",    "",       "O", s2_start + 13, 3),
-            make_token_with_head("evidence",  "NOUN",  "dobj",   "",       "O", s2_start + 17, 1),
-            make_token_with_head("carefully", "ADV",   "advmod", "",       "O", s2_start + 26, 1),
-            make_token_with_head(".",         "PUNCT", "punct",  "",       "O", s2_start + 35, 1),
+            make_token_with_head("She", "PRON", "nsubj", "", "O", s2_start + 0, 1),
+            make_token_with_head("examined", "VERB", "ROOT", "", "O", s2_start + 4, 1),
+            make_token_with_head("the", "DET", "det", "", "O", s2_start + 13, 3),
+            make_token_with_head("evidence", "NOUN", "dobj", "", "O", s2_start + 17, 1),
+            make_token_with_head("carefully", "ADV", "advmod", "", "O", s2_start + 26, 1),
+            make_token_with_head(".", "PUNCT", "punct", "", "O", s2_start + 35, 1),
         ];
-        let s2 = SpacySentence { text: "She examined the evidence carefully.".to_string(), start: s2_start, end: s2_start + 36, tokens: s2_tokens };
+        let s2 = SpacySentence {
+            text: "She examined the evidence carefully.".to_string(),
+            start: s2_start,
+            end: s2_start + 36,
+            tokens: s2_tokens,
+        };
 
         let entities = vec![make_entity("Sarah", "PERSON", 0)];
-        let doc = SpacyDoc { text: text.to_string(), sentences: vec![s1, s2], entities };
+        let doc = SpacyDoc {
+            text: text.to_string(),
+            sentences: vec![s1, s2],
+            entities,
+        };
         let tree = spacy_doc_to_owned_tree(&doc, text, None);
 
         // desc:entity should find Sarah
         let entity_results = run_tree_query(&tree, "desc:entity");
-        assert!(entity_results.contains(&"Sarah".to_string()), "Should find Sarah entity");
+        assert!(
+            entity_results.contains(&"Sarah".to_string()),
+            "Should find Sarah entity"
+        );
 
         // Sarah should have aliases
         let entity_idxs = tree.field_indices.get("entities").unwrap();
         let sarah = &tree.children[entity_idxs[0]];
         assert_eq!(sarah.text.as_deref(), Some("Sarah"));
 
-        assert!(sarah.field_indices.contains_key("aliases"),
-            "Sarah should have aliases, keys: {:?}", sarah.field_indices.keys().collect::<Vec<_>>());
+        assert!(
+            sarah.field_indices.contains_key("aliases"),
+            "Sarah should have aliases, keys: {:?}",
+            sarah.field_indices.keys().collect::<Vec<_>>()
+        );
         let aliases_idx = sarah.field_indices["aliases"][0];
         let aliases_node = &sarah.children[aliases_idx];
-        let alias_texts: Vec<&str> = aliases_node.children.iter().filter_map(|c| c.text.as_deref()).collect();
-        assert!(alias_texts.contains(&"the detective"),
-            "Should have 'the detective' alias, got {:?}", alias_texts);
+        let alias_texts: Vec<&str> = aliases_node
+            .children
+            .iter()
+            .filter_map(|c| c.text.as_deref())
+            .collect();
+        assert!(
+            alias_texts.contains(&"the detective"),
+            "Should have 'the detective' alias, got {:?}",
+            alias_texts
+        );
     }
 
     // ── Helper for tests needing custom lemmas ───────────────────────────────
@@ -3658,11 +4188,11 @@ mod tests {
     fn integration_action_roles() {
         // "Sarah kicked the ball."
         let tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah",  "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("kicked", "kick",   "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   3, 13),
-            make_token_with_lemma("ball",   "ball",   "NOUN",  "dobj",  1, 17),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 13),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 17),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent = make_sentence("Sarah kicked the ball.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
@@ -3670,8 +4200,13 @@ mod tests {
         let d = &interactions[0];
         assert_eq!(d.agent.as_deref(), Some("Sarah"));
         assert_eq!(d.patient.as_deref(), Some("the ball"));
-        assert!(d.roles.iter().any(|r| r.participant == "Sarah" && r.thematic_role == crate::roles::ThematicRole::Agent));
-        assert!(d.roles.iter().any(|r| r.participant == "the ball" && r.thematic_role == crate::roles::ThematicRole::Patient));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "Sarah"
+                && r.thematic_role == crate::roles::ThematicRole::Agent));
+        assert!(d.roles.iter().any(|r| r.participant == "the ball"
+            && r.thematic_role == crate::roles::ThematicRole::Patient));
         assert_eq!(d.verb_class, Some(crate::roles::VerbClass::Action));
     }
 
@@ -3679,19 +4214,21 @@ mod tests {
     fn integration_perception_roles() {
         // "Sarah heard the noise."
         let tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah",  "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("heard",  "hear",   "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   3, 12),
-            make_token_with_lemma("noise",  "noise",  "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent = make_sentence("Sarah heard the noise.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
         assert_eq!(interactions.len(), 1);
         let d = &interactions[0];
         assert_eq!(d.agent.as_deref(), Some("Sarah")); // backward compat: syntactic agent
-        assert!(d.roles.iter().any(|r| r.participant == "Sarah" && r.thematic_role == crate::roles::ThematicRole::Experiencer));
-        assert!(d.roles.iter().any(|r| r.participant == "the noise" && r.thematic_role == crate::roles::ThematicRole::Theme));
+        assert!(d.roles.iter().any(|r| r.participant == "Sarah"
+            && r.thematic_role == crate::roles::ThematicRole::Experiencer));
+        assert!(d.roles.iter().any(|r| r.participant == "the noise"
+            && r.thematic_role == crate::roles::ThematicRole::Theme));
         assert_eq!(d.verb_class, Some(crate::roles::VerbClass::Perception));
     }
 
@@ -3699,18 +4236,22 @@ mod tests {
     fn integration_motion_roles() {
         // "The ball rolled downhill."
         let tokens = vec![
-            make_token_with_lemma("The",      "the",      "DET",   "det",    1, 0),
-            make_token_with_lemma("ball",     "ball",     "NOUN",  "nsubj",  2, 4),
-            make_token_with_lemma("rolled",   "roll",     "VERB",  "ROOT",   2, 9),
-            make_token_with_lemma("downhill", "downhill", "ADV",   "advmod", 2, 16),
-            make_token_with_lemma(".",        ".",        "PUNCT", "punct",  2, 24),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("ball", "ball", "NOUN", "nsubj", 2, 4),
+            make_token_with_lemma("rolled", "roll", "VERB", "ROOT", 2, 9),
+            make_token_with_lemma("downhill", "downhill", "ADV", "advmod", 2, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 24),
         ];
         let sent = make_sentence("The ball rolled downhill.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
         assert_eq!(interactions.len(), 1);
         let d = &interactions[0];
         assert_eq!(d.agent.as_deref(), Some("The ball")); // syntactic
-        assert!(d.roles.iter().any(|r| r.participant == "The ball" && r.thematic_role == crate::roles::ThematicRole::Theme));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "The ball"
+                && r.thematic_role == crate::roles::ThematicRole::Theme));
         assert_eq!(d.verb_class, Some(crate::roles::VerbClass::Motion));
     }
 
@@ -3718,18 +4259,19 @@ mod tests {
     fn integration_ergative_roles() {
         // "The door opened."
         let tokens = vec![
-            make_token_with_lemma("The",    "the",  "DET",   "det",   1, 0),
-            make_token_with_lemma("door",   "door", "NOUN",  "nsubj", 2, 4),
-            make_token_with_lemma("opened", "open", "VERB",  "ROOT",  2, 9),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 2, 15),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("door", "door", "NOUN", "nsubj", 2, 4),
+            make_token_with_lemma("opened", "open", "VERB", "ROOT", 2, 9),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 15),
         ];
         let sent = make_sentence("The door opened.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
         assert_eq!(interactions.len(), 1);
         let d = &interactions[0];
         assert_eq!(d.agent.as_deref(), Some("The door")); // syntactic nsubj → agent field
-        // ergative: ChangeOfState + agent only → Patient role
-        assert!(d.roles.iter().any(|r| r.participant == "The door" && r.thematic_role == crate::roles::ThematicRole::Patient));
+                                                          // ergative: ChangeOfState + agent only → Patient role
+        assert!(d.roles.iter().any(|r| r.participant == "The door"
+            && r.thematic_role == crate::roles::ThematicRole::Patient));
         assert_eq!(d.verb_class, Some(crate::roles::VerbClass::ChangeOfState));
     }
 
@@ -3737,12 +4279,12 @@ mod tests {
     fn integration_transfer_roles() {
         // "Sarah gave Tom the book."
         let tokens = vec![
-            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj",  1, 0),
-            make_token_with_lemma("gave",  "give",  "VERB",  "ROOT",   1, 6),
-            make_token_with_lemma("Tom",   "tom",   "PROPN", "dative", 1, 11),
-            make_token_with_lemma("the",   "the",   "DET",   "det",    4, 15),
-            make_token_with_lemma("book",  "book",  "NOUN",  "dobj",   1, 19),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct",  1, 23),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("gave", "give", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("Tom", "tom", "PROPN", "dative", 1, 11),
+            make_token_with_lemma("the", "the", "DET", "det", 4, 15),
+            make_token_with_lemma("book", "book", "NOUN", "dobj", 1, 19),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 23),
         ];
         let sent = make_sentence("Sarah gave Tom the book.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
@@ -3751,22 +4293,34 @@ mod tests {
         assert_eq!(d.agent.as_deref(), Some("Sarah"));
         assert_eq!(d.patient.as_deref(), Some("the book"));
         assert_eq!(d.recipient.as_deref(), Some("Tom"));
-        assert!(d.roles.iter().any(|r| r.participant == "Sarah" && r.thematic_role == crate::roles::ThematicRole::Agent));
-        assert!(d.roles.iter().any(|r| r.participant == "the book" && r.thematic_role == crate::roles::ThematicRole::Theme));
-        assert!(d.roles.iter().any(|r| r.participant == "Tom" && r.thematic_role == crate::roles::ThematicRole::Recipient));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "Sarah"
+                && r.thematic_role == crate::roles::ThematicRole::Agent));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "the book"
+                && r.thematic_role == crate::roles::ThematicRole::Theme));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "Tom"
+                && r.thematic_role == crate::roles::ThematicRole::Recipient));
     }
 
     #[test]
     fn integration_passive_roles() {
         // "The window was broken by Sarah."
         let tokens = vec![
-            make_token_with_lemma("The",    "the",    "DET",   "det",      1, 0),
-            make_token_with_lemma("window", "window", "NOUN",  "nsubjpass", 3, 4),
-            make_token_with_lemma("was",    "be",     "AUX",   "auxpass",  3, 11),
-            make_token_with_lemma("broken", "break",  "VERB",  "ROOT",     3, 15),
-            make_token_with_lemma("by",     "by",     "ADP",   "agent",    3, 22),
-            make_token_with_lemma("Sarah",  "sarah",  "PROPN", "pobj",     4, 25),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct",    3, 30),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("window", "window", "NOUN", "nsubjpass", 3, 4),
+            make_token_with_lemma("was", "be", "AUX", "auxpass", 3, 11),
+            make_token_with_lemma("broken", "break", "VERB", "ROOT", 3, 15),
+            make_token_with_lemma("by", "by", "ADP", "agent", 3, 22),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "pobj", 4, 25),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 3, 30),
         ];
         let sent = make_sentence("The window was broken by Sarah.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
@@ -3775,8 +4329,13 @@ mod tests {
         assert!(d.is_passive);
         assert_eq!(d.agent.as_deref(), Some("Sarah"));
         assert_eq!(d.patient.as_deref(), Some("The window"));
-        assert!(d.roles.iter().any(|r| r.participant == "Sarah" && r.thematic_role == crate::roles::ThematicRole::Agent));
-        assert!(d.roles.iter().any(|r| r.participant == "The window" && r.thematic_role == crate::roles::ThematicRole::Patient));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "Sarah"
+                && r.thematic_role == crate::roles::ThematicRole::Agent));
+        assert!(d.roles.iter().any(|r| r.participant == "The window"
+            && r.thematic_role == crate::roles::ThematicRole::Patient));
     }
 
     #[test]
@@ -3784,32 +4343,33 @@ mod tests {
         // "Sarah baked a cake for Tom."
         let tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("baked", "bake",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("a",     "a",     "DET",   "det",   3, 12),
-            make_token_with_lemma("cake",  "cake",  "NOUN",  "dobj",  1, 14),
-            make_token_with_lemma("for",   "for",   "ADP",   "prep",  1, 19),
-            make_token_with_lemma("Tom",   "tom",   "PROPN", "pobj",  4, 23),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 26),
+            make_token_with_lemma("baked", "bake", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("a", "a", "DET", "det", 3, 12),
+            make_token_with_lemma("cake", "cake", "NOUN", "dobj", 1, 14),
+            make_token_with_lemma("for", "for", "ADP", "prep", 1, 19),
+            make_token_with_lemma("Tom", "tom", "PROPN", "pobj", 4, 23),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 26),
         ];
         let sent = make_sentence("Sarah baked a cake for Tom.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
         assert_eq!(interactions.len(), 1);
         let d = &interactions[0];
         assert_eq!(d.beneficiary.as_deref(), Some("Tom"));
-        assert!(d.roles.iter().any(|r| r.participant == "Tom" && r.thematic_role == crate::roles::ThematicRole::Beneficiary));
+        assert!(d.roles.iter().any(|r| r.participant == "Tom"
+            && r.thematic_role == crate::roles::ThematicRole::Beneficiary));
     }
 
     #[test]
     fn integration_prep_goal_source() {
         // "Sarah traveled from London to Paris."
         let tokens = vec![
-            make_token_with_lemma("Sarah",   "sarah",  "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("traveled","travel", "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("from",    "from",   "ADP",   "prep",  1, 15),
-            make_token_with_lemma("London",  "london", "PROPN", "pobj",  2, 20),
-            make_token_with_lemma("to",      "to",     "ADP",   "prep",  1, 27),
-            make_token_with_lemma("Paris",   "paris",  "PROPN", "pobj",  4, 30),
-            make_token_with_lemma(".",       ".",      "PUNCT", "punct", 1, 35),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("traveled", "travel", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("from", "from", "ADP", "prep", 1, 15),
+            make_token_with_lemma("London", "london", "PROPN", "pobj", 2, 20),
+            make_token_with_lemma("to", "to", "ADP", "prep", 1, 27),
+            make_token_with_lemma("Paris", "paris", "PROPN", "pobj", 4, 30),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 35),
         ];
         let sent = make_sentence("Sarah traveled from London to Paris.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
@@ -3817,31 +4377,44 @@ mod tests {
         let d = &interactions[0];
         assert_eq!(d.source.as_deref(), Some("London"));
         assert_eq!(d.goal.as_deref(), Some("Paris"));
-        assert!(d.roles.iter().any(|r| r.participant == "London" && r.thematic_role == crate::roles::ThematicRole::Source));
-        assert!(d.roles.iter().any(|r| r.participant == "Paris" && r.thematic_role == crate::roles::ThematicRole::Goal));
+        assert!(d
+            .roles
+            .iter()
+            .any(|r| r.participant == "London"
+                && r.thematic_role == crate::roles::ThematicRole::Source));
+        assert!(d.roles.iter().any(
+            |r| r.participant == "Paris" && r.thematic_role == crate::roles::ThematicRole::Goal
+        ));
     }
 
     #[test]
     fn integration_unknown_verb() {
         // "Sarah defenestrated the villain."
         let tokens = vec![
-            make_token_with_lemma("Sarah",          "sarah",         "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("defenestrated",  "defenestrate",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",            "the",           "DET",   "det",   3, 21),
-            make_token_with_lemma("villain",        "villain",       "NOUN",  "dobj",  1, 25),
-            make_token_with_lemma(".",              ".",             "PUNCT", "punct", 1, 32),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("defenestrated", "defenestrate", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 21),
+            make_token_with_lemma("villain", "villain", "NOUN", "dobj", 1, 25),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 32),
         ];
         let sent = make_sentence("Sarah defenestrated the villain.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
         assert_eq!(interactions.len(), 1);
         let d = &interactions[0];
-        assert!(d.roles.iter().all(|r| r.thematic_role == crate::roles::ThematicRole::Unknown && (r.confidence - 0.5).abs() < f32::EPSILON));
+        assert!(d
+            .roles
+            .iter()
+            .all(|r| r.thematic_role == crate::roles::ThematicRole::Unknown
+                && (r.confidence - 0.5).abs() < f32::EPSILON));
     }
 
     // ── Phase 4: thematic role children in OwnedNode trees ──────────────────
 
     fn find_child<'a>(node: &'a OwnedNode, name: &str) -> Option<&'a OwnedNode> {
-        node.field_indices.get(name).and_then(|indices| indices.first()).map(|&i| &node.children[i])
+        node.field_indices
+            .get(name)
+            .and_then(|indices| indices.first())
+            .map(|&i| &node.children[i])
     }
 
     #[test]
@@ -3849,10 +4422,10 @@ mod tests {
         // "Sarah heard the noise."
         let tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("heard", "hear",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   3, 12),
-            make_token_with_lemma("noise", "noise", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent = make_sentence("Sarah heard the noise.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
@@ -3866,11 +4439,11 @@ mod tests {
     fn verb_phrase_roles_action() {
         // "Sarah kicked the ball."
         let tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("kicked", "kick",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",   "DET",   "det",   3, 13),
-            make_token_with_lemma("ball",   "ball",  "NOUN",  "dobj",  1, 17),
-            make_token_with_lemma(".",      ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 13),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 17),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent = make_sentence("Sarah kicked the ball.", 0, tokens);
         let interactions = extract_interactions_from_sentence(&sent, &[0]);
@@ -3888,10 +4461,10 @@ mod tests {
         let source = "Sarah heard the noise.";
         let tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("heard", "hear",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   3, 12),
-            make_token_with_lemma("noise", "noise", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -3899,7 +4472,9 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_node = tree.children.iter()
+        let interaction_node = tree
+            .children
+            .iter()
             .find(|c| c.node_type == "interaction")
             .expect("interaction node missing");
         let vc = find_child(interaction_node, "verb_class").expect("verb_class child missing");
@@ -3911,14 +4486,14 @@ mod tests {
         // "Sarah broke the window with a hammer."
         let source = "Sarah broke the window with a hammer.";
         let tokens = vec![
-            make_token_with_lemma("Sarah",   "sarah",  "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("broke",   "break",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",     "the",    "DET",   "det",   3, 12),
-            make_token_with_lemma("window",  "window", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma("with",    "with",   "ADP",   "prep",  1, 23),
-            make_token_with_lemma("a",       "a",      "DET",   "det",   6, 28),
-            make_token_with_lemma("hammer",  "hammer", "NOUN",  "pobj",  4, 30),
-            make_token_with_lemma(".",       ".",      "PUNCT", "punct", 1, 36),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("broke", "break", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("window", "window", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma("with", "with", "ADP", "prep", 1, 23),
+            make_token_with_lemma("a", "a", "DET", "det", 6, 28),
+            make_token_with_lemma("hammer", "hammer", "NOUN", "pobj", 4, 30),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 36),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -3926,16 +4501,32 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_node = tree.children.iter()
+        let interaction_node = tree
+            .children
+            .iter()
             .find(|c| c.node_type == "interaction")
             .expect("interaction node missing");
-        let role_values: Vec<&str> = interaction_node.children.iter()
+        let role_values: Vec<&str> = interaction_node
+            .children
+            .iter()
             .filter(|c| c.node_type == "role")
             .filter_map(|c| c.text.as_deref())
             .collect();
-        assert!(role_values.contains(&"agent"),    "expected agent role, got {:?}", role_values);
-        assert!(role_values.contains(&"patient"),   "expected patient role, got {:?}", role_values);
-        assert!(role_values.contains(&"instrument"),"expected instrument role, got {:?}", role_values);
+        assert!(
+            role_values.contains(&"agent"),
+            "expected agent role, got {:?}",
+            role_values
+        );
+        assert!(
+            role_values.contains(&"patient"),
+            "expected patient role, got {:?}",
+            role_values
+        );
+        assert!(
+            role_values.contains(&"instrument"),
+            "expected instrument role, got {:?}",
+            role_values
+        );
     }
 
     #[test]
@@ -3944,12 +4535,12 @@ mod tests {
         let source = "Sarah baked a cake for Tom.";
         let tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("baked", "bake",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("a",     "a",     "DET",   "det",   3, 12),
-            make_token_with_lemma("cake",  "cake",  "NOUN",  "dobj",  1, 14),
-            make_token_with_lemma("for",   "for",   "ADP",   "prep",  1, 19),
-            make_token_with_lemma("Tom",   "tom",   "PROPN", "pobj",  4, 23),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 26),
+            make_token_with_lemma("baked", "bake", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("a", "a", "DET", "det", 3, 12),
+            make_token_with_lemma("cake", "cake", "NOUN", "dobj", 1, 14),
+            make_token_with_lemma("for", "for", "ADP", "prep", 1, 19),
+            make_token_with_lemma("Tom", "tom", "PROPN", "pobj", 4, 23),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 26),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -3957,10 +4548,13 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_node = tree.children.iter()
+        let interaction_node = tree
+            .children
+            .iter()
             .find(|c| c.node_type == "interaction")
             .expect("interaction node missing");
-        let beneficiary = find_child(interaction_node, "beneficiary").expect("beneficiary child missing");
+        let beneficiary =
+            find_child(interaction_node, "beneficiary").expect("beneficiary child missing");
         assert_eq!(beneficiary.text.as_deref(), Some("Tom"));
     }
 
@@ -3970,11 +4564,11 @@ mod tests {
         let source = "Sarah ran to the store.";
         let tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("ran",   "run",   "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("to",    "to",    "ADP",   "prep",  1, 10),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   4, 13),
-            make_token_with_lemma("store", "store", "NOUN",  "pobj",  2, 17),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 22),
+            make_token_with_lemma("ran", "run", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("to", "to", "ADP", "prep", 1, 10),
+            make_token_with_lemma("the", "the", "DET", "det", 4, 13),
+            make_token_with_lemma("store", "store", "NOUN", "pobj", 2, 17),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 22),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -3982,10 +4576,15 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_node = tree.children.iter()
+        let interaction_node = tree
+            .children
+            .iter()
             .find(|c| c.node_type == "interaction")
             .expect("interaction node missing");
-        assert!(find_child(interaction_node, "goal").is_some(), "goal child missing");
+        assert!(
+            find_child(interaction_node, "goal").is_some(),
+            "goal child missing"
+        );
     }
 
     #[test]
@@ -3993,11 +4592,11 @@ mod tests {
         // "Sarah chased the cat."
         let source = "Sarah chased the cat.";
         let tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("chased", "chase", "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",   "DET",   "det",   3, 13),
-            make_token_with_lemma("cat",    "cat",   "NOUN",  "dobj",  1, 17),
-            make_token_with_lemma(".",      ".",     "PUNCT", "punct", 1, 20),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("chased", "chase", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 13),
+            make_token_with_lemma("cat", "cat", "NOUN", "dobj", 1, 17),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 20),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4005,7 +4604,9 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_node = tree.children.iter()
+        let interaction_node = tree
+            .children
+            .iter()
             .find(|c| c.node_type == "interaction")
             .expect("interaction node missing");
         let agent = find_child(interaction_node, "agent").expect("agent child missing");
@@ -4021,17 +4622,17 @@ mod tests {
         let source = "Sarah heard the noise. Bob kicked the ball.";
         let sent1_tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("heard", "hear",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   3, 12),
-            make_token_with_lemma("noise", "noise", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("Bob",    "bob",  "PROPN", "nsubj", 1, 23),
-            make_token_with_lemma("kicked", "kick", "VERB",  "ROOT",  1, 27),
-            make_token_with_lemma("the",    "the",  "DET",   "det",   3, 34),
-            make_token_with_lemma("ball",   "ball", "NOUN",  "dobj",  1, 38),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 1, 42),
+            make_token_with_lemma("Bob", "bob", "PROPN", "nsubj", 1, 23),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 27),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 34),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 38),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 42),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4042,8 +4643,16 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let results = run_tree_query(&tree, r#"desc:interaction[.experiencer | @text == "Sarah"]"#);
-        assert_eq!(results.len(), 1, "expected 1 experiencer result, got: {:?}", results);
+        let results = run_tree_query(
+            &tree,
+            r#"desc:interaction[.experiencer | @text == "Sarah"]"#,
+        );
+        assert_eq!(
+            results.len(),
+            1,
+            "expected 1 experiencer result, got: {:?}",
+            results
+        );
     }
 
     /// interaction[instrument != null] returns only the interaction with an instrument.
@@ -4052,21 +4661,21 @@ mod tests {
         // "Sarah broke the window with a hammer. Bob kicked the ball."
         let source = "Sarah broke the window with a hammer. Bob kicked the ball.";
         let sent1_tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah",  "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("broke",  "break",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   3, 12),
-            make_token_with_lemma("window", "window", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma("with",   "with",   "ADP",   "prep",  1, 23),
-            make_token_with_lemma("a",      "a",      "DET",   "det",   6, 28),
-            make_token_with_lemma("hammer", "hammer", "NOUN",  "pobj",  4, 30),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1, 36),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("broke", "break", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("window", "window", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma("with", "with", "ADP", "prep", 1, 23),
+            make_token_with_lemma("a", "a", "DET", "det", 6, 28),
+            make_token_with_lemma("hammer", "hammer", "NOUN", "pobj", 4, 30),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 36),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("Bob",    "bob",  "PROPN", "nsubj", 1, 38),
-            make_token_with_lemma("kicked", "kick", "VERB",  "ROOT",  1, 42),
-            make_token_with_lemma("the",    "the",  "DET",   "det",   3, 49),
-            make_token_with_lemma("ball",   "ball", "NOUN",  "dobj",  1, 53),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 1, 57),
+            make_token_with_lemma("Bob", "bob", "PROPN", "nsubj", 1, 38),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 42),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 49),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 53),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 57),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4078,8 +4687,16 @@ mod tests {
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         // Regression: instrument filter still works after Phase 5 enrichment
-        let results = run_tree_query(&tree, r#"desc:interaction[.instrument | @text == "a hammer"]"#);
-        assert_eq!(results.len(), 1, "expected 1 instrument result, got: {:?}", results);
+        let results = run_tree_query(
+            &tree,
+            r#"desc:interaction[.instrument | @text == "a hammer"]"#,
+        );
+        assert_eq!(
+            results.len(),
+            1,
+            "expected 1 instrument result, got: {:?}",
+            results
+        );
     }
 
     /// interaction[beneficiary=Tom] returns only the baking interaction.
@@ -4089,19 +4706,19 @@ mod tests {
         let source = "Sarah baked a cake for Tom. Bob kicked the ball.";
         let sent1_tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("baked", "bake",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("a",     "a",     "DET",   "det",   3, 12),
-            make_token_with_lemma("cake",  "cake",  "NOUN",  "dobj",  1, 14),
-            make_token_with_lemma("for",   "for",   "ADP",   "prep",  1, 19),
-            make_token_with_lemma("Tom",   "tom",   "PROPN", "pobj",  4, 23),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 26),
+            make_token_with_lemma("baked", "bake", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("a", "a", "DET", "det", 3, 12),
+            make_token_with_lemma("cake", "cake", "NOUN", "dobj", 1, 14),
+            make_token_with_lemma("for", "for", "ADP", "prep", 1, 19),
+            make_token_with_lemma("Tom", "tom", "PROPN", "pobj", 4, 23),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 26),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("Bob",    "bob",  "PROPN", "nsubj", 1, 28),
-            make_token_with_lemma("kicked", "kick", "VERB",  "ROOT",  1, 32),
-            make_token_with_lemma("the",    "the",  "DET",   "det",   3, 39),
-            make_token_with_lemma("ball",   "ball", "NOUN",  "dobj",  1, 43),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 1, 47),
+            make_token_with_lemma("Bob", "bob", "PROPN", "nsubj", 1, 28),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 32),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 39),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 43),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 47),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4113,7 +4730,12 @@ mod tests {
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         let results = run_tree_query(&tree, r#"desc:interaction[.beneficiary | @text == "Tom"]"#);
-        assert_eq!(results.len(), 1, "expected 1 beneficiary result, got: {:?}", results);
+        assert_eq!(
+            results.len(),
+            1,
+            "expected 1 beneficiary result, got: {:?}",
+            results
+        );
     }
 
     /// interaction[role=agent] returns only interactions where an Agent role is present.
@@ -4123,18 +4745,18 @@ mod tests {
         // "Bob heard the noise."  → Experiencer (NOT agent)
         let source = "Sarah kicked the ball. Bob heard the noise.";
         let sent1_tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("kicked", "kick",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",   "DET",   "det",   3, 13),
-            make_token_with_lemma("ball",   "ball",  "NOUN",  "dobj",  1, 17),
-            make_token_with_lemma(".",      ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 13),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 17),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("Bob",   "bob",   "PROPN", "nsubj", 1, 23),
-            make_token_with_lemma("heard", "hear",  "VERB",  "ROOT",  1, 27),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   3, 33),
-            make_token_with_lemma("noise", "noise", "NOUN",  "dobj",  1, 37),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 42),
+            make_token_with_lemma("Bob", "bob", "PROPN", "nsubj", 1, 23),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 27),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 33),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 37),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 42),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4146,7 +4768,12 @@ mod tests {
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         let results = run_tree_query(&tree, r#"desc:interaction[.role | @text == "agent"]"#);
-        assert_eq!(results.len(), 1, "expected only kick (Agent), got: {:?}", results);
+        assert_eq!(
+            results.len(),
+            1,
+            "expected only kick (Agent), got: {:?}",
+            results
+        );
     }
 
     /// interaction[verb_class=perception] returns only perception interactions.
@@ -4156,17 +4783,17 @@ mod tests {
         let source = "Sarah heard the noise. Bob kicked the ball.";
         let sent1_tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("heard", "hear",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   3, 12),
-            make_token_with_lemma("noise", "noise", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("Bob",    "bob",  "PROPN", "nsubj", 1, 23),
-            make_token_with_lemma("kicked", "kick", "VERB",  "ROOT",  1, 27),
-            make_token_with_lemma("the",    "the",  "DET",   "det",   3, 34),
-            make_token_with_lemma("ball",   "ball", "NOUN",  "dobj",  1, 38),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 1, 42),
+            make_token_with_lemma("Bob", "bob", "PROPN", "nsubj", 1, 23),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 1, 27),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 34),
+            make_token_with_lemma("ball", "ball", "NOUN", "dobj", 1, 38),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 42),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4177,8 +4804,16 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let results = run_tree_query(&tree, r#"desc:interaction[.verb_class | @text == "perception"]"#);
-        assert_eq!(results.len(), 1, "expected 1 perception interaction, got: {:?}", results);
+        let results = run_tree_query(
+            &tree,
+            r#"desc:interaction[.verb_class | @text == "perception"]"#,
+        );
+        assert_eq!(
+            results.len(),
+            1,
+            "expected 1 perception interaction, got: {:?}",
+            results
+        );
     }
 
     /// interaction[experiencer=Sarah] | .agent returns "Sarah".
@@ -4189,10 +4824,10 @@ mod tests {
         let source = "Sarah heard the noise.";
         let tokens = vec![
             make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("heard", "hear",  "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",   "the",   "DET",   "det",   3, 12),
-            make_token_with_lemma("noise", "noise", "NOUN",  "dobj",  1, 16),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 1, 21),
+            make_token_with_lemma("heard", "hear", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 12),
+            make_token_with_lemma("noise", "noise", "NOUN", "dobj", 1, 16),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4202,12 +4837,19 @@ mod tests {
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
 
         // Thematic query: experiencer=Sarah → finds hearing interaction
-        let results = run_tree_query(&tree, r#"desc:interaction[.experiencer | @text == "Sarah"]"#);
+        let results = run_tree_query(
+            &tree,
+            r#"desc:interaction[.experiencer | @text == "Sarah"]"#,
+        );
         assert_eq!(results.len(), 1, "experiencer filter should match");
 
         // Syntactic backward-compat: agent=Sarah also works (nsubj is still stored as agent)
         let results2 = run_tree_query(&tree, r#"desc:interaction[.agent | @text == "Sarah"]"#);
-        assert_eq!(results2.len(), 1, "agent backward-compat should still match");
+        assert_eq!(
+            results2.len(),
+            1,
+            "agent backward-compat should still match"
+        );
     }
 
     /// Ergative ChangeOfState: nsubj("The door") gets thematic Patient child
@@ -4217,10 +4859,10 @@ mod tests {
         // "The door opened."
         let source = "The door opened.";
         let tokens = vec![
-            make_token_with_lemma("The",    "the",  "DET",   "det",   1, 0),
-            make_token_with_lemma("door",   "door", "NOUN",  "nsubj", 2, 4),
-            make_token_with_lemma("opened", "open", "VERB",  "ROOT",  2, 9),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 2, 15),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("door", "door", "NOUN", "nsubj", 2, 4),
+            make_token_with_lemma("opened", "open", "VERB", "ROOT", 2, 9),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 15),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4228,12 +4870,17 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_node = tree.children.iter()
+        let interaction_node = tree
+            .children
+            .iter()
             .find(|c| c.node_type == "interaction")
             .expect("interaction node missing");
         // The thematic Patient child should be present (nsubj→Patient for ChangeOfState ergative)
         let patient_child = find_child(interaction_node, "patient");
-        assert!(patient_child.is_some(), "ergative patient child should exist");
+        assert!(
+            patient_child.is_some(),
+            "ergative patient child should exist"
+        );
         assert_eq!(patient_child.unwrap().text.as_deref(), Some("The door"));
     }
 
@@ -4243,18 +4890,18 @@ mod tests {
         // "Sarah chased the cat. Bob opened the door."
         let source = "Sarah chased the cat. Bob opened the door.";
         let sent1_tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah", "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("chased", "chase", "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("the",    "the",   "DET",   "det",   3, 13),
-            make_token_with_lemma("cat",    "cat",   "NOUN",  "dobj",  1, 17),
-            make_token_with_lemma(".",      ".",     "PUNCT", "punct", 1, 20),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("chased", "chase", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 13),
+            make_token_with_lemma("cat", "cat", "NOUN", "dobj", 1, 17),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 20),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("Bob",    "bob",  "PROPN", "nsubj", 1, 22),
-            make_token_with_lemma("opened", "open", "VERB",  "ROOT",  1, 26),
-            make_token_with_lemma("the",    "the",  "DET",   "det",   3, 33),
-            make_token_with_lemma("door",   "door", "NOUN",  "dobj",  1, 37),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 1, 41),
+            make_token_with_lemma("Bob", "bob", "PROPN", "nsubj", 1, 22),
+            make_token_with_lemma("opened", "open", "VERB", "ROOT", 1, 26),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 33),
+            make_token_with_lemma("door", "door", "NOUN", "dobj", 1, 37),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 41),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4266,7 +4913,12 @@ mod tests {
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         let results = run_tree_query(&tree, r#"desc:interaction[.agent | @text == "Sarah"]"#);
-        assert_eq!(results.len(), 1, "Tier 2 regression: agent=Sarah should return 1, got: {:?}", results);
+        assert_eq!(
+            results.len(),
+            1,
+            "Tier 2 regression: agent=Sarah should return 1, got: {:?}",
+            results
+        );
     }
 
     /// E2E: two sentences with different verb classes — Perception and Motion.
@@ -4274,19 +4926,19 @@ mod tests {
     fn e2e_mixed_verb_classes() {
         let source = "Sarah saw the castle. She walked to the gate.";
         let sent1_tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah",  "PROPN", "nsubj", 1,  0),
-            make_token_with_lemma("saw",    "see",    "VERB",  "ROOT",  1,  6),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   3,  10),
-            make_token_with_lemma("castle", "castle", "NOUN",  "dobj",  1,  14),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1,  20),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("saw", "see", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 10),
+            make_token_with_lemma("castle", "castle", "NOUN", "dobj", 1, 14),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 20),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("She",    "she",    "PRON",  "nsubj", 1,  22),
-            make_token_with_lemma("walked", "walk",   "VERB",  "ROOT",  1,  26),
-            make_token_with_lemma("to",     "to",     "ADP",   "prep",  1,  33),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   4,  36),
-            make_token_with_lemma("gate",   "gate",   "NOUN",  "pobj",  2,  40),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1,  44),
+            make_token_with_lemma("She", "she", "PRON", "nsubj", 1, 22),
+            make_token_with_lemma("walked", "walk", "VERB", "ROOT", 1, 26),
+            make_token_with_lemma("to", "to", "ADP", "prep", 1, 33),
+            make_token_with_lemma("the", "the", "DET", "det", 4, 36),
+            make_token_with_lemma("gate", "gate", "NOUN", "pobj", 2, 40),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 44),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4297,11 +4949,20 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let r = run_tree_query(&tree, r#"desc:interaction[.verb_class | @text == "perception"]"#);
+        let r = run_tree_query(
+            &tree,
+            r#"desc:interaction[.verb_class | @text == "perception"]"#,
+        );
         assert_eq!(r.len(), 1, "perception class: {:?}", r);
-        let r = run_tree_query(&tree, r#"desc:interaction[.verb_class | @text == "motion"]"#);
+        let r = run_tree_query(
+            &tree,
+            r#"desc:interaction[.verb_class | @text == "motion"]"#,
+        );
         assert_eq!(r.len(), 1, "motion class: {:?}", r);
-        let r = run_tree_query(&tree, r#"desc:interaction[.experiencer | @text == "Sarah"]"#);
+        let r = run_tree_query(
+            &tree,
+            r#"desc:interaction[.experiencer | @text == "Sarah"]"#,
+        );
         assert_eq!(r.len(), 1, "experiencer=Sarah (saw only): {:?}", r);
         let r = run_tree_query(&tree, r#"desc:interaction[.theme | @text == "the castle"]"#);
         assert_eq!(r.len(), 1, "theme=the castle: {:?}", r);
@@ -4312,13 +4973,13 @@ mod tests {
     fn e2e_passive_with_roles() {
         let source = "The ball was kicked by Bob.";
         let tokens = vec![
-            make_token_with_lemma("The",    "the",  "DET",   "det",      1, 0),
-            make_token_with_lemma("ball",   "ball", "NOUN",  "nsubjpass",3, 4),
-            make_token_with_lemma("was",    "be",   "AUX",   "auxpass",  3, 9),
-            make_token_with_lemma("kicked", "kick", "VERB",  "ROOT",     3, 13),
-            make_token_with_lemma("by",     "by",   "ADP",   "agent",    3, 20),
-            make_token_with_lemma("Bob",    "bob",  "PROPN", "pobj",     4, 23),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct",    3, 26),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("ball", "ball", "NOUN", "nsubjpass", 3, 4),
+            make_token_with_lemma("was", "be", "AUX", "auxpass", 3, 9),
+            make_token_with_lemma("kicked", "kick", "VERB", "ROOT", 3, 13),
+            make_token_with_lemma("by", "by", "ADP", "agent", 3, 20),
+            make_token_with_lemma("Bob", "bob", "PROPN", "pobj", 4, 23),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 3, 26),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4337,10 +4998,10 @@ mod tests {
     fn e2e_ergative_narrative() {
         let source = "The ice melted.";
         let tokens = vec![
-            make_token_with_lemma("The",    "the",  "DET",   "det",   1, 0),
-            make_token_with_lemma("ice",    "ice",  "NOUN",  "nsubj", 2, 4),
-            make_token_with_lemma("melted", "melt", "VERB",  "ROOT",  2, 8),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 2, 14),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("ice", "ice", "NOUN", "nsubj", 2, 4),
+            make_token_with_lemma("melted", "melt", "VERB", "ROOT", 2, 8),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 14),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4357,13 +5018,13 @@ mod tests {
     fn e2e_transfer_verb() {
         let source = "The guard gave her a key.";
         let tokens = vec![
-            make_token_with_lemma("The",   "the",   "DET",   "det",   1, 0),
-            make_token_with_lemma("guard", "guard", "NOUN",  "nsubj", 2, 4),
-            make_token_with_lemma("gave",  "give",  "VERB",  "ROOT",  2, 10),
-            make_token_with_lemma("her",   "her",   "PRON",  "dative",2, 15),
-            make_token_with_lemma("a",     "a",     "DET",   "det",   5, 19),
-            make_token_with_lemma("key",   "key",   "NOUN",  "dobj",  2, 21),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 2, 24),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 0),
+            make_token_with_lemma("guard", "guard", "NOUN", "nsubj", 2, 4),
+            make_token_with_lemma("gave", "give", "VERB", "ROOT", 2, 10),
+            make_token_with_lemma("her", "her", "PRON", "dative", 2, 15),
+            make_token_with_lemma("a", "a", "DET", "det", 5, 19),
+            make_token_with_lemma("key", "key", "NOUN", "dobj", 2, 21),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 24),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4380,12 +5041,12 @@ mod tests {
     fn e2e_contribute_joey_battled() {
         let source = "Joey battled Kristy and won.";
         let tokens = vec![
-            make_token_with_lemma("Joey",    "joey",   "PROPN", "nsubj", 1,  0),
-            make_token_with_lemma("battled", "battle", "VERB",  "ROOT",  1,  5),
-            make_token_with_lemma("Kristy",  "kristy", "PROPN", "dobj",  1,  13),
-            make_token_with_lemma("and",     "and",    "CCONJ", "cc",    1,  20),
-            make_token_with_lemma("won",     "win",    "VERB",  "conj",  1,  24),
-            make_token_with_lemma(".",       ".",      "PUNCT", "punct", 1,  27),
+            make_token_with_lemma("Joey", "joey", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("battled", "battle", "VERB", "ROOT", 1, 5),
+            make_token_with_lemma("Kristy", "kristy", "PROPN", "dobj", 1, 13),
+            make_token_with_lemma("and", "and", "CCONJ", "cc", 1, 20),
+            make_token_with_lemma("won", "win", "VERB", "conj", 1, 24),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 27),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4394,7 +5055,11 @@ mod tests {
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         let r = run_tree_query(&tree, r#"desc:interaction[.agent | @text == "Joey"]"#);
-        assert!(r.len() >= 1, "at least 1 interaction with agent=Joey: {:?}", r);
+        assert!(
+            r.len() >= 1,
+            "at least 1 interaction with agent=Joey: {:?}",
+            r
+        );
     }
 
     /// E2E smoke: long multi-sentence narrative — no panics, multiple interactions.
@@ -4402,41 +5067,41 @@ mod tests {
     fn e2e_no_panic_long_narrative() {
         let source = "Sarah saw the castle. She walked to the gate. The guard gave her a key. She opened the door. The ice melted.";
         let sent1_tokens = vec![
-            make_token_with_lemma("Sarah",  "sarah",  "PROPN", "nsubj", 1,   0),
-            make_token_with_lemma("saw",    "see",    "VERB",  "ROOT",  1,   6),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   3,  10),
-            make_token_with_lemma("castle", "castle", "NOUN",  "dobj",  1,  14),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1,  20),
+            make_token_with_lemma("Sarah", "sarah", "PROPN", "nsubj", 1, 0),
+            make_token_with_lemma("saw", "see", "VERB", "ROOT", 1, 6),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 10),
+            make_token_with_lemma("castle", "castle", "NOUN", "dobj", 1, 14),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 20),
         ];
         let sent2_tokens = vec![
-            make_token_with_lemma("She",    "she",    "PRON",  "nsubj", 1,  22),
-            make_token_with_lemma("walked", "walk",   "VERB",  "ROOT",  1,  26),
-            make_token_with_lemma("to",     "to",     "ADP",   "prep",  1,  33),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   4,  36),
-            make_token_with_lemma("gate",   "gate",   "NOUN",  "pobj",  2,  40),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1,  44),
+            make_token_with_lemma("She", "she", "PRON", "nsubj", 1, 22),
+            make_token_with_lemma("walked", "walk", "VERB", "ROOT", 1, 26),
+            make_token_with_lemma("to", "to", "ADP", "prep", 1, 33),
+            make_token_with_lemma("the", "the", "DET", "det", 4, 36),
+            make_token_with_lemma("gate", "gate", "NOUN", "pobj", 2, 40),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 44),
         ];
         let sent3_tokens = vec![
-            make_token_with_lemma("The",   "the",   "DET",   "det",   1, 46),
-            make_token_with_lemma("guard", "guard", "NOUN",  "nsubj", 2, 50),
-            make_token_with_lemma("gave",  "give",  "VERB",  "ROOT",  2, 56),
-            make_token_with_lemma("her",   "her",   "PRON",  "dative",2, 61),
-            make_token_with_lemma("a",     "a",     "DET",   "det",   5, 65),
-            make_token_with_lemma("key",   "key",   "NOUN",  "dobj",  2, 67),
-            make_token_with_lemma(".",     ".",     "PUNCT", "punct", 2, 70),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 46),
+            make_token_with_lemma("guard", "guard", "NOUN", "nsubj", 2, 50),
+            make_token_with_lemma("gave", "give", "VERB", "ROOT", 2, 56),
+            make_token_with_lemma("her", "her", "PRON", "dative", 2, 61),
+            make_token_with_lemma("a", "a", "DET", "det", 5, 65),
+            make_token_with_lemma("key", "key", "NOUN", "dobj", 2, 67),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 70),
         ];
         let sent4_tokens = vec![
-            make_token_with_lemma("She",    "she",    "PRON",  "nsubj", 1, 72),
-            make_token_with_lemma("opened", "open",   "VERB",  "ROOT",  1, 76),
-            make_token_with_lemma("the",    "the",    "DET",   "det",   3, 83),
-            make_token_with_lemma("door",   "door",   "NOUN",  "dobj",  1, 87),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1, 91),
+            make_token_with_lemma("She", "she", "PRON", "nsubj", 1, 72),
+            make_token_with_lemma("opened", "open", "VERB", "ROOT", 1, 76),
+            make_token_with_lemma("the", "the", "DET", "det", 3, 83),
+            make_token_with_lemma("door", "door", "NOUN", "dobj", 1, 87),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 91),
         ];
         let sent5_tokens = vec![
-            make_token_with_lemma("The",    "the",  "DET",   "det",   1, 93),
-            make_token_with_lemma("ice",    "ice",  "NOUN",  "nsubj", 2, 97),
-            make_token_with_lemma("melted", "melt", "VERB",  "ROOT",  2, 101),
-            make_token_with_lemma(".",      ".",    "PUNCT", "punct", 2, 107),
+            make_token_with_lemma("The", "the", "DET", "det", 1, 93),
+            make_token_with_lemma("ice", "ice", "NOUN", "nsubj", 2, 97),
+            make_token_with_lemma("melted", "melt", "VERB", "ROOT", 2, 101),
+            make_token_with_lemma(".", ".", "PUNCT", "punct", 2, 107),
         ];
         let doc = SpacyDoc {
             text: source.to_string(),
@@ -4450,8 +5115,16 @@ mod tests {
             entities: vec![],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
-        let interaction_count = tree.children.iter().filter(|c| c.node_type == "interaction").count();
-        assert!(interaction_count >= 2, "expected multiple interactions, got: {}", interaction_count);
+        let interaction_count = tree
+            .children
+            .iter()
+            .filter(|c| c.node_type == "interaction")
+            .count();
+        assert!(
+            interaction_count >= 2,
+            "expected multiple interactions, got: {}",
+            interaction_count
+        );
     }
 
     // ── Fix 1: Entity type filtering tests ───────────────────────────────────
@@ -4475,48 +5148,69 @@ mod tests {
     /// CARDINAL entities must NOT appear as character arcs in the pipeline.
     #[test]
     fn cardinal_entities_excluded_from_character_arcs() {
-        let source = "Jacob had twelve sons.\n\nThe twelve journeyed to Egypt.\n\nJoseph ruled there.";
-        let para1_sent = make_sentence("Jacob had twelve sons.", 0, vec![
-            make_token_with_lemma("Jacob",  "jacob",  "PROPN", "nsubj", 1, 0),
-            make_token_with_lemma("had",    "have",   "VERB",  "ROOT",  1, 6),
-            make_token_with_lemma("twelve", "twelve", "NUM",   "nummod",1, 10),
-            make_token_with_lemma("sons",   "son",    "NOUN",  "dobj",  1, 17),
-            make_token_with_lemma(".",      ".",      "PUNCT", "punct", 1, 21),
-        ]);
-        let para2_sent = make_sentence("The twelve journeyed to Egypt.", 23, vec![
-            make_token_with_lemma("The",      "the",      "DET",   "det",   1, 23),
-            make_token_with_lemma("twelve",   "twelve",   "NUM",   "nsubj", 1, 27),
-            make_token_with_lemma("journeyed","journey",  "VERB",  "ROOT",  1, 34),
-            make_token_with_lemma("to",       "to",       "ADP",   "prep",  1, 44),
-            make_token_with_lemma("Egypt",    "egypt",    "PROPN", "pobj",  1, 47),
-            make_token_with_lemma(".",        ".",        "PUNCT", "punct", 1, 52),
-        ]);
-        let para3_sent = make_sentence("Joseph ruled there.", 54, vec![
-            make_token_with_lemma("Joseph",  "joseph",  "PROPN", "nsubj", 1, 54),
-            make_token_with_lemma("ruled",   "rule",    "VERB",  "ROOT",  1, 61),
-            make_token_with_lemma("there",   "there",   "ADV",   "advmod",1, 67),
-            make_token_with_lemma(".",       ".",       "PUNCT", "punct", 1, 72),
-        ]);
+        let source =
+            "Jacob had twelve sons.\n\nThe twelve journeyed to Egypt.\n\nJoseph ruled there.";
+        let para1_sent = make_sentence(
+            "Jacob had twelve sons.",
+            0,
+            vec![
+                make_token_with_lemma("Jacob", "jacob", "PROPN", "nsubj", 1, 0),
+                make_token_with_lemma("had", "have", "VERB", "ROOT", 1, 6),
+                make_token_with_lemma("twelve", "twelve", "NUM", "nummod", 1, 10),
+                make_token_with_lemma("sons", "son", "NOUN", "dobj", 1, 17),
+                make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 21),
+            ],
+        );
+        let para2_sent = make_sentence(
+            "The twelve journeyed to Egypt.",
+            23,
+            vec![
+                make_token_with_lemma("The", "the", "DET", "det", 1, 23),
+                make_token_with_lemma("twelve", "twelve", "NUM", "nsubj", 1, 27),
+                make_token_with_lemma("journeyed", "journey", "VERB", "ROOT", 1, 34),
+                make_token_with_lemma("to", "to", "ADP", "prep", 1, 44),
+                make_token_with_lemma("Egypt", "egypt", "PROPN", "pobj", 1, 47),
+                make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 52),
+            ],
+        );
+        let para3_sent = make_sentence(
+            "Joseph ruled there.",
+            54,
+            vec![
+                make_token_with_lemma("Joseph", "joseph", "PROPN", "nsubj", 1, 54),
+                make_token_with_lemma("ruled", "rule", "VERB", "ROOT", 1, 61),
+                make_token_with_lemma("there", "there", "ADV", "advmod", 1, 67),
+                make_token_with_lemma(".", ".", "PUNCT", "punct", 1, 72),
+            ],
+        );
         let doc = SpacyDoc {
             text: source.to_string(),
             sentences: vec![para1_sent, para2_sent, para3_sent],
             entities: vec![
-                make_entity("Jacob",  "PERSON", 0),
+                make_entity("Jacob", "PERSON", 0),
                 make_entity("twelve", "CARDINAL", 10),
                 make_entity("twelve", "CARDINAL", 27),
-                make_entity("Egypt",  "GPE", 47),
+                make_entity("Egypt", "GPE", 47),
                 make_entity("Joseph", "PERSON", 54),
             ],
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         // Character arcs node should only contain PERSON entities, not CARDINAL/GPE
-        let arc_names: Vec<String> = tree.children.iter()
+        let arc_names: Vec<String> = tree
+            .children
+            .iter()
             .filter(|c| c.node_type == "arc")
             .filter_map(|c| c.text.clone())
             .collect();
         // "twelve" (CARDINAL) and "Egypt" (GPE) must not appear as character arcs
-        assert!(!arc_names.iter().any(|n| n == "twelve"), "CARDINAL 'twelve' should not be a character arc");
-        assert!(!arc_names.iter().any(|n| n == "Egypt"),  "GPE 'Egypt' should not be a character arc");
+        assert!(
+            !arc_names.iter().any(|n| n == "twelve"),
+            "CARDINAL 'twelve' should not be a character arc"
+        );
+        assert!(
+            !arc_names.iter().any(|n| n == "Egypt"),
+            "GPE 'Egypt' should not be a character arc"
+        );
         // PERSON entities should appear if they have enough mentions
         // (Jacob and Joseph are PERSON; test doesn't assert their presence
         //  because the arc threshold requires multiple interactions)
@@ -4528,7 +5222,7 @@ mod tests {
     /// the canonical name of its chain.
     #[test]
     fn pronoun_resolution_maps_through_coref_chains() {
-        use crate::coref::{CoreferenceChain, CoreferenceData, CorefType};
+        use crate::coref::{CorefType, CoreferenceChain, CoreferenceData};
         let chains = vec![
             CoreferenceChain {
                 canonical: "Joseph".to_string(),
@@ -4560,17 +5254,15 @@ mod tests {
                 canonical: "Pharaoh".to_string(),
                 entity_type: "PERSON".to_string(),
                 aliases: vec![],
-                mentions: vec![
-                    CoreferenceData {
-                        referent: "he".to_string(),
-                        canonical: "Pharaoh".to_string(),
-                        coref_type: CorefType::SameSentencePronoun,
-                        confidence: 0.7,
-                        sentence_idx: 3,
-                        token_idx: 0,
-                        source_line: 4,
-                    },
-                ],
+                mentions: vec![CoreferenceData {
+                    referent: "he".to_string(),
+                    canonical: "Pharaoh".to_string(),
+                    coref_type: CorefType::SameSentencePronoun,
+                    confidence: 0.7,
+                    sentence_idx: 3,
+                    token_idx: 0,
+                    source_line: 4,
+                }],
                 total_mention_count: 1,
             },
         ];
@@ -4589,7 +5281,7 @@ mod tests {
     /// must appear in character arc profiles (not be filtered out).
     #[test]
     fn person_aliased_gpe_rescued() {
-        use crate::coref::{CoreferenceChain, CoreferenceData, CorefType};
+        use crate::coref::{CorefType, CoreferenceChain, CoreferenceData};
 
         // Simulate "Israel" being labeled GPE by spaCy but sharing a coref chain
         // with "Jacob" (PERSON).  The pipeline should rescue "Israel" and include
@@ -4599,9 +5291,11 @@ mod tests {
         // logic by constructing the coref chain and entity_type_map directly.
 
         let entity_type_map: HashMap<String, String> = [
-            ("jacob".to_string(),  "PERSON".to_string()),
+            ("jacob".to_string(), "PERSON".to_string()),
             ("israel".to_string(), "GPE".to_string()),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
         let chains = vec![CoreferenceChain {
             canonical: "Jacob".to_string(),
@@ -4620,7 +5314,8 @@ mod tests {
         }];
 
         // Replicate the person_aliased_gpe construction logic
-        let mut person_aliased_gpe: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut person_aliased_gpe: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         for chain in &chains {
             let canonical_is_person = entity_type_map
                 .get(&chain.canonical.to_lowercase())
@@ -4628,13 +5323,17 @@ mod tests {
                 .unwrap_or(false);
             if canonical_is_person {
                 for alias in &chain.aliases {
-                    let alias_type = entity_type_map.get(&alias.to_lowercase()).map(|s| s.as_str());
+                    let alias_type = entity_type_map
+                        .get(&alias.to_lowercase())
+                        .map(|s| s.as_str());
                     if matches!(alias_type, Some("GPE" | "LOC")) {
                         person_aliased_gpe.insert(alias.clone());
                     }
                 }
                 for mention in &chain.mentions {
-                    let ref_type = entity_type_map.get(&mention.referent.to_lowercase()).map(|s| s.as_str());
+                    let ref_type = entity_type_map
+                        .get(&mention.referent.to_lowercase())
+                        .map(|s| s.as_str());
                     if matches!(ref_type, Some("GPE" | "LOC")) {
                         person_aliased_gpe.insert(mention.referent.clone());
                     }
@@ -4643,21 +5342,31 @@ mod tests {
         }
 
         // "Israel" must be in the rescue set
-        assert!(person_aliased_gpe.contains("Israel"),
-            "Israel (GPE aliased to Jacob PERSON) should be in rescue set, got {:?}", person_aliased_gpe);
+        assert!(
+            person_aliased_gpe.contains("Israel"),
+            "Israel (GPE aliased to Jacob PERSON) should be in rescue set, got {:?}",
+            person_aliased_gpe
+        );
 
         // The combined filter: !is_narrative_entity(label) && !person_aliased_gpe.contains(text)
         // For "Israel" with label "GPE": is_narrative_entity("GPE") == false,
         // but person_aliased_gpe.contains("Israel") == true → should NOT skip.
         let israel_label = "GPE";
-        let should_skip = !is_narrative_entity(israel_label) && !person_aliased_gpe.contains("Israel");
-        assert!(!should_skip, "Israel should NOT be skipped by the combined entity filter");
+        let should_skip =
+            !is_narrative_entity(israel_label) && !person_aliased_gpe.contains("Israel");
+        assert!(
+            !should_skip,
+            "Israel should NOT be skipped by the combined entity filter"
+        );
 
         // For "Egypt" (GPE, NOT aliased to a person): should still be skipped
         let egypt_label = "GPE";
         let egypt_not_aliased = !person_aliased_gpe.contains("Egypt");
         let egypt_should_skip = !is_narrative_entity(egypt_label) && egypt_not_aliased;
-        assert!(egypt_should_skip, "Egypt (unaliased GPE) should still be filtered out");
+        assert!(
+            egypt_should_skip,
+            "Egypt (unaliased GPE) should still be filtered out"
+        );
     }
 
     // ── Fix P2: Patient movement tracking tests ──────────────────────────────
@@ -4668,8 +5377,19 @@ mod tests {
     fn patient_movement_tracked() {
         // "They brought Joseph into Egypt."
         // Joseph is the dobj (patient) — not the agent — but he relocated.
-        let patient_movement_verbs: HashSet<&str> = ["brought", "carried", "took", "sent",
-            "led", "dragged", "transported", "delivered"].iter().copied().collect();
+        let patient_movement_verbs: HashSet<&str> = [
+            "brought",
+            "carried",
+            "took",
+            "sent",
+            "led",
+            "dragged",
+            "transported",
+            "delivered",
+        ]
+        .iter()
+        .copied()
+        .collect();
 
         // Verify all expected verbs are present
         assert!(patient_movement_verbs.contains("brought"));
@@ -4683,16 +5403,28 @@ mod tests {
 
         // Simulate the patient movement logic for a "brought" interaction
         let scenes = vec![
-            SceneBoundary { scene_index: 0, start_para_idx: 0, end_para_idx: 0,
-                start_line: 1, end_line: 5,
-                location: Some("Canaan".to_string()), temporal_marker: None,
+            SceneBoundary {
+                scene_index: 0,
+                start_para_idx: 0,
+                end_para_idx: 0,
+                start_line: 1,
+                end_line: 5,
+                location: Some("Canaan".to_string()),
+                temporal_marker: None,
                 entity_names: vec!["Joseph".to_string()],
-                boundary_signals: vec![] },
-            SceneBoundary { scene_index: 1, start_para_idx: 1, end_para_idx: 1,
-                start_line: 6, end_line: 10,
-                location: Some("Egypt".to_string()), temporal_marker: None,
+                boundary_signals: vec![],
+            },
+            SceneBoundary {
+                scene_index: 1,
+                start_para_idx: 1,
+                end_para_idx: 1,
+                start_line: 6,
+                end_line: 10,
+                location: Some("Egypt".to_string()),
+                temporal_marker: None,
                 entity_names: vec!["Joseph".to_string()],
-                boundary_signals: vec![] },
+                boundary_signals: vec![],
+            },
         ];
 
         let mut movement_interactions: HashSet<(String, usize, usize)> = HashSet::new();
@@ -4707,19 +5439,29 @@ mod tests {
             for (scene_idx, scene) in scenes.iter().enumerate() {
                 if line >= scene.start_line && line <= scene.end_line {
                     if scene_idx + 1 < scenes.len() {
-                        movement_interactions.insert((patient.to_string(), scene_idx, scene_idx + 1));
+                        movement_interactions.insert((
+                            patient.to_string(),
+                            scene_idx,
+                            scene_idx + 1,
+                        ));
                     }
                     if scene_idx > 0 {
-                        movement_interactions.insert((patient.to_string(), scene_idx - 1, scene_idx));
+                        movement_interactions.insert((
+                            patient.to_string(),
+                            scene_idx - 1,
+                            scene_idx,
+                        ));
                     }
                     break;
                 }
             }
         }
 
-        assert!(movement_interactions.contains(&("Joseph".to_string(), 0, 1)),
+        assert!(
+            movement_interactions.contains(&("Joseph".to_string(), 0, 1)),
             "Joseph should be tracked as moving from scene 0 to scene 1 when 'brought', got {:?}",
-            movement_interactions);
+            movement_interactions
+        );
     }
 
     // ── Requirement tests ────────────────────────────────────────────────────
@@ -4742,7 +5484,12 @@ mod tests {
         };
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         let results = run_tree_query(&tree, "desc:requirement");
-        assert_eq!(results.len(), 1, "expected 1 requirement, got: {:?}", results);
+        assert_eq!(
+            results.len(),
+            1,
+            "expected 1 requirement, got: {:?}",
+            results
+        );
         assert!(
             results[0].contains("shall"),
             "should contain 'shall': {}",

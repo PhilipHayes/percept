@@ -4,14 +4,12 @@ use std::sync::LazyLock;
 use crate::model::{Level, LogEntry};
 
 // Cargo: error[E0308]: or warning: or note:
-static CARGO_LINE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(error|warning|note)(?:\[E\d+\])?:\s*(.*)$").unwrap()
-});
+static CARGO_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(error|warning|note)(?:\[E\d+\])?:\s*(.*)$").unwrap());
 
 // Cargo location: --> src/main.rs:10:5
-static CARGO_LOCATION: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*-->\s*(\S+:\d+:\d+)").unwrap()
-});
+static CARGO_LOCATION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*-->\s*(\S+:\d+:\d+)").unwrap());
 
 // Gradle: > Task :build FAILED or BUILD SUCCESSFUL
 static GRADLE_STATUS: LazyLock<Regex> = LazyLock::new(|| {
@@ -19,9 +17,8 @@ static GRADLE_STATUS: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 // xcodebuild: error: or warning: with file locations
-static XCODE_LINE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(.*?):\s*(error|warning|note):\s*(.*)$").unwrap()
-});
+static XCODE_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(.*?):\s*(error|warning|note):\s*(.*)$").unwrap());
 
 /// Parse a build tool output line (cargo, gradle, xcodebuild).
 pub fn parse_build_line(line: &str, raw: &str) -> LogEntry {

@@ -57,10 +57,22 @@ pub fn parse_json_line(clean: &str, raw: &str) -> LogEntry {
 
     // Remaining fields (exclude already-extracted keys)
     let extracted_keys = [
-        "level", "lvl", "severity",
-        "msg", "message",
-        "timestamp", "time", "ts", "@timestamp", "datetime", "date",
-        "name", "source", "logger", "module", "component",
+        "level",
+        "lvl",
+        "severity",
+        "msg",
+        "message",
+        "timestamp",
+        "time",
+        "ts",
+        "@timestamp",
+        "datetime",
+        "date",
+        "name",
+        "source",
+        "logger",
+        "module",
+        "component",
     ];
     let fields: HashMap<String, Value> = obj
         .iter()
@@ -68,11 +80,11 @@ pub fn parse_json_line(clean: &str, raw: &str) -> LogEntry {
         .filter(|(k, _)| {
             // Also skip "fields" if we extracted message from it
             k.as_str() != "fields"
-                || !obj
+                || obj
                     .get("fields")
                     .and_then(|f| f.as_object())
                     .and_then(|f| f.get("message"))
-                    .is_some()
+                    .is_none()
         })
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();

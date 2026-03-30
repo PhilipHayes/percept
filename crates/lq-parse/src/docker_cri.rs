@@ -36,7 +36,10 @@ pub fn parse_cri_line(line: &str, raw: &str) -> LogEntry {
     };
 
     let mut fields = std::collections::HashMap::new();
-    fields.insert("stream".to_string(), serde_json::Value::String(stream.to_string()));
+    fields.insert(
+        "stream".to_string(),
+        serde_json::Value::String(stream.to_string()),
+    );
 
     LogEntry {
         timestamp,

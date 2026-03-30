@@ -1,37 +1,29 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // "  ✓ should add numbers (5ms)"
 // "  ✕ should divide by zero (3ms)"
 // "  ○ skipped pending test"
-static JEST_PASS: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*[✓✔√]\s+(.+?)(?:\s+\((\d+)\s*ms\))?\s*$").unwrap()
-});
+static JEST_PASS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*[✓✔√]\s+(.+?)(?:\s+\((\d+)\s*ms\))?\s*$").unwrap());
 
-static JEST_FAIL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*[✕✗×]\s+(.+?)(?:\s+\((\d+)\s*ms\))?\s*$").unwrap()
-});
+static JEST_FAIL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*[✕✗×]\s+(.+?)(?:\s+\((\d+)\s*ms\))?\s*$").unwrap());
 
-static JEST_SKIP: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*[○◌]\s+(skipped\s+)?(.+)$").unwrap()
-});
+static JEST_SKIP: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*[○◌]\s+(skipped\s+)?(.+)$").unwrap());
 
 // "  ● should divide by zero" — failure detail header
-static JEST_FAILURE_HEADER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*●\s+(.+)$").unwrap()
-});
+static JEST_FAILURE_HEADER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*●\s+(.+)$").unwrap());
 
 // "Tests:   1 failed, 2 passed, 3 total"
-static JEST_SUMMARY: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"Tests:\s+(.+)total").unwrap()
-});
+static JEST_SUMMARY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Tests:\s+(.+)total").unwrap());
 
 // "PASS src/math.test.js" or "FAIL src/math.test.js"
-static JEST_SUITE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(PASS|FAIL)\s+(.+)$").unwrap()
-});
+static JEST_SUITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(PASS|FAIL)\s+(.+)$").unwrap());
 
 /// Parse Jest text output.
 pub fn parse_jest(input: &str) -> TestRun {
@@ -131,7 +123,10 @@ pub fn parse_jest(input: &str) -> TestRun {
 
     // Attach failure messages
     for (fail_name, lines) in &failure_blocks {
-        if let Some(result) = results.iter_mut().find(|r| r.name == *fail_name || fail_name.ends_with(&r.name)) {
+        if let Some(result) = results
+            .iter_mut()
+            .find(|r| r.name == *fail_name || fail_name.ends_with(&r.name))
+        {
             let body = lines.join("\n").trim().to_string();
             if result.message.is_none() && !body.is_empty() {
                 let msg = body

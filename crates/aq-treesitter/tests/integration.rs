@@ -1,7 +1,7 @@
 /// Integration tests: parse real source code with tree-sitter and evaluate aq queries.
-use aq_core::{lex, parse, eval, result_to_json};
-use aq_treesitter::parse::ParsedTree;
+use aq_core::{eval, lex, parse, result_to_json};
 use aq_treesitter::langs::Language;
+use aq_treesitter::parse::ParsedTree;
 
 /// Helper: parse source, run query, return JSON values
 fn query_source(source: &str, lang: Language, query: &str) -> Vec<serde_json::Value> {
@@ -53,13 +53,20 @@ fn rust_root_type() {
 
 #[test]
 fn rust_find_functions() {
-    let results = query_source(RUST_SOURCE, Language::Rust, "desc:function_item | .name | @text");
-    assert_eq!(results, vec![
-        serde_json::json!("hello"),
-        serde_json::json!("add"),
-        serde_json::json!("new"),
-        serde_json::json!("distance"),
-    ]);
+    let results = query_source(
+        RUST_SOURCE,
+        Language::Rust,
+        "desc:function_item | .name | @text",
+    );
+    assert_eq!(
+        results,
+        vec![
+            serde_json::json!("hello"),
+            serde_json::json!("add"),
+            serde_json::json!("new"),
+            serde_json::json!("distance"),
+        ]
+    );
 }
 
 #[test]
@@ -78,23 +85,27 @@ fn rust_function_line_counts() {
 
 #[test]
 fn rust_find_structs() {
-    let results = query_source(RUST_SOURCE, Language::Rust, "desc:struct_item | .name | @text");
+    let results = query_source(
+        RUST_SOURCE,
+        Language::Rust,
+        "desc:struct_item | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Point")]);
 }
 
 #[test]
 fn rust_use_declarations() {
-    let results = query_source(RUST_SOURCE, Language::Rust, "desc:use_declaration | @subtree_text");
+    let results = query_source(
+        RUST_SOURCE,
+        Language::Rust,
+        "desc:use_declaration | @subtree_text",
+    );
     assert_eq!(results.len(), 2);
 }
 
 #[test]
 fn rust_count_functions() {
-    let results = query_source(
-        RUST_SOURCE,
-        Language::Rust,
-        "[desc:function_item] | length",
-    );
+    let results = query_source(RUST_SOURCE, Language::Rust, "[desc:function_item] | length");
     assert_eq!(results, vec![serde_json::json!(4)]);
 }
 
@@ -130,10 +141,10 @@ fn rust_impl_functions() {
         Language::Rust,
         "desc:impl_item | desc:function_item | .name | @text",
     );
-    assert_eq!(results, vec![
-        serde_json::json!("new"),
-        serde_json::json!("distance"),
-    ]);
+    assert_eq!(
+        results,
+        vec![serde_json::json!("new"), serde_json::json!("distance"),]
+    );
 }
 
 #[test]
@@ -170,7 +181,10 @@ fn rust_join_names() {
         Language::Rust,
         r#"[desc:function_item | .name | @text] | join(", ")"#,
     );
-    assert_eq!(results, vec![serde_json::json!("hello, add, new, distance")]);
+    assert_eq!(
+        results,
+        vec![serde_json::json!("hello, add, new, distance")]
+    );
 }
 
 #[test]
@@ -237,7 +251,11 @@ fn python_find_functions() {
         "desc:function_definition | .name | @text",
     );
     // Top-level: greet, add; Class methods: __init__, add, result
-    assert!(results.len() >= 5, "Expected >= 5 functions, got {}", results.len());
+    assert!(
+        results.len() >= 5,
+        "Expected >= 5 functions, got {}",
+        results.len()
+    );
 }
 
 #[test]
@@ -307,11 +325,7 @@ fn js_find_classes() {
 
 #[test]
 fn js_children_count() {
-    let results = query_source(
-        JS_SOURCE,
-        Language::JavaScript,
-        "[children] | length",
-    );
+    let results = query_source(JS_SOURCE, Language::JavaScript, "[children] | length");
     // Should have several top-level declarations
     assert!(results[0].as_u64().unwrap() >= 3);
 }
@@ -338,7 +352,11 @@ fn json_root_type() {
 #[test]
 fn json_find_pairs() {
     let results = query_source(JSON_SOURCE, Language::Json, "desc:pair | .key | @text");
-    assert!(results.len() >= 4, "Expected >= 4 pairs, got {}", results.len());
+    assert!(
+        results.len() >= 4,
+        "Expected >= 4 pairs, got {}",
+        results.len()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -436,16 +454,24 @@ func (p Point) Distance() float64 {
 
 #[test]
 fn go_find_functions() {
-    let results = query_source(GO_SOURCE, Language::Go, "desc:function_declaration | .name | @text");
-    assert_eq!(results, vec![
-        serde_json::json!("greet"),
-        serde_json::json!("add"),
-    ]);
+    let results = query_source(
+        GO_SOURCE,
+        Language::Go,
+        "desc:function_declaration | .name | @text",
+    );
+    assert_eq!(
+        results,
+        vec![serde_json::json!("greet"), serde_json::json!("add"),]
+    );
 }
 
 #[test]
 fn go_find_methods() {
-    let results = query_source(GO_SOURCE, Language::Go, "desc:method_declaration | .name | @text");
+    let results = query_source(
+        GO_SOURCE,
+        Language::Go,
+        "desc:method_declaration | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Distance")]);
 }
 
@@ -461,7 +487,11 @@ fn go_find_structs() {
 
 #[test]
 fn go_import_statements() {
-    let results = query_source(GO_SOURCE, Language::Go, "desc:import_declaration | @subtree_text");
+    let results = query_source(
+        GO_SOURCE,
+        Language::Go,
+        "desc:import_declaration | @subtree_text",
+    );
     assert_eq!(results.len(), 1);
 }
 
@@ -495,29 +525,48 @@ public class Calculator {
 
 #[test]
 fn java_find_classes() {
-    let results = query_source(JAVA_SOURCE, Language::Java, "desc:class_declaration | .name | @text");
+    let results = query_source(
+        JAVA_SOURCE,
+        Language::Java,
+        "desc:class_declaration | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Calculator")]);
 }
 
 #[test]
 fn java_find_methods() {
-    let results = query_source(JAVA_SOURCE, Language::Java, "desc:method_declaration | .name | @text");
-    assert_eq!(results, vec![
-        serde_json::json!("add"),
-        serde_json::json!("result"),
-        serde_json::json!("main"),
-    ]);
+    let results = query_source(
+        JAVA_SOURCE,
+        Language::Java,
+        "desc:method_declaration | .name | @text",
+    );
+    assert_eq!(
+        results,
+        vec![
+            serde_json::json!("add"),
+            serde_json::json!("result"),
+            serde_json::json!("main"),
+        ]
+    );
 }
 
 #[test]
 fn java_import_statements() {
-    let results = query_source(JAVA_SOURCE, Language::Java, "desc:import_declaration | @subtree_text");
+    let results = query_source(
+        JAVA_SOURCE,
+        Language::Java,
+        "desc:import_declaration | @subtree_text",
+    );
     assert_eq!(results.len(), 1);
 }
 
 #[test]
 fn java_method_count() {
-    let results = query_source(JAVA_SOURCE, Language::Java, "[desc:method_declaration] | length");
+    let results = query_source(
+        JAVA_SOURCE,
+        Language::Java,
+        "[desc:method_declaration] | length",
+    );
     assert_eq!(results, vec![serde_json::json!(3)]);
 }
 
@@ -549,15 +598,19 @@ fn c_find_functions() {
         Language::C,
         "desc:function_definition | .declarator | .declarator | @text",
     );
-    assert_eq!(results, vec![
-        serde_json::json!("add"),
-        serde_json::json!("greet"),
-    ]);
+    assert_eq!(
+        results,
+        vec![serde_json::json!("add"), serde_json::json!("greet"),]
+    );
 }
 
 #[test]
 fn c_find_structs() {
-    let results = query_source(C_SOURCE, Language::C, "desc:struct_specifier | .name | @text");
+    let results = query_source(
+        C_SOURCE,
+        Language::C,
+        "desc:struct_specifier | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Point")]);
 }
 
@@ -594,7 +647,11 @@ int add(int a, int b) {
 
 #[test]
 fn cpp_find_classes() {
-    let results = query_source(CPP_SOURCE, Language::Cpp, "desc:class_specifier | .name | @text");
+    let results = query_source(
+        CPP_SOURCE,
+        Language::Cpp,
+        "desc:class_specifier | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Point")]);
 }
 
@@ -605,7 +662,11 @@ fn cpp_find_functions() {
         Language::Cpp,
         "desc:function_definition | .declarator | @text",
     );
-    assert!(results.len() >= 2, "Expected >= 2 functions, got {}", results.len());
+    assert!(
+        results.len() >= 2,
+        "Expected >= 2 functions, got {}",
+        results.len()
+    );
 }
 
 #[test]
@@ -642,20 +703,36 @@ String greet(String name) {
 
 #[test]
 fn dart_find_classes() {
-    let results = query_source(DART_SOURCE, Language::Dart, "desc:class_definition | .name | @text");
+    let results = query_source(
+        DART_SOURCE,
+        Language::Dart,
+        "desc:class_definition | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Calculator")]);
 }
 
 #[test]
 fn dart_find_function_signatures() {
-    let results = query_source(DART_SOURCE, Language::Dart, "desc:function_signature | .name | @text");
+    let results = query_source(
+        DART_SOURCE,
+        Language::Dart,
+        "desc:function_signature | .name | @text",
+    );
     // Should find class methods + top-level functions
-    assert!(results.len() >= 2, "Expected >= 2 function signatures, got {}", results.len());
+    assert!(
+        results.len() >= 2,
+        "Expected >= 2 function signatures, got {}",
+        results.len()
+    );
 }
 
 #[test]
 fn dart_import_statements() {
-    let results = query_source(DART_SOURCE, Language::Dart, "desc:import_or_export | @subtree_text");
+    let results = query_source(
+        DART_SOURCE,
+        Language::Dart,
+        "desc:import_or_export | @subtree_text",
+    );
     assert_eq!(results.len(), 1);
 }
 
@@ -699,23 +776,38 @@ class Point {
 
 #[test]
 fn swift_find_functions() {
-    let results = query_source(SWIFT_SOURCE, Language::Swift, "desc:function_declaration | .name | @text");
-    assert_eq!(results, vec![
-        serde_json::json!("greet"),
-        serde_json::json!("add"),
-        serde_json::json!("distance"),
-    ]);
+    let results = query_source(
+        SWIFT_SOURCE,
+        Language::Swift,
+        "desc:function_declaration | .name | @text",
+    );
+    assert_eq!(
+        results,
+        vec![
+            serde_json::json!("greet"),
+            serde_json::json!("add"),
+            serde_json::json!("distance"),
+        ]
+    );
 }
 
 #[test]
 fn swift_find_classes() {
-    let results = query_source(SWIFT_SOURCE, Language::Swift, "desc:class_declaration | .name | @text");
+    let results = query_source(
+        SWIFT_SOURCE,
+        Language::Swift,
+        "desc:class_declaration | .name | @text",
+    );
     assert_eq!(results, vec![serde_json::json!("Point")]);
 }
 
 #[test]
 fn swift_function_count() {
-    let results = query_source(SWIFT_SOURCE, Language::Swift, "[desc:function_declaration] | length");
+    let results = query_source(
+        SWIFT_SOURCE,
+        Language::Swift,
+        "[desc:function_declaration] | length",
+    );
     assert_eq!(results, vec![serde_json::json!(3)]);
 }
 
@@ -736,7 +828,8 @@ fn swift_top_level_types() {
 fn rust_parent_navigation() {
     // Identifier inside function → parent is function_item
     let results = query_source(
-        RUST_SOURCE, Language::Rust,
+        RUST_SOURCE,
+        Language::Rust,
         r#"desc:identifier | select(@text == "hello") | parent | @type"#,
     );
     assert_eq!(results, vec![serde_json::json!("function_item")]);
@@ -746,7 +839,8 @@ fn rust_parent_navigation() {
 fn rust_ancestors() {
     // Identifier "hello" → ancestors chain to source_file
     let results = query_source(
-        RUST_SOURCE, Language::Rust,
+        RUST_SOURCE,
+        Language::Rust,
         r#"desc:identifier | select(@text == "hello") | ancestors | @type"#,
     );
     let types: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
@@ -758,7 +852,8 @@ fn rust_ancestors() {
 fn rust_siblings() {
     // "hello" function's siblings should include "add"
     let results = query_source(
-        RUST_SOURCE, Language::Rust,
+        RUST_SOURCE,
+        Language::Rust,
         r#"desc:function_item | select(.name | @text == "hello") | siblings | select(@type == "function_item") | .name | @text"#,
     );
     let names: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
@@ -769,19 +864,25 @@ fn rust_siblings() {
 fn rust_depth() {
     // Identifier is nested: source_file → function_item → identifier = depth 2
     let results = query_source(
-        RUST_SOURCE, Language::Rust,
+        RUST_SOURCE,
+        Language::Rust,
         r#"desc:identifier | select(@text == "hello") | @depth"#,
     );
     assert_eq!(results.len(), 1);
     let depth = results[0].as_i64().unwrap();
-    assert!(depth >= 2, "identifier should be at depth >= 2, got {}", depth);
+    assert!(
+        depth >= 2,
+        "identifier should be at depth >= 2, got {}",
+        depth
+    );
 }
 
 #[test]
 fn rust_path() {
     // Path from root to identifier "hello"
     let results = query_source(
-        RUST_SOURCE, Language::Rust,
+        RUST_SOURCE,
+        Language::Rust,
         r#"desc:identifier | select(@text == "hello") | @path"#,
     );
     assert_eq!(results.len(), 1);
@@ -794,7 +895,8 @@ fn rust_path() {
 fn rust_field_child_parent() {
     // .name field access should return a node with a working parent
     let results = query_source(
-        RUST_SOURCE, Language::Rust,
+        RUST_SOURCE,
+        Language::Rust,
         r#"desc:function_item | select(.name | @text == "hello") | .name | parent | @type"#,
     );
     assert_eq!(results, vec![serde_json::json!("function_item")]);
@@ -803,7 +905,8 @@ fn rust_field_child_parent() {
 #[test]
 fn python_parent_navigation() {
     let results = query_source(
-        PYTHON_SOURCE, Language::Python,
+        PYTHON_SOURCE,
+        Language::Python,
         r#"desc:identifier | select(@text == "greet") | parent | @type"#,
     );
     assert_eq!(results.len(), 1);
@@ -817,7 +920,12 @@ fn python_parent_navigation() {
 
 #[test]
 fn metrics_valid_rust_has_full_confidence() {
-    let tree = ParsedTree::parse(RUST_SOURCE.to_string(), Language::Rust, Some("test.rs".into())).unwrap();
+    let tree = ParsedTree::parse(
+        RUST_SOURCE.to_string(),
+        Language::Rust,
+        Some("test.rs".into()),
+    )
+    .unwrap();
     let m = tree.metrics();
     assert_eq!(m.error_nodes, 0);
     assert_eq!(m.missing_nodes, 0);
@@ -829,16 +937,31 @@ fn metrics_valid_rust_has_full_confidence() {
 #[test]
 fn metrics_broken_rust_detects_errors() {
     let broken = "fn foo() { let x = ; } fn bar(a: i32 b: i32) {}";
-    let tree = ParsedTree::parse(broken.to_string(), Language::Rust, Some("broken.rs".into())).unwrap();
+    let tree =
+        ParsedTree::parse(broken.to_string(), Language::Rust, Some("broken.rs".into())).unwrap();
     let m = tree.metrics();
-    assert!(m.error_nodes > 0, "should detect ERROR nodes in broken code");
-    assert!(m.confidence < 1.0, "confidence should be < 1.0 for broken code");
-    assert!(m.confidence > 0.0, "confidence should still be > 0.0 for partial parse");
+    assert!(
+        m.error_nodes > 0,
+        "should detect ERROR nodes in broken code"
+    );
+    assert!(
+        m.confidence < 1.0,
+        "confidence should be < 1.0 for broken code"
+    );
+    assert!(
+        m.confidence > 0.0,
+        "confidence should still be > 0.0 for partial parse"
+    );
 }
 
 #[test]
 fn metrics_valid_python_has_full_confidence() {
-    let tree = ParsedTree::parse(PYTHON_SOURCE.to_string(), Language::Python, Some("test.py".into())).unwrap();
+    let tree = ParsedTree::parse(
+        PYTHON_SOURCE.to_string(),
+        Language::Python,
+        Some("test.py".into()),
+    )
+    .unwrap();
     let m = tree.metrics();
     assert_eq!(m.error_nodes, 0);
     assert_eq!(m.confidence, 1.0);

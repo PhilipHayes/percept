@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use crate::node::OwnedNode;
+    use crate::query::eval::{eval, result_to_json};
     use crate::query::lexer::lex;
     use crate::query::parser::parse;
-    use crate::query::eval::{eval, result_to_json};
     use std::collections::HashMap;
 
     // -----------------------------------------------------------------------
@@ -148,11 +148,14 @@ mod tests {
     fn desc_type_filter() {
         let root = make_root();
         let results = run("desc:function_item | .name | @text", &root);
-        assert_eq!(results, vec![
-            serde_json::json!("foo"),
-            serde_json::json!("bar"),
-            serde_json::json!("_private"),
-        ]);
+        assert_eq!(
+            results,
+            vec![
+                serde_json::json!("foo"),
+                serde_json::json!("bar"),
+                serde_json::json!("_private"),
+            ]
+        );
     }
 
     #[test]
@@ -192,10 +195,10 @@ mod tests {
             "desc:function_item | select(.name | @text | startswith(\"_\") | not) | .name | @text",
             &root,
         );
-        assert_eq!(results, vec![
-            serde_json::json!("foo"),
-            serde_json::json!("bar"),
-        ]);
+        assert_eq!(
+            results,
+            vec![serde_json::json!("foo"), serde_json::json!("bar"),]
+        );
     }
 
     #[test]
@@ -216,7 +219,10 @@ mod tests {
     fn object_construction() {
         let fn_node = make_function("my_func", 5, 15);
         let results = run("{name: .name | @text, line: @line}", &fn_node);
-        assert_eq!(results, vec![serde_json::json!({"name": "my_func", "line": 5})]);
+        assert_eq!(
+            results,
+            vec![serde_json::json!({"name": "my_func", "line": 5})]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -383,9 +389,15 @@ mod tests {
     #[test]
     fn builtin_type() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        assert_eq!(run("\"hello\" | type", &leaf), vec![serde_json::json!("string")]);
+        assert_eq!(
+            run("\"hello\" | type", &leaf),
+            vec![serde_json::json!("string")]
+        );
         assert_eq!(run("42 | type", &leaf), vec![serde_json::json!("number")]);
-        assert_eq!(run("true | type", &leaf), vec![serde_json::json!("boolean")]);
+        assert_eq!(
+            run("true | type", &leaf),
+            vec![serde_json::json!("boolean")]
+        );
         assert_eq!(run("null | type", &leaf), vec![serde_json::json!("null")]);
         assert_eq!(run("[1] | type", &leaf), vec![serde_json::json!("array")]);
     }
@@ -408,13 +420,19 @@ mod tests {
     fn builtin_sort_by() {
         let leaf = OwnedNode::leaf("x", "0", 1);
         let results = run(r#"[{"a": 3}, {"a": 1}, {"a": 2}] | sort_by(.a)"#, &leaf);
-        assert_eq!(results, vec![serde_json::json!([{"a": 1}, {"a": 2}, {"a": 3}])]);
+        assert_eq!(
+            results,
+            vec![serde_json::json!([{"a": 1}, {"a": 2}, {"a": 3}])]
+        );
     }
 
     #[test]
     fn builtin_group_by() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        let results = run(r#"[{"t": "a"}, {"t": "b"}, {"t": "a"}] | group_by(.t)"#, &leaf);
+        let results = run(
+            r#"[{"t": "a"}, {"t": "b"}, {"t": "a"}] | group_by(.t)"#,
+            &leaf,
+        );
         let groups = results[0].as_array().unwrap();
         assert_eq!(groups.len(), 2);
     }
@@ -457,9 +475,18 @@ mod tests {
     #[test]
     fn builtin_any_all() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        assert_eq!(run("[true, false, true] | any", &leaf), vec![serde_json::json!(true)]);
-        assert_eq!(run("[true, false, true] | all", &leaf), vec![serde_json::json!(false)]);
-        assert_eq!(run("[true, true, true] | all", &leaf), vec![serde_json::json!(true)]);
+        assert_eq!(
+            run("[true, false, true] | any", &leaf),
+            vec![serde_json::json!(true)]
+        );
+        assert_eq!(
+            run("[true, false, true] | all", &leaf),
+            vec![serde_json::json!(false)]
+        );
+        assert_eq!(
+            run("[true, true, true] | all", &leaf),
+            vec![serde_json::json!(true)]
+        );
     }
 
     #[test]
@@ -486,14 +513,23 @@ mod tests {
     #[test]
     fn builtin_test() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        assert_eq!(run(r#""hello123" | test("\\d+")"#, &leaf), vec![serde_json::json!(true)]);
-        assert_eq!(run(r#""hello" | test("\\d+")"#, &leaf), vec![serde_json::json!(false)]);
+        assert_eq!(
+            run(r#""hello123" | test("\\d+")"#, &leaf),
+            vec![serde_json::json!(true)]
+        );
+        assert_eq!(
+            run(r#""hello" | test("\\d+")"#, &leaf),
+            vec![serde_json::json!(false)]
+        );
     }
 
     #[test]
     fn builtin_to_number() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        assert_eq!(run(r#""42" | to_number"#, &leaf), vec![serde_json::json!(42)]);
+        assert_eq!(
+            run(r#""42" | to_number"#, &leaf),
+            vec![serde_json::json!(42)]
+        );
         assert_eq!(run("42 | tonumber", &leaf), vec![serde_json::json!(42)]);
     }
 
@@ -501,14 +537,23 @@ mod tests {
     fn builtin_to_string() {
         let leaf = OwnedNode::leaf("x", "0", 1);
         assert_eq!(run("42 | to_string", &leaf), vec![serde_json::json!("42")]);
-        assert_eq!(run("true | tostring", &leaf), vec![serde_json::json!("true")]);
+        assert_eq!(
+            run("true | tostring", &leaf),
+            vec![serde_json::json!("true")]
+        );
     }
 
     #[test]
     fn builtin_ascii_case() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        assert_eq!(run(r#""Hello" | ascii_downcase"#, &leaf), vec![serde_json::json!("hello")]);
-        assert_eq!(run(r#""Hello" | ascii_upcase"#, &leaf), vec![serde_json::json!("HELLO")]);
+        assert_eq!(
+            run(r#""Hello" | ascii_downcase"#, &leaf),
+            vec![serde_json::json!("hello")]
+        );
+        assert_eq!(
+            run(r#""Hello" | ascii_upcase"#, &leaf),
+            vec![serde_json::json!("HELLO")]
+        );
     }
 
     #[test]
@@ -532,18 +577,27 @@ mod tests {
     fn iterate_array() {
         let leaf = OwnedNode::leaf("x", "0", 1);
         let results = run("[1, 2, 3] | .[]", &leaf);
-        assert_eq!(results, vec![
-            serde_json::json!(1),
-            serde_json::json!(2),
-            serde_json::json!(3),
-        ]);
+        assert_eq!(
+            results,
+            vec![
+                serde_json::json!(1),
+                serde_json::json!(2),
+                serde_json::json!(3),
+            ]
+        );
     }
 
     #[test]
     fn index_array() {
         let leaf = OwnedNode::leaf("x", "0", 1);
-        assert_eq!(run("[10, 20, 30] | .[0]", &leaf), vec![serde_json::json!(10)]);
-        assert_eq!(run("[10, 20, 30] | .[-1]", &leaf), vec![serde_json::json!(30)]);
+        assert_eq!(
+            run("[10, 20, 30] | .[0]", &leaf),
+            vec![serde_json::json!(10)]
+        );
+        assert_eq!(
+            run("[10, 20, 30] | .[-1]", &leaf),
+            vec![serde_json::json!(30)]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -861,22 +915,20 @@ mod tests {
     fn path_of_root() {
         let root = make_root();
         let results = run("@path", &root);
-        assert_eq!(
-            results,
-            vec![serde_json::json!(["source_file"])]
-        );
+        assert_eq!(results, vec![serde_json::json!(["source_file"])]);
     }
 
     #[test]
     fn path_of_leaf() {
         let root = make_root();
-        let results = run(
-            r#"desc:identifier | select(@text == "foo") | @path"#,
-            &root,
-        );
+        let results = run(r#"desc:identifier | select(@text == "foo") | @path"#, &root);
         assert_eq!(
             results,
-            vec![serde_json::json!(["source_file", "function_item", "identifier"])]
+            vec![serde_json::json!([
+                "source_file",
+                "function_item",
+                "identifier"
+            ])]
         );
     }
 
@@ -888,10 +940,7 @@ mod tests {
     fn field_child_has_parent() {
         let root = make_root();
         // Accessing .name via field should still have a parent (function_item)
-        let results = run(
-            "children[0] | .name | parent | @type",
-            &root,
-        );
+        let results = run("children[0] | .name | parent | @type", &root);
         assert_eq!(results, vec![serde_json::json!("function_item")]);
     }
 }

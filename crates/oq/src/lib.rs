@@ -93,7 +93,7 @@ impl Cache {
         let workdir = repo.workdir().context("bare repository")?;
         let rel = file
             .strip_prefix(workdir)
-            .or_else(|_| {
+            .or({
                 // file might already be relative
                 Ok::<&Path, std::path::StripPrefixError>(file)
             })
@@ -132,9 +132,7 @@ impl Cache {
             .context("bare repo")?
             .to_string_lossy()
             .to_string();
-        let rel = file
-            .strip_prefix(repo.workdir().unwrap())
-            .unwrap_or(file);
+        let rel = file.strip_prefix(repo.workdir().unwrap()).unwrap_or(file);
         let key = Self::cache_key(&repo_root, &rel.to_string_lossy(), &blob, mode);
         let path = self.dir.join(&key);
 
@@ -162,9 +160,7 @@ impl Cache {
             .context("bare repo")?
             .to_string_lossy()
             .to_string();
-        let rel = file
-            .strip_prefix(repo.workdir().unwrap())
-            .unwrap_or(file);
+        let rel = file.strip_prefix(repo.workdir().unwrap()).unwrap_or(file);
         let key = Self::cache_key(&repo_root, &rel.to_string_lossy(), &blob, mode);
 
         let entry = CacheEntry {
@@ -213,7 +209,7 @@ impl Cache {
                 let items: Result<Vec<serde_json::Value>, _> = stdout
                     .lines()
                     .filter(|l| !l.trim().is_empty())
-                    .map(|l| serde_json::from_str(l))
+                    .map(serde_json::from_str)
                     .collect();
                 items.map(serde_json::Value::Array)
             })
@@ -240,12 +236,7 @@ impl Cache {
     }
 
     /// Warm the cache for multiple files.
-    pub fn warm(
-        &self,
-        repo: &Repository,
-        files: &[PathBuf],
-        mode: &str,
-    ) -> Result<WarmResult> {
+    pub fn warm(&self, repo: &Repository, files: &[PathBuf], mode: &str) -> Result<WarmResult> {
         let mut result = WarmResult::default();
         for file in files {
             let abs = if file.is_absolute() {
@@ -270,11 +261,7 @@ impl Cache {
 
     /// Invalidate cache entries for files that changed since a ref/date.
     /// Returns paths of files that were invalidated.
-    pub fn invalidate_changed(
-        &self,
-        repo: &Repository,
-        since: &str,
-    ) -> Result<Vec<String>> {
+    pub fn invalidate_changed(&self, repo: &Repository, since: &str) -> Result<Vec<String>> {
         // Use gq to find changed files
         let output = Command::new("gq")
             .arg("--changed-since")
@@ -289,8 +276,7 @@ impl Cache {
             anyhow::bail!("gq failed: {stderr}");
         }
 
-        let entries: Vec<serde_json::Value> =
-            serde_json::from_slice(&output.stdout)?;
+        let entries: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
 
         let mut invalidated = Vec::new();
         for entry in &entries {
@@ -503,7 +489,9 @@ mod tests {
         let file = dir.path().join("f.txt");
         std::fs::write(&file, "hello").unwrap();
         let data = serde_json::json!({"key": "value"});
-        cache.put_by_hash(&file, "deadbeef", "skeleton", data.clone()).unwrap();
+        cache
+            .put_by_hash(&file, "deadbeef", "skeleton", data.clone())
+            .unwrap();
         let got = cache.get_by_hash(&file, "deadbeef", "skeleton").unwrap();
         assert_eq!(got.unwrap(), data);
     }

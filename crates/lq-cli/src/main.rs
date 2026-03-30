@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
     let query_is_file = cli
         .query
         .as_ref()
-        .map_or(false, |q| std::path::Path::new(q).exists());
+        .is_some_and(|q| std::path::Path::new(q).exists());
     if query_is_file {
         files.insert(0, cli.query.as_ref().unwrap());
     }
@@ -74,7 +74,7 @@ fn main() -> anyhow::Result<()> {
         if files.is_empty() {
             anyhow::bail!("lq: --follow requires at least one file argument");
         }
-        return follow_file(&files[0], &pipeline, cli.budget);
+        return follow_file(files[0], &pipeline, cli.budget);
     }
 
     // --budget mode wraps output with progressive disclosure
@@ -252,8 +252,7 @@ fn output_with_budget(results: &[serde_json::Value], budget: Option<usize>) -> a
         }
         Some(max_tokens) => {
             let mut tokens_used = 0usize;
-            let mut disclosed = 0usize;
-            for val in results {
+            for (disclosed, val) in results.iter().enumerate() {
                 let json = serde_json::to_string(val)?;
                 let entry_tokens = json.len() / 4 + 1;
                 if tokens_used + entry_tokens > max_tokens && disclosed > 0 {
@@ -274,7 +273,6 @@ fn output_with_budget(results: &[serde_json::Value], budget: Option<usize>) -> a
                 }
                 println!("{}", json);
                 tokens_used += entry_tokens;
-                disclosed += 1;
             }
         }
     }
@@ -289,8 +287,7 @@ fn follow_file(
 ) -> anyhow::Result<()> {
     use std::fs::File;
 
-    let mut file = File::open(path)
-        .map_err(|e| anyhow::anyhow!("lq: {}: {}", path, e))?;
+    let mut file = File::open(path).map_err(|e| anyhow::anyhow!("lq: {}: {}", path, e))?;
 
     // Read initial content for format detection
     let mut initial = String::new();
@@ -356,7 +353,8 @@ fn print_summary(name: &str, lines: &[&str], format: Format) -> anyhow::Result<(
     let mut sources = std::collections::HashSet::new();
     let mut first_ts = None;
     let mut last_ts = None;
-    let mut error_messages: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut error_messages: std::collections::HashMap<String, u64> =
+        std::collections::HashMap::new();
 
     for line in lines {
         let entry = parse_line(line, format);
@@ -387,7 +385,11 @@ fn print_summary(name: &str, lines: &[&str], format: Format) -> anyhow::Result<(
     let total = lines.len() as f64;
     let error_count = levels.get(&lq_parse::Level::Error).copied().unwrap_or(0)
         + levels.get(&lq_parse::Level::Fatal).copied().unwrap_or(0);
-    let error_rate = if total > 0.0 { error_count as f64 / total } else { 0.0 };
+    let error_rate = if total > 0.0 {
+        error_count as f64 / total
+    } else {
+        0.0
+    };
 
     // Top 5 errors by frequency
     let mut top_errors: Vec<_> = error_messages.into_iter().collect();

@@ -1,7 +1,7 @@
-use aq_core::backend::{Backend, BackendError};
-use aq_core::node::OwnedNode;
 use crate::spacy;
 use crate::tree;
+use aq_core::backend::{Backend, BackendError};
+use aq_core::node::OwnedNode;
 
 /// NLP backend — calls spaCy and maps to OwnedNode (ADR-015 Tier 1).
 pub struct NlpBackend;
@@ -13,8 +13,7 @@ impl Backend for NlpBackend {
         _language: &str,
         file_path: Option<&str>,
     ) -> Result<OwnedNode, BackendError> {
-        let doc = spacy::parse_with_spacy(source)
-            .map_err(|e| BackendError::from(e.to_string()))?;
+        let doc = spacy::parse_with_spacy(source).map_err(|e| BackendError::from(e.to_string()))?;
         Ok(tree::spacy_doc_to_owned_tree(&doc, source, file_path))
     }
 
@@ -45,7 +44,9 @@ mod tests {
 
     #[test]
     fn nlp_backend_parses_english_text() {
-        if !spacy_available() { return; }
+        if !spacy_available() {
+            return;
+        }
         let backend = NlpBackend;
         let result = backend.parse("Sarah went to Paris.", "english", None);
         assert!(result.is_ok(), "Expected Ok, got: {:?}", result);
@@ -62,7 +63,9 @@ mod tests {
 
     #[test]
     fn nlp_backend_parses_empty_text() {
-        if !spacy_available() { return; }
+        if !spacy_available() {
+            return;
+        }
         let backend = NlpBackend;
         let result = backend.parse("", "english", None);
         assert!(result.is_ok());
@@ -72,10 +75,16 @@ mod tests {
 
     #[test]
     fn nlp_backend_entities_present() {
-        if !spacy_available() { return; }
+        if !spacy_available() {
+            return;
+        }
         let backend = NlpBackend;
-        let result = backend.parse("Sarah went to Paris.", "english", None).unwrap();
-        let entities: Vec<_> = result.children.iter()
+        let result = backend
+            .parse("Sarah went to Paris.", "english", None)
+            .unwrap();
+        let entities: Vec<_> = result
+            .children
+            .iter()
             .flat_map(|c| c.children.iter())
             .chain(result.children.iter())
             .filter(|c| c.node_type == "entity")

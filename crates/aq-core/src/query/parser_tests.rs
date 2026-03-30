@@ -64,7 +64,10 @@ mod tests {
 
     #[test]
     fn meta_start_end() {
-        assert!(matches!(parse_query("@start"), Expr::Meta(MetaField::Start)));
+        assert!(matches!(
+            parse_query("@start"),
+            Expr::Meta(MetaField::Start)
+        ));
         assert!(matches!(parse_query("@end"), Expr::Meta(MetaField::End)));
     }
 
@@ -75,7 +78,10 @@ mod tests {
 
     #[test]
     fn meta_subtree_text() {
-        assert!(matches!(parse_query("@subtree_text"), Expr::Meta(MetaField::SubtreeText)));
+        assert!(matches!(
+            parse_query("@subtree_text"),
+            Expr::Meta(MetaField::SubtreeText)
+        ));
     }
 
     #[test]
@@ -102,8 +108,14 @@ mod tests {
 
     #[test]
     fn children_with_index() {
-        assert!(matches!(parse_query("children[0]"), Expr::Children(Some(0))));
-        assert!(matches!(parse_query("children[-1]"), Expr::Children(Some(-1))));
+        assert!(matches!(
+            parse_query("children[0]"),
+            Expr::Children(Some(0))
+        ));
+        assert!(matches!(
+            parse_query("children[-1]"),
+            Expr::Children(Some(-1))
+        ));
     }
 
     #[test]
@@ -124,9 +136,18 @@ mod tests {
 
     #[test]
     fn siblings() {
-        assert!(matches!(parse_query("siblings"), Expr::Sibling(SiblingKind::All)));
-        assert!(matches!(parse_query("prev_sibling"), Expr::Sibling(SiblingKind::Prev)));
-        assert!(matches!(parse_query("next_sibling"), Expr::Sibling(SiblingKind::Next)));
+        assert!(matches!(
+            parse_query("siblings"),
+            Expr::Sibling(SiblingKind::All)
+        ));
+        assert!(matches!(
+            parse_query("prev_sibling"),
+            Expr::Sibling(SiblingKind::Prev)
+        ));
+        assert!(matches!(
+            parse_query("next_sibling"),
+            Expr::Sibling(SiblingKind::Next)
+        ));
     }
 
     // -----------------------------------------------------------------------
@@ -361,8 +382,14 @@ mod tests {
 
     #[test]
     fn literal_bool() {
-        assert!(matches!(parse_query("true"), Expr::Literal(Value::Bool(true))));
-        assert!(matches!(parse_query("false"), Expr::Literal(Value::Bool(false))));
+        assert!(matches!(
+            parse_query("true"),
+            Expr::Literal(Value::Bool(true))
+        ));
+        assert!(matches!(
+            parse_query("false"),
+            Expr::Literal(Value::Bool(false))
+        ));
     }
 
     #[test]
@@ -481,7 +508,10 @@ mod tests {
         match parse_query("match(impl_item function_item)") {
             Expr::Match(pattern) => {
                 assert_eq!(pattern.steps.len(), 2);
-                assert!(matches!(pattern.steps[1].combinator, Combinator::Descendant));
+                assert!(matches!(
+                    pattern.steps[1].combinator,
+                    Combinator::Descendant
+                ));
             }
             other => panic!("Expected Match, got {:?}", other),
         }
@@ -513,7 +543,10 @@ mod tests {
     fn match_with_field_constraint() {
         match parse_query("match(function_item name:(identifier))") {
             Expr::Match(pattern) => {
-                assert_eq!(pattern.steps[0].field_constraint, Some(("name".into(), "identifier".into())));
+                assert_eq!(
+                    pattern.steps[0].field_constraint,
+                    Some(("name".into(), "identifier".into()))
+                );
             }
             other => panic!("Expected Match with field constraint, got {:?}", other),
         }
@@ -618,7 +651,8 @@ mod tests {
     #[test]
     fn bracket_filter_in_pipeline() {
         // Bracket-filter followed by more pipe stages
-        let expr = parse_query("desc:function_item[.name | @text | startswith(\"test\")] | .name | @text");
+        let expr =
+            parse_query("desc:function_item[.name | @text | startswith(\"test\")] | .name | @text");
         // Should parse as a pipeline
         assert!(matches!(expr, Expr::Pipe(_, _)));
     }

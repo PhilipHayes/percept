@@ -1,15 +1,13 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // "00:05 +3: test widget renders correctly"
 // "00:05 +3 -1: test widget fails to render"
 // "00:05 +3 ~1: test widget skipped"
 static FLUTTER_RESULT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"^(\d{2}:\d{2})\s+\+(\d+)(?:\s+-(\d+))?(?:\s+~(\d+))?\s*:\s+(.+)$"
-    ).unwrap()
+    Regex::new(r"^(\d{2}:\d{2})\s+\+(\d+)(?:\s+-(\d+))?(?:\s+~(\d+))?\s*:\s+(.+)$").unwrap()
 });
 
 // "  test widget renders correctly" (final summary line with status)
@@ -30,7 +28,10 @@ pub fn parse_flutter(input: &str) -> TestRun {
     for line in input.lines() {
         if let Some(caps) = FLUTTER_RESULT.captures(line) {
             let cur_passed: u32 = caps[2].parse().unwrap_or(0);
-            let cur_failed: u32 = caps.get(3).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+            let cur_failed: u32 = caps
+                .get(3)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
             let test_name = caps[5].trim().to_string();
 
             // Skip "loading" and summary lines

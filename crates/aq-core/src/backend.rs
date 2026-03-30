@@ -24,7 +24,9 @@ impl From<String> for BackendError {
 
 impl From<&str> for BackendError {
     fn from(s: &str) -> Self {
-        Self { message: s.to_string() }
+        Self {
+            message: s.to_string(),
+        }
     }
 }
 

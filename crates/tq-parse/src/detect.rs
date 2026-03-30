@@ -23,7 +23,9 @@ pub fn detect_format(lines: &[&str]) -> Format {
         }
 
         // libtest JSON: {"type":"suite",...} or {"type":"test",...}
-        if trimmed.starts_with('{') && (trimmed.contains(r#""type":"suite""#) || trimmed.contains(r#""type":"test""#)) {
+        if trimmed.starts_with('{')
+            && (trimmed.contains(r#""type":"suite""#) || trimmed.contains(r#""type":"test""#))
+        {
             libtest_json_score += 3;
         }
 
@@ -36,7 +38,10 @@ pub fn detect_format(lines: &[&str]) -> Format {
         }
 
         // Go test -json: {"Time":..., "Action":..., "Test":...}
-        if trimmed.starts_with('{') && trimmed.contains(r#""Action""#) && trimmed.contains(r#""Test""#) {
+        if trimmed.starts_with('{')
+            && trimmed.contains(r#""Action""#)
+            && trimmed.contains(r#""Test""#)
+        {
             go_json_score += 3;
         }
 
@@ -52,20 +57,34 @@ pub fn detect_format(lines: &[&str]) -> Format {
         if trimmed.starts_with("test result:") || trimmed.starts_with("running ") {
             libtest_score += 3;
         }
-        if trimmed.starts_with("test ") && (trimmed.ends_with("... ok") || trimmed.ends_with("... FAILED") || trimmed.ends_with("... ignored")) {
+        if trimmed.starts_with("test ")
+            && (trimmed.ends_with("... ok")
+                || trimmed.ends_with("... FAILED")
+                || trimmed.ends_with("... ignored"))
+        {
             libtest_score += 2;
         }
 
         // pytest: lines with :: separators, PASSED/FAILED/ERROR
-        if trimmed.contains("::") && (trimmed.contains("PASSED") || trimmed.contains("FAILED") || trimmed.contains("ERROR")) {
+        if trimmed.contains("::")
+            && (trimmed.contains("PASSED")
+                || trimmed.contains("FAILED")
+                || trimmed.contains("ERROR"))
+        {
             pytest_score += 3;
         }
-        if trimmed.starts_with("=") && (trimmed.contains("passed") || trimmed.contains("failed") || trimmed.contains("error")) {
+        if trimmed.starts_with("=")
+            && (trimmed.contains("passed")
+                || trimmed.contains("failed")
+                || trimmed.contains("error"))
+        {
             pytest_score += 2;
         }
 
         // Jest: "Tests:" summary or "PASS " / "FAIL " file prefixes
-        if trimmed.starts_with("Tests:") && (trimmed.contains("passed") || trimmed.contains("failed")) {
+        if trimmed.starts_with("Tests:")
+            && (trimmed.contains("passed") || trimmed.contains("failed"))
+        {
             jest_score += 3;
         }
         if trimmed.starts_with("PASS ") || trimmed.starts_with("FAIL ") {

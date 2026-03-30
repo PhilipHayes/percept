@@ -14,19 +14,36 @@ fn index_and_search_round_trip() {
     // Index
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["index", "--collection", "test-code", "--key", ".name", "--text", ".description"])
+        .args([
+            "index",
+            "--collection",
+            "test-code",
+            "--key",
+            ".name",
+            "--text",
+            ".description",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
 
-    assert!(output.status.success(), "index failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "index failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let index_result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(index_result["added"], 3);
     assert_eq!(index_result["total"], 3);
@@ -34,17 +51,31 @@ fn index_and_search_round_trip() {
     // Search for authentication
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["search", "authentication login password", "--collection", "test-code", "-k", "3"])
+        .args([
+            "search",
+            "authentication login password",
+            "--collection",
+            "test-code",
+            "-k",
+            "3",
+        ])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "search failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "search failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let results: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
     assert!(!results.is_empty(), "search should return results");
     // verify_credentials should rank highest for auth query
-    assert_eq!(results[0]["key"], "verify_credentials", "Top result should be verify_credentials");
+    assert_eq!(
+        results[0]["key"], "verify_credentials",
+        "Top result should be verify_credentials"
+    );
 
     // Stats
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
@@ -55,7 +86,11 @@ fn index_and_search_round_trip() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stats failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stats failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stats: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(stats["items"], 3);
     assert_eq!(stats["dims"], 384);
@@ -77,14 +112,27 @@ fn search_with_threshold_filters_results() {
     // Index
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["index", "--collection", "test-threshold", "--key", ".name", "--text", ".description"])
+        .args([
+            "index",
+            "--collection",
+            "test-threshold",
+            "--key",
+            ".name",
+            "--text",
+            ".description",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
@@ -93,7 +141,14 @@ fn search_with_threshold_filters_results() {
     // Search with high threshold — only strong matches
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["search", "database connection postgres", "--collection", "test-threshold", "--threshold", "0.5"])
+        .args([
+            "search",
+            "database connection postgres",
+            "--collection",
+            "test-threshold",
+            "--threshold",
+            "0.5",
+        ])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
@@ -123,14 +178,27 @@ fn invalidate_removes_entries() {
     // Index 3 items
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["index", "--collection", "test-invalidate", "--key", ".name", "--text", ".description"])
+        .args([
+            "index",
+            "--collection",
+            "test-invalidate",
+            "--key",
+            ".name",
+            "--text",
+            ".description",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
@@ -146,7 +214,12 @@ fn invalidate_removes_entries() {
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(b"func_a\nfunc_c\n").unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(b"func_a\nfunc_c\n")
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
@@ -182,14 +255,27 @@ fn upsert_updates_existing_entries() {
     // Index first time
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["index", "--collection", "test-upsert", "--key", ".name", "--text", ".description"])
+        .args([
+            "index",
+            "--collection",
+            "test-upsert",
+            "--key",
+            ".name",
+            "--text",
+            ".description",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input1.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input1.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
@@ -200,14 +286,28 @@ fn upsert_updates_existing_entries() {
     // Upsert with updated description
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["index", "--collection", "test-upsert", "--key", ".name", "--text", ".description", "--upsert"])
+        .args([
+            "index",
+            "--collection",
+            "test-upsert",
+            "--key",
+            ".name",
+            "--text",
+            ".description",
+            "--upsert",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input2.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input2.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
@@ -229,19 +329,36 @@ fn ndjson_input_works() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_mq"))
         .env("HOME", &home)
-        .args(["index", "--collection", "test-ndjson", "--key", ".name", "--text", ".description"])
+        .args([
+            "index",
+            "--collection",
+            "test-ndjson",
+            "--key",
+            ".name",
+            "--text",
+            ".description",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
 
-    assert!(output.status.success(), "ndjson index failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "ndjson index failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let r: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(r["added"], 2);
 
@@ -284,9 +401,12 @@ fn match_finds_fuzzy_pairs() {
             "match",
             left_file.to_str().unwrap(),
             right_file.to_str().unwrap(),
-            "--left-key", ".name",
-            "--right-key", ".description",
-            "--threshold", "0.5",
+            "--left-key",
+            ".name",
+            "--right-key",
+            ".description",
+            "--threshold",
+            "0.5",
         ])
         .output()
         .unwrap();
@@ -305,7 +425,10 @@ fn match_finds_fuzzy_pairs() {
         m["left"].as_str().unwrap_or("").contains("GitHub")
             && m["right"].as_str().unwrap_or("").contains("GITHUB")
     });
-    assert!(github_match.is_some(), "Expected GitHub Copilot to match GITHUB.COM/COPILOT");
+    assert!(
+        github_match.is_some(),
+        "Expected GitHub Copilot to match GITHUB.COM/COPILOT"
+    );
     assert!(github_match.unwrap()["score"].as_f64().unwrap() >= 0.5);
 
     let _ = std::fs::remove_dir_all(&home);
@@ -330,24 +453,48 @@ fn similar_finds_related_items() {
 
     let index_out = Command::new(binary)
         .env("HOME", &home)
-        .args(["index", "--collection", "modules", "--key", ".key", "--text", ".text"])
+        .args([
+            "index",
+            "--collection",
+            "modules",
+            "--key",
+            ".key",
+            "--text",
+            ".text",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
 
-    assert!(index_out.status.success(), "index failed: {}", String::from_utf8_lossy(&index_out.stderr));
+    assert!(
+        index_out.status.success(),
+        "index failed: {}",
+        String::from_utf8_lossy(&index_out.stderr)
+    );
 
     // Find items similar to "auth-login"
     let output = Command::new(binary)
         .env("HOME", &home)
-        .args(["similar", "auth-login", "--collection", "modules", "-k", "3"])
+        .args([
+            "similar",
+            "auth-login",
+            "--collection",
+            "modules",
+            "-k",
+            "3",
+        ])
         .output()
         .unwrap();
 
@@ -375,17 +522,35 @@ fn index_collection(binary: &str, home: &std::path::Path, collection: &str, inpu
     use std::io::Write;
     let out = Command::new(binary)
         .env("HOME", home)
-        .args(["index", "--collection", collection, "--key", ".key", "--text", ".text"])
+        .args([
+            "index",
+            "--collection",
+            collection,
+            "--key",
+            ".key",
+            "--text",
+            ".text",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
-            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(input.as_bytes())
+                .unwrap();
             child.wait_with_output()
         })
         .unwrap();
-    assert!(out.status.success(), "index {} failed: {}", collection, String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "index {} failed: {}",
+        collection,
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]
@@ -397,17 +562,27 @@ fn relate_finds_cross_collection_matches() {
     let binary = env!("CARGO_BIN_EXE_mq");
 
     // Index two related collections
-    index_collection(binary, &home, "errors", r#"[
+    index_collection(
+        binary,
+        &home,
+        "errors",
+        r#"[
         {"key": "err-auth", "text": "Authentication failed: invalid credentials"},
         {"key": "err-timeout", "text": "Request timed out after 30 seconds"},
         {"key": "err-perm", "text": "Permission denied: insufficient access rights"}
-    ]"#);
+    ]"#,
+    );
 
-    index_collection(binary, &home, "docs", r#"[
+    index_collection(
+        binary,
+        &home,
+        "docs",
+        r#"[
         {"key": "doc-login", "text": "How to configure user login and authentication"},
         {"key": "doc-network", "text": "Network configuration and timeout settings"},
         {"key": "doc-rbac", "text": "Role-based access control and permissions setup"}
-    ]"#);
+    ]"#,
+    );
 
     // Relate errors to docs
     let output = Command::new(binary)
@@ -447,21 +622,29 @@ fn classify_assigns_categories() {
     let binary = env!("CARGO_BIN_EXE_mq");
 
     // Index items to classify
-    index_collection(binary, &home, "tasks", r#"[
+    index_collection(
+        binary,
+        &home,
+        "tasks",
+        r#"[
         {"key": "fix-login-bug", "text": "Fix the broken user login authentication flow"},
         {"key": "add-dark-mode", "text": "Implement dark mode theme for the user interface"},
         {"key": "optimize-query", "text": "Speed up slow database query performance"},
         {"key": "write-api-docs", "text": "Document the REST API endpoints and responses"}
-    ]"#);
+    ]"#,
+    );
 
     // Classify against categories
     let output = Command::new(binary)
         .env("HOME", &home)
         .args([
             "classify",
-            "--collection", "tasks",
-            "--categories", "bug fix,feature,performance,documentation",
-            "--threshold", "0.2",
+            "--collection",
+            "tasks",
+            "--categories",
+            "bug fix,feature,performance,documentation",
+            "--threshold",
+            "0.2",
         ])
         .output()
         .unwrap();
@@ -477,7 +660,8 @@ fn classify_assigns_categories() {
 
     // Check each item got a reasonable category
     let find_cat = |key: &str| -> String {
-        classified.iter()
+        classified
+            .iter()
             .find(|c| c["key"] == key)
             .map(|c| c["category"].as_str().unwrap().to_string())
             .unwrap_or_default()
@@ -507,7 +691,10 @@ fn relate_rejects_model_mismatch() {
         .output()
         .unwrap();
 
-    assert!(!output.status.success(), "relate should fail for missing collection");
+    assert!(
+        !output.status.success(),
+        "relate should fail for missing collection"
+    );
 
     let _ = std::fs::remove_dir_all(&home);
 }

@@ -34,8 +34,18 @@ pub fn parse_logfmt_line(clean: &str, raw: &str) -> LogEntry {
         .cloned();
 
     let extracted_keys = [
-        "level", "lvl", "severity", "msg", "message",
-        "time", "timestamp", "ts", "source", "logger", "component", "caller",
+        "level",
+        "lvl",
+        "severity",
+        "msg",
+        "message",
+        "time",
+        "timestamp",
+        "ts",
+        "source",
+        "logger",
+        "component",
+        "caller",
     ];
     let fields: HashMap<String, serde_json::Value> = pairs
         .iter()
@@ -61,7 +71,7 @@ fn parse_pairs(line: &str) -> HashMap<String, String> {
 
     loop {
         // Skip whitespace
-        while chars.peek().map_or(false, |c| c.is_whitespace()) {
+        while chars.peek().is_some_and(|c| c.is_whitespace()) {
             chars.next();
         }
         if chars.peek().is_none() {
@@ -81,7 +91,7 @@ fn parse_pairs(line: &str) -> HashMap<String, String> {
         // Expect '='
         if chars.peek() != Some(&'=') {
             // Not a key=value pair — skip this token
-            while chars.peek().map_or(false, |c| !c.is_whitespace()) {
+            while chars.peek().is_some_and(|c| !c.is_whitespace()) {
                 chars.next();
             }
             continue;

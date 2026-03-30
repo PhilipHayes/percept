@@ -95,7 +95,10 @@ impl Drain {
 
             // No match — new cluster
             clusters.push(Cluster {
-                tokens: tokens.iter().map(|t| Token::Constant(t.to_string())).collect(),
+                tokens: tokens
+                    .iter()
+                    .map(|t| Token::Constant(t.to_string()))
+                    .collect(),
                 count: 1,
                 samples: vec![message.to_string()],
             });
@@ -104,7 +107,10 @@ impl Drain {
             self.groups.insert(
                 key,
                 vec![Cluster {
-                    tokens: tokens.iter().map(|t| Token::Constant(t.to_string())).collect(),
+                    tokens: tokens
+                        .iter()
+                        .map(|t| Token::Constant(t.to_string()))
+                        .collect(),
                     count: 1,
                     samples: vec![message.to_string()],
                 }],
@@ -174,10 +180,7 @@ mod tests {
         let patterns = drain.patterns();
         assert_eq!(patterns.len(), 1);
         assert_eq!(patterns[0].count, 3);
-        assert_eq!(
-            patterns[0].template,
-            "Connection refused to host <*>"
-        );
+        assert_eq!(patterns[0].template, "Connection refused to host <*>");
     }
 
     #[test]

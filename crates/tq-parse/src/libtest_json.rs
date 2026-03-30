@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 /// A single event from `cargo test --format json` (nightly) or `cargo test -- -Z unstable-options --format json`.
 /// Each line is an NDJSON record like:
@@ -31,7 +31,9 @@ pub fn parse_libtest_json(input: &str) -> TestRun {
         };
 
         if event.event_type == "test" {
-            let Some(ref event_str) = event.event else { continue };
+            let Some(ref event_str) = event.event else {
+                continue;
+            };
             let Some(ref name) = event.name else { continue };
 
             // "started" events just mark the beginning; skip them
@@ -106,7 +108,11 @@ mod tests {
         assert_eq!(run.failed, 1);
         let failures = run.failures();
         assert_eq!(failures[0].name, "math::div");
-        assert!(failures[0].message.as_ref().unwrap().contains("division by zero"));
+        assert!(failures[0]
+            .message
+            .as_ref()
+            .unwrap()
+            .contains("division by zero"));
     }
 
     #[test]

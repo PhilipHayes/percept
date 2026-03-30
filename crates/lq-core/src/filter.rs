@@ -19,17 +19,17 @@ pub enum Filter {
 impl Filter {
     pub fn matches(&self, entry: &LogEntry) -> bool {
         match self {
-            Filter::Level(min) => entry.level.map_or(false, |l| l >= *min),
+            Filter::Level(min) => entry.level.is_some_and(|l| l >= *min),
             Filter::Source(s) => entry
                 .source
                 .as_ref()
-                .map_or(false, |src| src.to_lowercase().contains(&s.to_lowercase())),
+                .is_some_and(|src| src.to_lowercase().contains(&s.to_lowercase())),
             Filter::Text(t) => {
                 let lower = t.to_lowercase();
                 entry.message.to_lowercase().contains(&lower)
             }
-            Filter::Since(ts) => entry.timestamp.map_or(false, |t| t >= *ts),
-            Filter::Until(ts) => entry.timestamp.map_or(false, |t| t <= *ts),
+            Filter::Since(ts) => entry.timestamp.is_some_and(|t| t >= *ts),
+            Filter::Until(ts) => entry.timestamp.is_some_and(|t| t <= *ts),
         }
     }
 }
@@ -125,9 +125,7 @@ fn parse_time_spec(spec: &str) -> Option<DateTime<Utc>> {
     }
     // Try date-only (assume start of day UTC)
     if let Ok(date) = chrono::NaiveDate::parse_from_str(spec, "%Y-%m-%d") {
-        return date
-            .and_hms_opt(0, 0, 0)
-            .map(|dt| dt.and_utc());
+        return date.and_hms_opt(0, 0, 0).map(|dt| dt.and_utc());
     }
     None
 }

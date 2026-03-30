@@ -118,7 +118,7 @@ fn try_level_first(clean: &str, raw: &str) -> Option<LogEntry> {
 fn try_bare_level(clean: &str, raw: &str) -> Option<LogEntry> {
     static RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"^(TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|ERR|FATAL|CRITICAL)\s+(?:(\S+?):\s+)?(.+)$"
+            r"^(TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|ERR|FATAL|CRITICAL)\s+(?:(\S+?):\s+)?(.+)$",
         )
         .unwrap()
     });

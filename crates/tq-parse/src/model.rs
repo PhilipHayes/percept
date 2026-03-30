@@ -60,13 +60,29 @@ impl TestRun {
     /// Build a TestRun from a list of results, computing totals.
     pub fn from_results(tests: Vec<TestResult>, runner: Option<String>, format: Format) -> Self {
         let total = tests.len() as u32;
-        let passed = tests.iter().filter(|t| t.status == TestStatus::Passed).count() as u32;
-        let failed = tests.iter().filter(|t| t.status == TestStatus::Failed).count() as u32;
-        let skipped = tests.iter().filter(|t| t.status == TestStatus::Skipped).count() as u32;
-        let errored = tests.iter().filter(|t| t.status == TestStatus::Errored).count() as u32;
+        let passed = tests
+            .iter()
+            .filter(|t| t.status == TestStatus::Passed)
+            .count() as u32;
+        let failed = tests
+            .iter()
+            .filter(|t| t.status == TestStatus::Failed)
+            .count() as u32;
+        let skipped = tests
+            .iter()
+            .filter(|t| t.status == TestStatus::Skipped)
+            .count() as u32;
+        let errored = tests
+            .iter()
+            .filter(|t| t.status == TestStatus::Errored)
+            .count() as u32;
         let duration_ms = {
             let sum: u64 = tests.iter().filter_map(|t| t.duration_ms).sum();
-            if sum > 0 { Some(sum) } else { None }
+            if sum > 0 {
+                Some(sum)
+            } else {
+                None
+            }
         };
         Self {
             total,
@@ -127,23 +143,34 @@ mod tests {
                 name: "test_a".into(),
                 status: TestStatus::Passed,
                 duration_ms: Some(10),
-                file: None, line: None, message: None,
-                stdout: None, stderr: None, suite: None,
+                file: None,
+                line: None,
+                message: None,
+                stdout: None,
+                stderr: None,
+                suite: None,
             },
             TestResult {
                 name: "test_b".into(),
                 status: TestStatus::Failed,
                 duration_ms: Some(20),
-                file: None, line: None,
+                file: None,
+                line: None,
                 message: Some("assertion failed".into()),
-                stdout: None, stderr: None, suite: None,
+                stdout: None,
+                stderr: None,
+                suite: None,
             },
             TestResult {
                 name: "test_c".into(),
                 status: TestStatus::Skipped,
                 duration_ms: None,
-                file: None, line: None, message: None,
-                stdout: None, stderr: None, suite: None,
+                file: None,
+                line: None,
+                message: None,
+                stdout: None,
+                stderr: None,
+                suite: None,
             },
         ];
         let run = TestRun::from_results(tests, Some("cargo".into()), Format::Libtest);

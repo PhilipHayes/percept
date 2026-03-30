@@ -2,12 +2,15 @@ use anyhow::Result;
 use clap::Parser;
 use std::io::{self, Read};
 
-use tq_parse::{detect_format, parse_output};
 use tq_core::diff::diff_runs;
 use tq_core::flaky::detect_flaky;
+use tq_parse::{detect_format, parse_output};
 
 #[derive(Parser)]
-#[command(name = "tq", about = "Test Results Query — structured test output for agents")]
+#[command(
+    name = "tq",
+    about = "Test Results Query — structured test output for agents"
+)]
 struct Cli {
     /// Show summary (total/passed/failed/skipped + failures)
     #[arg(long)]
@@ -56,8 +59,7 @@ fn main() -> Result<()> {
     if let Some(ref flaky_files) = cli.flaky {
         let mut runs = Vec::new();
         for path in flaky_files {
-            let run: tq_parse::TestRun =
-                serde_json::from_str(&std::fs::read_to_string(path)?)?;
+            let run: tq_parse::TestRun = serde_json::from_str(&std::fs::read_to_string(path)?)?;
             runs.push(run);
         }
         let report = detect_flaky(&runs);

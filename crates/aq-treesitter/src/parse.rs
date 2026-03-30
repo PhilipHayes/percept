@@ -33,7 +33,11 @@ pub struct ParsedTree {
 
 impl ParsedTree {
     /// Parse source code in the given language.
-    pub fn parse(source: String, language: Language, file_path: Option<String>) -> Result<Self, ParseTreeError> {
+    pub fn parse(
+        source: String,
+        language: Language,
+        file_path: Option<String>,
+    ) -> Result<Self, ParseTreeError> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(&language.ts_language())
@@ -41,11 +45,9 @@ impl ParsedTree {
                 message: format!("Failed to set language: {e}"),
             })?;
 
-        let tree = parser
-            .parse(&source, None)
-            .ok_or_else(|| ParseTreeError {
-                message: "tree-sitter parse returned None".into(),
-            })?;
+        let tree = parser.parse(&source, None).ok_or_else(|| ParseTreeError {
+            message: "tree-sitter parse returned None".into(),
+        })?;
 
         Ok(Self {
             source,
@@ -90,9 +92,7 @@ impl ParsedTree {
             }
 
             // Depth-first traversal
-            if did_enter && cursor.goto_first_child() {
-                did_enter = true;
-            } else if cursor.goto_next_sibling() {
+            if (did_enter && cursor.goto_first_child()) || cursor.goto_next_sibling() {
                 did_enter = true;
             } else if cursor.goto_parent() {
                 did_enter = false;
@@ -131,7 +131,11 @@ impl ParsedTree {
         self.convert_node(&self.root_node(), true)
     }
 
-    fn convert_node(&self, ts_node: &tree_sitter::Node<'_>, include_all: bool) -> aq_core::OwnedNode {
+    fn convert_node(
+        &self,
+        ts_node: &tree_sitter::Node<'_>,
+        include_all: bool,
+    ) -> aq_core::OwnedNode {
         let mut children = Vec::new();
         let mut field_indices: HashMap<String, Vec<usize>> = HashMap::new();
 

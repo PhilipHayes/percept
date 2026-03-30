@@ -7,8 +7,9 @@ use crate::model::{Level, LogEntry};
 // 127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.example.com/start.html" "Mozilla/4.08"
 static ACCESS_LOG: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r#"^(\S+)\s+(\S+)\s+(\S+)\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d{3})\s+(\S+)(?:\s+"([^"]*)")?"#
-    ).unwrap()
+        r#"^(\S+)\s+(\S+)\s+(\S+)\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d{3})\s+(\S+)(?:\s+"([^"]*)")?"#,
+    )
+    .unwrap()
 });
 
 /// Map HTTP status code to log level.
@@ -42,11 +43,23 @@ pub fn parse_access_line(line: &str, raw: &str) -> LogEntry {
         let level = status_to_level(status);
 
         let mut fields = std::collections::HashMap::new();
-        fields.insert("client_ip".to_string(), serde_json::Value::String(client_ip.to_string()));
-        fields.insert("status".to_string(), serde_json::Value::Number(status.into()));
-        fields.insert("bytes".to_string(), serde_json::Value::String(bytes.to_string()));
+        fields.insert(
+            "client_ip".to_string(),
+            serde_json::Value::String(client_ip.to_string()),
+        );
+        fields.insert(
+            "status".to_string(),
+            serde_json::Value::Number(status.into()),
+        );
+        fields.insert(
+            "bytes".to_string(),
+            serde_json::Value::String(bytes.to_string()),
+        );
         if let Some(ref_str) = referer {
-            fields.insert("referer".to_string(), serde_json::Value::String(ref_str.to_string()));
+            fields.insert(
+                "referer".to_string(),
+                serde_json::Value::String(ref_str.to_string()),
+            );
         }
 
         LogEntry {

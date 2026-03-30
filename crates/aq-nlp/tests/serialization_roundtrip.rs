@@ -58,7 +58,10 @@ fn test_full_nlp_tree_roundtrip() {
     let mut restored_keys = Vec::new();
     collect_field_keys(&tree, &mut original_keys);
     collect_field_keys(&restored, &mut restored_keys);
-    assert_eq!(original_keys, restored_keys, "field_indices keys differ after round-trip");
+    assert_eq!(
+        original_keys, restored_keys,
+        "field_indices keys differ after round-trip"
+    );
 
     // Verify source_file propagated
     assert_eq!(tree.source_file.as_deref(), Some("genesis.txt"));

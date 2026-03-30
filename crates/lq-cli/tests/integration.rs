@@ -88,7 +88,8 @@ fn summary_mode() {
         .output()
         .unwrap();
     assert!(out.status.success());
-    let v: serde_json::Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+    let v: serde_json::Value =
+        serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
     assert_eq!(v["format"], "json");
     assert_eq!(v["lines"], 5);
     assert_eq!(v["levels"]["error"], 2);
@@ -126,7 +127,8 @@ fn auto_detect_json_passthrough() {
         .output()
         .unwrap();
     assert!(out.status.success());
-    let v: serde_json::Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
+    let v: serde_json::Value =
+        serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
     assert_eq!(v["lines"], 5);
 }
 

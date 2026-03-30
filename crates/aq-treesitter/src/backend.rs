@@ -17,20 +17,26 @@ impl Backend for TreeSitterBackend {
         let lang = Language::from_name(language)
             .ok_or_else(|| BackendError::from(format!("Unsupported language: {language}")))?;
 
-        let parsed = ParsedTree::parse(
-            source.to_string(),
-            lang,
-            file_path.map(|s| s.to_string()),
-        )
-        .map_err(|e| BackendError::from(e.to_string()))?;
+        let parsed = ParsedTree::parse(source.to_string(), lang, file_path.map(|s| s.to_string()))
+            .map_err(|e| BackendError::from(e.to_string()))?;
 
         Ok(parsed.to_owned_node())
     }
 
     fn supported_languages(&self) -> Vec<&str> {
         vec![
-            "c", "cpp", "dart", "go", "java", "javascript",
-            "json", "python", "rust", "swift", "tsx", "typescript",
+            "c",
+            "cpp",
+            "dart",
+            "go",
+            "java",
+            "javascript",
+            "json",
+            "python",
+            "rust",
+            "swift",
+            "tsx",
+            "typescript",
         ]
     }
 }

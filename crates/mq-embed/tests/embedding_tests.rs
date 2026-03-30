@@ -4,9 +4,9 @@
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
     use mq_embed::engine::EmbedEngine;
     use mq_embed::model::ModelKind;
+    use std::sync::Mutex;
 
     // Serialize access to the model to avoid lock contention
     static ENGINE_LOCK: Mutex<()> = Mutex::new(());
@@ -34,7 +34,9 @@ mod tests {
         let mut engine = EmbedEngine::new(ModelKind::BgeSmall).unwrap();
         let a = engine.embed_one("the cat sat on the mat").unwrap();
         let b = engine.embed_one("a cat is sitting on a mat").unwrap();
-        let c = engine.embed_one("quantum chromodynamics in lattice gauge theory").unwrap();
+        let c = engine
+            .embed_one("quantum chromodynamics in lattice gauge theory")
+            .unwrap();
 
         let sim_ab = cosine(&a, &b);
         let sim_ac = cosine(&a, &c);
@@ -46,7 +48,11 @@ mod tests {
             sim_ab,
             sim_ac
         );
-        assert!(sim_ab > 0.7, "similar sentences should have high similarity: {}", sim_ab);
+        assert!(
+            sim_ab > 0.7,
+            "similar sentences should have high similarity: {}",
+            sim_ab
+        );
     }
 
     #[test]

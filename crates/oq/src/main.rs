@@ -60,7 +60,10 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let repo_path = cli.repo.as_deref().unwrap_or_else(|| std::path::Path::new("."));
+    let repo_path = cli
+        .repo
+        .as_deref()
+        .unwrap_or_else(|| std::path::Path::new("."));
     let repo = Repository::discover(repo_path).context("not inside a git repository")?;
     let workdir = repo.workdir().context("bare repository")?.to_path_buf();
 
@@ -106,8 +109,15 @@ fn main() -> anyhow::Result<()> {
     } else if let Some(ref since) = cli.invalidate {
         let changed = cache.invalidate_changed(&repo, since)?;
         println!("{}", serde_json::to_string_pretty(&changed)?);
-        eprintln!("{} files changed — re-warm with: oq --warm {}", changed.len(),
-            changed.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" "));
+        eprintln!(
+            "{} files changed — re-warm with: oq --warm {}",
+            changed.len(),
+            changed
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
     } else {
         Cli::parse_from(["oq", "--help"]);
     }
@@ -118,9 +128,8 @@ fn main() -> anyhow::Result<()> {
 /// Check if a file has an extension the given mode can process.
 fn is_parseable(path: &str, mode: &str) -> bool {
     let code = [
-        ".rs", ".ts", ".tsx", ".js", ".jsx", ".py",
-        ".go", ".java", ".kt", ".c", ".cpp", ".h", ".hpp",
-        ".swift", ".dart", ".rb", ".cs",
+        ".rs", ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".java", ".kt", ".c", ".cpp", ".h",
+        ".hpp", ".swift", ".dart", ".rb", ".cs",
     ];
     let prose = [".md", ".txt", ".yaml", ".yml"];
     if mode.starts_with("nq-") {
@@ -129,4 +138,3 @@ fn is_parseable(path: &str, mode: &str) -> bool {
         code.iter().any(|ext| path.ends_with(ext))
     }
 }
-

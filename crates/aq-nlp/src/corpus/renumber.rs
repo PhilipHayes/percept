@@ -52,10 +52,7 @@ impl LineMapping {
 ///
 /// `file_line_counts` should contain `(filename, total_line_count)` for each
 /// file in merge order.  The tree is mutated in-place.
-pub fn renumber_global(
-    tree: &mut OwnedNode,
-    file_line_counts: &[(String, usize)],
-) -> LineMapping {
+pub fn renumber_global(tree: &mut OwnedNode, file_line_counts: &[(String, usize)]) -> LineMapping {
     let mapping = LineMapping::from_file_line_counts(file_line_counts);
     renumber_node(tree, &mapping);
     mapping
@@ -204,11 +201,7 @@ mod tests {
         }
     }
 
-    fn make_interaction_with_line(
-        verb: &str,
-        source_line: usize,
-        source: &str,
-    ) -> OwnedNode {
+    fn make_interaction_with_line(verb: &str, source_line: usize, source: &str) -> OwnedNode {
         let line_node = OwnedNode {
             node_type: "line".to_string(),
             text: Some(source_line.to_string()),
@@ -353,9 +346,7 @@ mod tests {
     #[test]
     fn test_renumber_interactions() {
         // Interaction from b.txt at local line 3. With a.txt having 10 lines.
-        let mut doc = build_merged_doc(vec![
-            make_interaction_with_line("sold", 3, "b.txt"),
-        ]);
+        let mut doc = build_merged_doc(vec![make_interaction_with_line("sold", 3, "b.txt")]);
 
         renumber_global(
             &mut doc,
@@ -375,9 +366,7 @@ mod tests {
     #[test]
     fn test_renumber_entity_lines() {
         // Entity from b.txt at local line 5, char offset 12.
-        let mut doc = build_merged_doc(vec![
-            make_entity_with_location("Joseph", 5, 12, "b.txt"),
-        ]);
+        let mut doc = build_merged_doc(vec![make_entity_with_location("Joseph", 5, 12, "b.txt")]);
 
         renumber_global(
             &mut doc,
@@ -386,7 +375,7 @@ mod tests {
 
         let entity = &doc.children[0];
         assert_eq!(entity.start_line, 15); // 5 + 10
-        // Location text: "5:12" → "15:12"
+                                           // Location text: "5:12" → "15:12"
         let loc = &entity.children[0];
         assert_eq!(loc.text.as_deref(), Some("15:12"));
         assert_eq!(loc.start_line, 15);

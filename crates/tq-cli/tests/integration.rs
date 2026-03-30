@@ -11,10 +11,19 @@ fn fixture(name: &str) -> String {
 #[test]
 fn summary_cargo_test() {
     let output = tq_bin()
-        .args(["--format", "libtest", "--summary", &fixture("cargo-test.txt")])
+        .args([
+            "--format",
+            "libtest",
+            "--summary",
+            &fixture("cargo-test.txt"),
+        ])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -25,10 +34,19 @@ fn summary_cargo_test() {
 #[test]
 fn summary_libtest_json() {
     let output = tq_bin()
-        .args(["--format", "libtest-json", "--summary", &fixture("cargo-test.json")])
+        .args([
+            "--format",
+            "libtest-json",
+            "--summary",
+            &fixture("cargo-test.json"),
+        ])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 3);
@@ -42,7 +60,11 @@ fn summary_pytest() {
         .args(["--format", "pytest", "--summary", &fixture("pytest.txt")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -56,7 +78,11 @@ fn summary_junit() {
         .args(["--format", "junit", "--summary", &fixture("junit.xml")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -72,7 +98,11 @@ fn autodetect_format() {
         .args(["--summary", &fixture("cargo-test.txt")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -88,13 +118,17 @@ fn budget_truncates_output() {
         .expect("failed to run tq");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("truncated"), "expected truncation message, got: {}", stdout);
+    assert!(
+        stdout.contains("truncated"),
+        "expected truncation message, got: {}",
+        stdout
+    );
 }
 
 #[test]
 fn stdin_input() {
-    use std::process::Stdio;
     use std::io::Write;
+    use std::process::Stdio;
 
     let fixture_content = std::fs::read_to_string(fixture("cargo-test.txt")).unwrap();
     let mut child = tq_bin()
@@ -104,9 +138,18 @@ fn stdin_input() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("failed to spawn tq");
-    child.stdin.take().unwrap().write_all(fixture_content.as_bytes()).unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(fixture_content.as_bytes())
+        .unwrap();
     let output = child.wait_with_output().unwrap();
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -136,8 +179,10 @@ fn save_and_diff() {
     // Save before (cargo-test.txt has 3 pass, 1 fail)
     let output = tq_bin()
         .args([
-            "--format", "libtest",
-            "--save", before_path.to_str().unwrap(),
+            "--format",
+            "libtest",
+            "--save",
+            before_path.to_str().unwrap(),
             "--summary",
             &fixture("cargo-test.txt"),
         ])
@@ -150,8 +195,10 @@ fn save_and_diff() {
     // and just verify the diff runs
     let output = tq_bin()
         .args([
-            "--format", "libtest",
-            "--save", after_path.to_str().unwrap(),
+            "--format",
+            "libtest",
+            "--save",
+            after_path.to_str().unwrap(),
             "--summary",
             &fixture("cargo-test.txt"),
         ])
@@ -188,32 +235,32 @@ fn flaky_detection() {
 
     let output = tq_bin()
         .args([
-            "--format", "libtest",
-            "--save", run1.to_str().unwrap(),
-            "--summary",
-            &fixture("cargo-test.txt"),
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-
-    let output = tq_bin()
-        .args([
-            "--format", "libtest",
-            "--save", run2.to_str().unwrap(),
-            "--summary",
-            &fixture("cargo-test.txt"),
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-
-    let output = tq_bin()
-        .args([
-            "--flaky",
+            "--format",
+            "libtest",
+            "--save",
             run1.to_str().unwrap(),
-            run2.to_str().unwrap(),
+            "--summary",
+            &fixture("cargo-test.txt"),
         ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    let output = tq_bin()
+        .args([
+            "--format",
+            "libtest",
+            "--save",
+            run2.to_str().unwrap(),
+            "--summary",
+            &fixture("cargo-test.txt"),
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    let output = tq_bin()
+        .args(["--flaky", run1.to_str().unwrap(), run2.to_str().unwrap()])
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -231,7 +278,11 @@ fn summary_jest() {
         .args(["--format", "jest", "--summary", &fixture("jest.txt")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -246,7 +297,11 @@ fn summary_gotest() {
         .args(["--format", "gotest", "--summary", &fixture("gotest.txt")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -258,10 +313,19 @@ fn summary_gotest() {
 #[test]
 fn summary_gotest_json() {
     let output = tq_bin()
-        .args(["--format", "gotest-json", "--summary", &fixture("gotest.json")])
+        .args([
+            "--format",
+            "gotest-json",
+            "--summary",
+            &fixture("gotest.json"),
+        ])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 2);
@@ -275,7 +339,11 @@ fn summary_tap() {
         .args(["--format", "tap", "--summary", &fixture("tap.txt")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 4);
@@ -290,7 +358,11 @@ fn summary_flutter() {
         .args(["--format", "flutter", "--summary", &fixture("flutter.txt")])
         .output()
         .expect("failed to run tq");
-    assert!(output.status.success(), "tq exited with error: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "tq exited with error: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
     assert_eq!(json["total"], 3);

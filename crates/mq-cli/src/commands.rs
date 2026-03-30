@@ -41,7 +41,11 @@ pub fn index(
 
     // Read JSON from stdin
     let stdin = io::stdin();
-    let input: String = stdin.lock().lines().collect::<Result<Vec<_>, _>>()?.join("\n");
+    let input: String = stdin
+        .lock()
+        .lines()
+        .collect::<Result<Vec<_>, _>>()?
+        .join("\n");
     if input.trim().is_empty() {
         bail!("No input on stdin");
     }
@@ -222,7 +226,11 @@ pub fn match_cmd(
     // Read left items
     let left_data = if left_path == "-" {
         let stdin = io::stdin();
-        stdin.lock().lines().collect::<Result<Vec<_>, _>>()?.join("\n")
+        stdin
+            .lock()
+            .lines()
+            .collect::<Result<Vec<_>, _>>()?
+            .join("\n")
     } else {
         std::fs::read_to_string(left_path)
             .with_context(|| format!("Failed to read left file: {}", left_path))?
@@ -294,21 +302,17 @@ pub fn match_cmd(
     Ok(())
 }
 
-pub fn similar(
-    key: &str,
-    collection_name: &str,
-    k: usize,
-    threshold: f32,
-) -> Result<()> {
+pub fn similar(key: &str, collection_name: &str, k: usize, threshold: f32) -> Result<()> {
     let coll = Collection::load(collection_name)
         .with_context(|| format!("Collection '{}' not found", collection_name))?;
 
     // Find the item with the given key
-    let source = coll
-        .items
-        .iter()
-        .find(|i| i.key == key)
-        .with_context(|| format!("Key '{}' not found in collection '{}'", key, collection_name))?;
+    let source = coll.items.iter().find(|i| i.key == key).with_context(|| {
+        format!(
+            "Key '{}' not found in collection '{}'",
+            key, collection_name
+        )
+    })?;
 
     let query_embedding = source.embedding.clone();
 
@@ -325,12 +329,7 @@ pub fn similar(
     Ok(())
 }
 
-pub fn relate(
-    left_name: &str,
-    right_name: &str,
-    k: usize,
-    threshold: f32,
-) -> Result<()> {
+pub fn relate(left_name: &str, right_name: &str, k: usize, threshold: f32) -> Result<()> {
     let left_coll = Collection::load(left_name)
         .with_context(|| format!("Collection '{}' not found", left_name))?;
     let right_coll = Collection::load(right_name)
@@ -367,11 +366,7 @@ pub fn relate(
     Ok(())
 }
 
-pub fn classify(
-    collection_name: &str,
-    categories_csv: &str,
-    threshold: f32,
-) -> Result<()> {
+pub fn classify(collection_name: &str, categories_csv: &str, threshold: f32) -> Result<()> {
     let coll = Collection::load(collection_name)
         .with_context(|| format!("Collection '{}' not found", collection_name))?;
 

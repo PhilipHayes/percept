@@ -3,8 +3,7 @@ use std::sync::LazyLock;
 
 /// Strip ANSI escape codes (colors, cursor control) from a string.
 pub fn strip_ansi(input: &str) -> String {
-    static RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"\x1b\[[0-9;]*[a-zA-Z]").unwrap());
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\x1b\[[0-9;]*[a-zA-Z]").unwrap());
     RE.replace_all(input, "").into_owned()
 }
 

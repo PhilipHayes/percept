@@ -141,11 +141,7 @@ impl NqCache {
     }
 
     /// Look up a cached OwnedNode tree. Returns `None` on miss.
-    pub fn get(
-        &self,
-        file: &Path,
-        content_hash: &str,
-    ) -> anyhow::Result<Option<OwnedNode>> {
+    pub fn get(&self, file: &Path, content_hash: &str) -> anyhow::Result<Option<OwnedNode>> {
         let mode = self.mode();
         match self.inner.get_by_hash(file, content_hash, &mode)? {
             Some(value) => {
@@ -157,12 +153,7 @@ impl NqCache {
     }
 
     /// Write an OwnedNode tree to cache.
-    pub fn put(
-        &self,
-        file: &Path,
-        content_hash: &str,
-        tree: &OwnedNode,
-    ) -> anyhow::Result<()> {
+    pub fn put(&self, file: &Path, content_hash: &str, tree: &OwnedNode) -> anyhow::Result<()> {
         let mode = self.mode();
         let value = serde_json::to_value(tree)?;
         self.inner.put_by_hash(file, content_hash, &mode, value)?;
@@ -174,11 +165,7 @@ impl NqCache {
     }
 
     /// Check cache status without returning the tree.
-    pub fn get_status(
-        &self,
-        file: &Path,
-        content_hash: &str,
-    ) -> anyhow::Result<NqCacheStatus> {
+    pub fn get_status(&self, file: &Path, content_hash: &str) -> anyhow::Result<NqCacheStatus> {
         let mode = self.mode();
         if self.inner.get_by_hash(file, content_hash, &mode)?.is_some() {
             return Ok(NqCacheStatus::Hit);
@@ -325,7 +312,9 @@ mod tests {
     #[test]
     fn test_miss() {
         let (cache, _tmp) = temp_cache();
-        let result = cache.get(Path::new("missing.txt"), "deadbeef00").expect("get");
+        let result = cache
+            .get(Path::new("missing.txt"), "deadbeef00")
+            .expect("get");
         assert_eq!(result, None);
     }
 

@@ -69,7 +69,7 @@ pub fn detect_flaky(runs: &[TestRun]) -> FlakyReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tq_parse::{TestResult, Format};
+    use tq_parse::{Format, TestResult};
 
     fn make_run(tests: Vec<(&str, TestStatus)>) -> TestRun {
         let results: Vec<TestResult> = tests

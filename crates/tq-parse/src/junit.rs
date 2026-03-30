@@ -1,52 +1,36 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // Match <testcase> elements: name, classname, time
-static TESTCASE_OPEN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<testcase\s+([^>]*)>"#).unwrap()
-});
+static TESTCASE_OPEN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<testcase\s+([^>]*)>"#).unwrap());
 
 // Self-closing: <testcase ... />
-static TESTCASE_SELF_CLOSE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<testcase\s+([^/]*)/>"#).unwrap()
-});
+static TESTCASE_SELF_CLOSE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<testcase\s+([^/]*)/>"#).unwrap());
 
-static ATTR_NAME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"name="([^"]*)""#).unwrap()
-});
+static ATTR_NAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"name="([^"]*)""#).unwrap());
 
-static ATTR_CLASSNAME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"classname="([^"]*)""#).unwrap()
-});
+static ATTR_CLASSNAME: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"classname="([^"]*)""#).unwrap());
 
-static ATTR_TIME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"time="([^"]*)""#).unwrap()
-});
+static ATTR_TIME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"time="([^"]*)""#).unwrap());
 
-static ATTR_FILE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"file="([^"]*)""#).unwrap()
-});
+static ATTR_FILE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"file="([^"]*)""#).unwrap());
 
-static ATTR_LINE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"line="([^"]*)""#).unwrap()
-});
+static ATTR_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"line="([^"]*)""#).unwrap());
 
 // <failure ...> or <error ...>
-static FAILURE_TAG: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<(failure|error)\b[^>]*>"#).unwrap()
-});
+static FAILURE_TAG: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<(failure|error)\b[^>]*>"#).unwrap());
 
 // message="..." attribute inside failure/error tags
-static FAILURE_MSG: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"message="([^"]*)""#).unwrap()
-});
+static FAILURE_MSG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"message="([^"]*)""#).unwrap());
 
 // <skipped>
-static SKIPPED_TAG: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<skipped\b"#).unwrap()
-});
+static SKIPPED_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"<skipped\b"#).unwrap());
 
 /// Parse JUnit XML test results.
 /// This is a regex-based parser that handles the common JUnit XML schema
@@ -156,9 +140,7 @@ impl PendingTestCase {
             .unwrap_or_else(|| "unknown".to_string());
         let classname = ATTR_CLASSNAME.captures(attrs).map(|c| c[1].to_string());
         let file = ATTR_FILE.captures(attrs).map(|c| c[1].to_string());
-        let line = ATTR_LINE
-            .captures(attrs)
-            .and_then(|c| c[1].parse().ok());
+        let line = ATTR_LINE.captures(attrs).and_then(|c| c[1].parse().ok());
         let duration_ms = ATTR_TIME
             .captures(attrs)
             .and_then(|c| c[1].parse::<f64>().ok())

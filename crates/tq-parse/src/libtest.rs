@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // "test module::test_name ... ok" or "... FAILED" or "... ignored"
 static TEST_LINE: LazyLock<Regex> = LazyLock::new(|| {
@@ -9,9 +9,8 @@ static TEST_LINE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 // Failure block delimiter: "---- module::test_name stdout ----"
-static FAILURE_HEADER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^---- (\S+) stdout ----$").unwrap()
-});
+static FAILURE_HEADER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^---- (\S+) stdout ----$").unwrap());
 
 /// Parse cargo test (libtest) text output.
 pub fn parse_libtest(input: &str) -> TestRun {
@@ -32,7 +31,10 @@ pub fn parse_libtest(input: &str) -> TestRun {
 
         // If inside a failure block, collect lines until next delimiter
         if let Some((_, ref mut lines)) = current_failure {
-            if line.starts_with("---- ") || line.starts_with("failures:") || line.starts_with("test result:") {
+            if line.starts_with("---- ")
+                || line.starts_with("failures:")
+                || line.starts_with("test result:")
+            {
                 let (name, collected) = current_failure.take().unwrap();
                 failure_outputs.push((name, collected.join("\n")));
                 // Fall through to process this line normally

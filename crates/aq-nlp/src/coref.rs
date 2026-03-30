@@ -13,6 +13,7 @@ pub(crate) enum CorefType {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct CoreferenceData {
     pub referent: String,
     pub canonical: String,
@@ -24,6 +25,7 @@ pub(crate) struct CoreferenceData {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct CoreferenceChain {
     pub canonical: String,
     pub entity_type: String,
@@ -112,10 +114,7 @@ pub(crate) fn build_coreference_chains(
         .map(|key| {
             let mentions_refs = &groups[&key];
             let canonical = first_case[&key].clone();
-            let entity_type = entity_type_map
-                .get(&key)
-                .cloned()
-                .unwrap_or_default();
+            let entity_type = entity_type_map.get(&key).cloned().unwrap_or_default();
 
             let mut aliases: Vec<String> = Vec::new();
             for m in mentions_refs.iter() {
@@ -259,8 +258,7 @@ pub(crate) fn resolve_same_sentence_pronouns(
                     if let Some((noun_idx, _)) = tokens
                         .iter()
                         .enumerate()
-                        .filter(|(i, t)| *i < token_index && t.pos == "NOUN")
-                        .last()
+                        .rfind(|(i, t)| *i < token_index && t.pos == "NOUN")
                     {
                         candidates.push(noun_idx);
                     }
@@ -310,6 +308,7 @@ pub(crate) fn resolve_same_sentence_pronouns(
 
 // ── Phase 3: Cross-sentence pronoun resolution ──────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_cross_sentence_pronouns(
     sentence: &SpacySentence,
     sentence_idx: usize,
@@ -391,8 +390,7 @@ pub(crate) fn resolve_cross_sentence_pronouns(
                     if let Some((noun_idx, _)) = prev_tokens
                         .iter()
                         .enumerate()
-                        .filter(|(_, t)| t.pos == "NOUN")
-                        .last()
+                        .rfind(|(_, t)| t.pos == "NOUN")
                     {
                         candidates.push(noun_idx);
                     }
@@ -542,16 +540,16 @@ mod tests {
     #[test]
     fn appositive_simple() {
         let tokens = vec![
-            make_token("Sarah",     "PROPN", "nsubj",  5, "PERSON", 0),
-            make_token(",",         "PUNCT", "punct",  0, "",        5),
-            make_token("the",       "DET",   "det",    3, "",        7),
-            make_token("detective", "NOUN",  "appos",  0, "",        11),
-            make_token(",",         "PUNCT", "punct",  0, "",        20),
-            make_token("arrived",   "VERB",  "ROOT",   5, "",        22),
-            make_token("at",        "ADP",   "prep",   5, "",        30),
-            make_token("the",       "DET",   "det",    8, "",        33),
-            make_token("scene",     "NOUN",  "pobj",   6, "",        37),
-            make_token(".",         "PUNCT", "punct",  5, "",        42),
+            make_token("Sarah", "PROPN", "nsubj", 5, "PERSON", 0),
+            make_token(",", "PUNCT", "punct", 0, "", 5),
+            make_token("the", "DET", "det", 3, "", 7),
+            make_token("detective", "NOUN", "appos", 0, "", 11),
+            make_token(",", "PUNCT", "punct", 0, "", 20),
+            make_token("arrived", "VERB", "ROOT", 5, "", 22),
+            make_token("at", "ADP", "prep", 5, "", 30),
+            make_token("the", "DET", "det", 8, "", 33),
+            make_token("scene", "NOUN", "pobj", 6, "", 37),
+            make_token(".", "PUNCT", "punct", 5, "", 42),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -569,15 +567,15 @@ mod tests {
     #[test]
     fn appositive_compound_name() {
         let tokens = vec![
-            make_token("Bob",    "PROPN", "compound", 1, "PERSON", 0),
-            make_token("Markey", "PROPN", "nsubj",    5, "PERSON", 4),
-            make_token(",",      "PUNCT", "punct",    1, "",        10),
-            make_token("the",    "DET",   "det",      4, "",        12),
-            make_token("healer", "NOUN",  "appos",    1, "",        16),
-            make_token("came",   "VERB",  "ROOT",     5, "",        23),
-            make_token("to",     "PART",  "aux",      7, "",        28),
-            make_token("help",   "VERB",  "xcomp",    5, "",        31),
-            make_token(".",      "PUNCT", "punct",    5, "",        35),
+            make_token("Bob", "PROPN", "compound", 1, "PERSON", 0),
+            make_token("Markey", "PROPN", "nsubj", 5, "PERSON", 4),
+            make_token(",", "PUNCT", "punct", 1, "", 10),
+            make_token("the", "DET", "det", 4, "", 12),
+            make_token("healer", "NOUN", "appos", 1, "", 16),
+            make_token("came", "VERB", "ROOT", 5, "", 23),
+            make_token("to", "PART", "aux", 7, "", 28),
+            make_token("help", "VERB", "xcomp", 5, "", 31),
+            make_token(".", "PUNCT", "punct", 5, "", 35),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -592,11 +590,11 @@ mod tests {
     #[test]
     fn no_appositive() {
         let tokens = vec![
-            make_token("Sarah",  "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("chased", "VERB",  "ROOT",  1, "",        6),
-            make_token("the",    "DET",   "det",   3, "",        13),
-            make_token("cat",    "NOUN",  "dobj",  1, "",        17),
-            make_token(".",      "PUNCT", "punct", 1, "",        20),
+            make_token("Sarah", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("chased", "VERB", "ROOT", 1, "", 6),
+            make_token("the", "DET", "det", 3, "", 13),
+            make_token("cat", "NOUN", "dobj", 1, "", 17),
+            make_token(".", "PUNCT", "punct", 1, "", 20),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -609,17 +607,17 @@ mod tests {
     #[test]
     fn appositive_chained() {
         let tokens = vec![
-            make_token("Sarah",        "PROPN", "nsubj",  7, "PERSON", 0),
-            make_token(",",            "PUNCT", "punct",  0, "",        5),
-            make_token("the",          "DET",   "det",    3, "",        7),
-            make_token("detective",    "NOUN",  "appos",  0, "",        11),
-            make_token(",",            "PUNCT", "punct",  0, "",        20),
-            make_token("our",          "DET",   "poss",   7, "",        22),
-            make_token("lead",         "NOUN",  "compound", 7, "",      26),
-            make_token("investigator", "NOUN",  "appos",  0, "",        31),
-            make_token(",",            "PUNCT", "punct",  0, "",        43),
-            make_token("arrived",      "VERB",  "ROOT",   9, "",        45),
-            make_token(".",            "PUNCT", "punct",  9, "",        52),
+            make_token("Sarah", "PROPN", "nsubj", 7, "PERSON", 0),
+            make_token(",", "PUNCT", "punct", 0, "", 5),
+            make_token("the", "DET", "det", 3, "", 7),
+            make_token("detective", "NOUN", "appos", 0, "", 11),
+            make_token(",", "PUNCT", "punct", 0, "", 20),
+            make_token("our", "DET", "poss", 7, "", 22),
+            make_token("lead", "NOUN", "compound", 7, "", 26),
+            make_token("investigator", "NOUN", "appos", 0, "", 31),
+            make_token(",", "PUNCT", "punct", 0, "", 43),
+            make_token("arrived", "VERB", "ROOT", 9, "", 45),
+            make_token(".", "PUNCT", "punct", 9, "", 52),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -701,14 +699,14 @@ mod tests {
     #[test]
     fn same_sentence_with_antecedent() {
         let tokens = vec![
-            make_token("Sarah",   "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("saw",     "VERB",  "ROOT",  1, "",        6),
-            make_token("the",     "DET",   "det",   3, "",        10),
-            make_token("cat",     "NOUN",  "dobj",  1, "",        14),
-            make_token("and",     "CCONJ", "cc",    5, "",        18),
-            make_token("she",     "PRON",  "nsubj", 5, "",        22),
-            make_token("smiled",  "VERB",  "conj",  1, "",        26),
-            make_token(".",       "PUNCT", "punct", 1, "",        33),
+            make_token("Sarah", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("saw", "VERB", "ROOT", 1, "", 6),
+            make_token("the", "DET", "det", 3, "", 10),
+            make_token("cat", "NOUN", "dobj", 1, "", 14),
+            make_token("and", "CCONJ", "cc", 5, "", 18),
+            make_token("she", "PRON", "nsubj", 5, "", 22),
+            make_token("smiled", "VERB", "conj", 1, "", 26),
+            make_token(".", "PUNCT", "punct", 1, "", 33),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -725,15 +723,15 @@ mod tests {
     #[test]
     fn possessive_pronoun_test() {
         let tokens = vec![
-            make_token("Jane",   "PROPN", "nsubj",  1, "PERSON", 0),
-            make_token("ran",    "VERB",  "ROOT",   1, "",        5),
-            make_token("away",   "ADV",   "advmod", 1, "",        9),
-            make_token("to",     "ADP",   "prep",   1, "",        14),
-            make_token("her",    "PRON",  "poss",   5, "",        17),
-            make_token("home",   "NOUN",  "pobj",   3, "",        21),
-            make_token("in",     "ADP",   "prep",   5, "",        26),
-            make_token("Azure",  "PROPN", "pobj",   6, "GPE",     29),
-            make_token(".",      "PUNCT", "punct",  1, "",        34),
+            make_token("Jane", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("ran", "VERB", "ROOT", 1, "", 5),
+            make_token("away", "ADV", "advmod", 1, "", 9),
+            make_token("to", "ADP", "prep", 1, "", 14),
+            make_token("her", "PRON", "poss", 5, "", 17),
+            make_token("home", "NOUN", "pobj", 3, "", 21),
+            make_token("in", "ADP", "prep", 5, "", 26),
+            make_token("Azure", "PROPN", "pobj", 6, "GPE", 29),
+            make_token(".", "PUNCT", "punct", 1, "", 34),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -750,11 +748,11 @@ mod tests {
     #[test]
     fn expletive_it() {
         let tokens = vec![
-            make_token("It",     "PRON",  "nsubj",    1, "", 0),
-            make_token("rained", "VERB",  "ROOT",     1, "", 3),
-            make_token("all",    "DET",   "det",      3, "", 10),
-            make_token("day",    "NOUN",  "npadvmod", 1, "", 14),
-            make_token(".",      "PUNCT", "punct",    1, "", 17),
+            make_token("It", "PRON", "nsubj", 1, "", 0),
+            make_token("rained", "VERB", "ROOT", 1, "", 3),
+            make_token("all", "DET", "det", 3, "", 10),
+            make_token("day", "NOUN", "npadvmod", 1, "", 14),
+            make_token(".", "PUNCT", "punct", 1, "", 17),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -766,15 +764,15 @@ mod tests {
     #[test]
     fn neutral_it_resolved() {
         let tokens = vec![
-            make_token("Sarah",  "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("picked", "VERB",  "ROOT",  1, "",        6),
-            make_token("up",     "ADP",   "prt",   1, "",        13),
-            make_token("the",    "DET",   "det",   4, "",        16),
-            make_token("book",   "NOUN",  "dobj",  1, "",        20),
-            make_token("and",    "CCONJ", "cc",    6, "",        25),
-            make_token("read",   "VERB",  "conj",  1, "",        29),
-            make_token("it",     "PRON",  "dobj",  6, "",        34),
-            make_token(".",      "PUNCT", "punct", 1, "",        36),
+            make_token("Sarah", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("picked", "VERB", "ROOT", 1, "", 6),
+            make_token("up", "ADP", "prt", 1, "", 13),
+            make_token("the", "DET", "det", 4, "", 16),
+            make_token("book", "NOUN", "dobj", 1, "", 20),
+            make_token("and", "CCONJ", "cc", 6, "", 25),
+            make_token("read", "VERB", "conj", 1, "", 29),
+            make_token("it", "PRON", "dobj", 6, "", 34),
+            make_token(".", "PUNCT", "punct", 1, "", 36),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -791,10 +789,10 @@ mod tests {
     #[test]
     fn reflexive_skipped() {
         let tokens = vec![
-            make_token("Sarah",   "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("hurt",    "VERB",  "ROOT",  1, "",        6),
-            make_token("herself", "PRON",  "dobj",  1, "",        11),
-            make_token(".",       "PUNCT", "punct", 1, "",        18),
+            make_token("Sarah", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("hurt", "VERB", "ROOT", 1, "", 6),
+            make_token("herself", "PRON", "dobj", 1, "", 11),
+            make_token(".", "PUNCT", "punct", 1, "", 18),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -806,11 +804,11 @@ mod tests {
     #[test]
     fn no_pronoun() {
         let tokens = vec![
-            make_token("Sarah",  "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("chased", "VERB",  "ROOT",  1, "",        6),
-            make_token("the",    "DET",   "det",   3, "",        13),
-            make_token("cat",    "NOUN",  "dobj",  1, "",        17),
-            make_token(".",      "PUNCT", "punct", 1, "",        20),
+            make_token("Sarah", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("chased", "VERB", "ROOT", 1, "", 6),
+            make_token("the", "DET", "det", 3, "", 13),
+            make_token("cat", "NOUN", "dobj", 1, "", 17),
+            make_token(".", "PUNCT", "punct", 1, "", 20),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -822,12 +820,12 @@ mod tests {
     #[test]
     fn subject_pronoun_skipped_for_cross_sentence() {
         let tokens = vec![
-            make_token("She",   "PRON",  "nsubj", 1, "", 0),
-            make_token("ran",   "VERB",  "ROOT",  1, "", 4),
-            make_token("to",    "ADP",   "prep",  1, "", 8),
-            make_token("the",   "DET",   "det",   4, "", 11),
-            make_token("store", "NOUN",  "pobj",  2, "", 15),
-            make_token(".",     "PUNCT", "punct", 1, "", 19),
+            make_token("She", "PRON", "nsubj", 1, "", 0),
+            make_token("ran", "VERB", "ROOT", 1, "", 4),
+            make_token("to", "ADP", "prep", 1, "", 8),
+            make_token("the", "DET", "det", 4, "", 11),
+            make_token("store", "NOUN", "pobj", 2, "", 15),
+            make_token(".", "PUNCT", "punct", 1, "", 19),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -841,20 +839,20 @@ mod tests {
     #[test]
     fn cross_sentence_simple() {
         let s1_tokens = vec![
-            make_token("David",   "PROPN", "nsubjpass", 2, "PERSON", 0),
-            make_token("was",     "AUX",   "auxpass",   2, "",        6),
-            make_token("punched", "VERB",  "ROOT",      2, "",        10),
-            make_token(".",       "PUNCT", "punct",     2, "",        17),
+            make_token("David", "PROPN", "nsubjpass", 2, "PERSON", 0),
+            make_token("was", "AUX", "auxpass", 2, "", 6),
+            make_token("punched", "VERB", "ROOT", 2, "", 10),
+            make_token(".", "PUNCT", "punct", 2, "", 17),
         ];
         let s1 = make_sentence(s1_tokens);
 
         let s2_tokens = vec![
-            make_token("He",     "PRON",  "nsubj", 1, "", 0),
-            make_token("fell",   "VERB",  "ROOT",  1, "", 3),
-            make_token("to",     "ADP",   "prep",  1, "", 8),
-            make_token("the",    "DET",   "det",   4, "", 11),
-            make_token("ground", "NOUN",  "pobj",  2, "", 15),
-            make_token(".",      "PUNCT", "punct", 1, "", 21),
+            make_token("He", "PRON", "nsubj", 1, "", 0),
+            make_token("fell", "VERB", "ROOT", 1, "", 3),
+            make_token("to", "ADP", "prep", 1, "", 8),
+            make_token("the", "DET", "det", 4, "", 11),
+            make_token("ground", "NOUN", "pobj", 2, "", 15),
+            make_token(".", "PUNCT", "punct", 1, "", 21),
         ];
         let s2 = make_sentence(s2_tokens);
 
@@ -866,7 +864,14 @@ mod tests {
         let entity_gender_map = HashMap::new();
         let topic_entities = HashMap::new();
         let results = resolve_cross_sentence_pronouns(
-            &s2, 1, Some(&s1), true, &[], &entity_gender_map, &topic_entities, &line_starts,
+            &s2,
+            1,
+            Some(&s1),
+            true,
+            &[],
+            &entity_gender_map,
+            &topic_entities,
+            &line_starts,
         );
 
         assert_eq!(results.len(), 1);
@@ -882,16 +887,16 @@ mod tests {
     fn cross_sentence_gender_filter() {
         let s2_tokens = vec![
             make_token("David", "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("sat",   "VERB",  "ROOT",  1, "",        6),
-            make_token("down",  "ADP",   "prt",   1, "",        10),
-            make_token(".",     "PUNCT", "punct", 1, "",        14),
+            make_token("sat", "VERB", "ROOT", 1, "", 6),
+            make_token("down", "ADP", "prt", 1, "", 10),
+            make_token(".", "PUNCT", "punct", 1, "", 14),
         ];
         let s2 = make_sentence(s2_tokens);
 
         let s3_tokens = vec![
-            make_token("She",    "PRON", "nsubj", 1, "", 0),
-            make_token("smiled", "VERB", "ROOT",  1, "", 4),
-            make_token(".",      "PUNCT", "punct", 1, "", 11),
+            make_token("She", "PRON", "nsubj", 1, "", 0),
+            make_token("smiled", "VERB", "ROOT", 1, "", 4),
+            make_token(".", "PUNCT", "punct", 1, "", 11),
         ];
         let s3 = make_sentence(s3_tokens);
 
@@ -904,7 +909,14 @@ mod tests {
         topic_entities.insert(Gender::Female, "Sarah".to_string());
 
         let results = resolve_cross_sentence_pronouns(
-            &s3, 2, Some(&s2), true, &[], &entity_gender_map, &topic_entities, &line_starts,
+            &s3,
+            2,
+            Some(&s2),
+            true,
+            &[],
+            &entity_gender_map,
+            &topic_entities,
+            &line_starts,
         );
 
         assert_eq!(results.len(), 1);
@@ -918,18 +930,18 @@ mod tests {
     #[test]
     fn paragraph_boundary_blocks() {
         let s1_tokens = vec![
-            make_token("Sarah",   "PROPN", "nsubj", 1, "PERSON", 0),
-            make_token("arrived", "VERB",  "ROOT",  1, "",        6),
-            make_token(".",       "PUNCT", "punct", 1, "",        13),
+            make_token("Sarah", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("arrived", "VERB", "ROOT", 1, "", 6),
+            make_token(".", "PUNCT", "punct", 1, "", 13),
         ];
         let s1 = make_sentence(s1_tokens);
 
         let s2_tokens = vec![
-            make_token("He",      "PRON",  "nsubj", 1, "", 0),
-            make_token("entered", "VERB",  "ROOT",  1, "", 3),
-            make_token("the",     "DET",   "det",   3, "", 11),
-            make_token("room",    "NOUN",  "dobj",  1, "", 15),
-            make_token(".",       "PUNCT", "punct", 1, "", 19),
+            make_token("He", "PRON", "nsubj", 1, "", 0),
+            make_token("entered", "VERB", "ROOT", 1, "", 3),
+            make_token("the", "DET", "det", 3, "", 11),
+            make_token("room", "NOUN", "dobj", 1, "", 15),
+            make_token(".", "PUNCT", "punct", 1, "", 19),
         ];
         let s2 = make_sentence(s2_tokens);
 
@@ -938,7 +950,14 @@ mod tests {
         let topic_entities = HashMap::new();
 
         let results = resolve_cross_sentence_pronouns(
-            &s2, 1, Some(&s1), false, &[], &entity_gender_map, &topic_entities, &line_starts,
+            &s2,
+            1,
+            Some(&s1),
+            false,
+            &[],
+            &entity_gender_map,
+            &topic_entities,
+            &line_starts,
         );
         assert!(results.is_empty());
     }
@@ -947,9 +966,9 @@ mod tests {
     #[test]
     fn no_previous_sentence() {
         let tokens = vec![
-            make_token("She", "PRON",  "nsubj", 1, "", 0),
-            make_token("ran", "VERB",  "ROOT",  1, "", 4),
-            make_token(".",   "PUNCT", "punct", 1, "", 7),
+            make_token("She", "PRON", "nsubj", 1, "", 0),
+            make_token("ran", "VERB", "ROOT", 1, "", 4),
+            make_token(".", "PUNCT", "punct", 1, "", 7),
         ];
         let sentence = make_sentence(tokens);
         let line_starts = vec![0usize];
@@ -957,7 +976,14 @@ mod tests {
         let topic_entities = HashMap::new();
 
         let results = resolve_cross_sentence_pronouns(
-            &sentence, 0, None, true, &[], &entity_gender_map, &topic_entities, &line_starts,
+            &sentence,
+            0,
+            None,
+            true,
+            &[],
+            &entity_gender_map,
+            &topic_entities,
+            &line_starts,
         );
         assert!(results.is_empty());
     }
@@ -967,25 +993,25 @@ mod tests {
     #[test]
     fn cross_sentence_possessive() {
         let s1_tokens = vec![
-            make_token("Jane", "PROPN", "nsubj",  1, "PERSON", 0),
-            make_token("came", "VERB",  "ROOT",   1, "",        5),
-            make_token("back", "ADV",   "advmod", 1, "",        10),
-            make_token("to",   "ADP",   "prep",   1, "",        15),
-            make_token("life", "NOUN",  "pobj",   3, "",        18),
-            make_token(".",    "PUNCT", "punct",  1, "",        22),
+            make_token("Jane", "PROPN", "nsubj", 1, "PERSON", 0),
+            make_token("came", "VERB", "ROOT", 1, "", 5),
+            make_token("back", "ADV", "advmod", 1, "", 10),
+            make_token("to", "ADP", "prep", 1, "", 15),
+            make_token("life", "NOUN", "pobj", 3, "", 18),
+            make_token(".", "PUNCT", "punct", 1, "", 22),
         ];
         let s1 = make_sentence(s1_tokens);
 
         let s2_tokens = vec![
-            make_token("She",   "PRON",  "nsubj", 1, "",     0),
-            make_token("ran",   "VERB",  "ROOT",  1, "",     4),
-            make_token("away",  "ADV",   "advmod",1, "",     8),
-            make_token("to",    "ADP",   "prep",  1, "",     13),
-            make_token("her",   "PRON",  "poss",  5, "",     17),
-            make_token("home",  "NOUN",  "pobj",  3, "",     21),
-            make_token("in",    "ADP",   "prep",  5, "",     26),
-            make_token("Azure", "PROPN", "pobj",  6, "GPE",  29),
-            make_token(".",     "PUNCT", "punct", 1, "",     35),
+            make_token("She", "PRON", "nsubj", 1, "", 0),
+            make_token("ran", "VERB", "ROOT", 1, "", 4),
+            make_token("away", "ADV", "advmod", 1, "", 8),
+            make_token("to", "ADP", "prep", 1, "", 13),
+            make_token("her", "PRON", "poss", 5, "", 17),
+            make_token("home", "NOUN", "pobj", 3, "", 21),
+            make_token("in", "ADP", "prep", 5, "", 26),
+            make_token("Azure", "PROPN", "pobj", 6, "GPE", 29),
+            make_token(".", "PUNCT", "punct", 1, "", 35),
         ];
         let s2 = make_sentence(s2_tokens);
 
@@ -998,16 +1024,29 @@ mod tests {
         let entity_gender_map = HashMap::new();
         let topic_entities = HashMap::new();
         let results = resolve_cross_sentence_pronouns(
-            &s2, 1, Some(&s1), true, &[], &entity_gender_map, &topic_entities, &line_starts,
+            &s2,
+            1,
+            Some(&s1),
+            true,
+            &[],
+            &entity_gender_map,
+            &topic_entities,
+            &line_starts,
         );
 
         assert_eq!(results.len(), 2);
-        let she = results.iter().find(|r| r.referent == "She").expect("She not found");
+        let she = results
+            .iter()
+            .find(|r| r.referent == "She")
+            .expect("She not found");
         assert_eq!(she.canonical, "Jane");
         assert_eq!(she.coref_type, CorefType::CrossSentencePronoun);
         assert!((she.confidence - 0.80).abs() < f32::EPSILON);
 
-        let her = results.iter().find(|r| r.referent == "her").expect("her not found");
+        let her = results
+            .iter()
+            .find(|r| r.referent == "her")
+            .expect("her not found");
         assert_eq!(her.canonical, "Jane");
         assert_eq!(her.coref_type, CorefType::PossessivePronoun);
         assert!((her.confidence - 0.80).abs() < f32::EPSILON);

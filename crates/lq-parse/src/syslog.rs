@@ -5,12 +5,16 @@ use crate::model::{Level, LogEntry};
 
 // RFC 3164: <priority>Mon DD HH:MM:SS hostname app[pid]: message
 static SYSLOG_3164: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^<(\d+)>(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$").unwrap()
+    Regex::new(
+        r"^<(\d+)>(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$",
+    )
+    .unwrap()
 });
 
 // RFC 5424: <priority>version timestamp hostname app-name procid msgid structured-data msg
 static SYSLOG_5424: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^<(\d+)>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(?:\[.*?\]|-)\s*(.*)$").unwrap()
+    Regex::new(r"^<(\d+)>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(?:\[.*?\]|-)\s*(.*)$")
+        .unwrap()
 });
 
 /// Map syslog priority to a Level.
@@ -43,10 +47,17 @@ pub fn parse_syslog_line(line: &str, raw: &str) -> LogEntry {
             .map(|dt| dt.with_timezone(&chrono::Utc));
 
         let level = severity_to_level(priority);
-        let source = if app != "-" { Some(app.to_string()) } else { None };
+        let source = if app != "-" {
+            Some(app.to_string())
+        } else {
+            None
+        };
 
         let mut fields = std::collections::HashMap::new();
-        fields.insert("hostname".to_string(), serde_json::Value::String(hostname.to_string()));
+        fields.insert(
+            "hostname".to_string(),
+            serde_json::Value::String(hostname.to_string()),
+        );
 
         return LogEntry {
             timestamp,
@@ -69,7 +80,10 @@ pub fn parse_syslog_line(line: &str, raw: &str) -> LogEntry {
         let source = Some(app.to_string());
 
         let mut fields = std::collections::HashMap::new();
-        fields.insert("hostname".to_string(), serde_json::Value::String(hostname.to_string()));
+        fields.insert(
+            "hostname".to_string(),
+            serde_json::Value::String(hostname.to_string()),
+        );
 
         return LogEntry {
             timestamp: None, // RFC 3164 timestamps lack year, skip parsing
@@ -126,10 +140,10 @@ mod tests {
 
     #[test]
     fn severity_mapping() {
-        assert_eq!(severity_to_level(0), Level::Fatal);   // emerg
-        assert_eq!(severity_to_level(3), Level::Error);   // err
-        assert_eq!(severity_to_level(4), Level::Warn);    // warning
-        assert_eq!(severity_to_level(6), Level::Info);    // info
-        assert_eq!(severity_to_level(7), Level::Debug);   // debug
+        assert_eq!(severity_to_level(0), Level::Fatal); // emerg
+        assert_eq!(severity_to_level(3), Level::Error); // err
+        assert_eq!(severity_to_level(4), Level::Warn); // warning
+        assert_eq!(severity_to_level(6), Level::Info); // info
+        assert_eq!(severity_to_level(7), Level::Debug); // debug
     }
 }

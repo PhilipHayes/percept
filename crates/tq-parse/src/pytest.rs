@@ -1,24 +1,20 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // "test_file.py::TestClass::test_method PASSED"
 // "test_file.py::test_function FAILED"
-static PYTEST_RESULT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(\S+::(?:\S+::)?\S+)\s+(PASSED|FAILED|ERROR|SKIPPED)").unwrap()
-});
+static PYTEST_RESULT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(\S+::(?:\S+::)?\S+)\s+(PASSED|FAILED|ERROR|SKIPPED)").unwrap());
 
 // "FAILED test_file.py::test_name - AssertionError: message"
-static PYTEST_FAILURE_SHORT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^FAILED\s+(\S+)\s+-\s+(.+)$").unwrap()
-});
-
+static PYTEST_FAILURE_SHORT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^FAILED\s+(\S+)\s+-\s+(.+)$").unwrap());
 
 // "_______ TestClass.test_name _______" failure section header
-static PYTEST_FAILURE_HEADER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^_{3,}\s+(\S+)\s+_{3,}$").unwrap()
-});
+static PYTEST_FAILURE_HEADER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^_{3,}\s+(\S+)\s+_{3,}$").unwrap());
 
 /// Parse pytest text output.
 pub fn parse_pytest(input: &str) -> TestRun {
@@ -111,9 +107,10 @@ pub fn parse_pytest(input: &str) -> TestRun {
     // Attach failure messages to results by matching test names
     for (fail_name, output) in &failure_messages {
         // pytest failure headers use "TestClass.test_method" but result lines use "file::TestClass::test_method"
-        if let Some(result) = results.iter_mut().find(|r| {
-            r.name.ends_with(fail_name) || r.name.contains(fail_name)
-        }) {
+        if let Some(result) = results
+            .iter_mut()
+            .find(|r| r.name.ends_with(fail_name) || r.name.contains(fail_name))
+        {
             if result.message.is_none() {
                 let trimmed = output.trim();
                 let msg = trimmed
@@ -176,7 +173,11 @@ FAILED test_math.py::test_div - ZeroDivisionError: division by zero
         assert_eq!(run.failed, 1);
         let failures = run.failures();
         assert_eq!(failures[0].name, "test_math.py::test_div");
-        assert!(failures[0].message.as_ref().unwrap().contains("ZeroDivisionError"));
+        assert!(failures[0]
+            .message
+            .as_ref()
+            .unwrap()
+            .contains("ZeroDivisionError"));
     }
 
     #[test]

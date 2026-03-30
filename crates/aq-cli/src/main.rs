@@ -108,8 +108,7 @@ fn main() -> anyhow::Result<()> {
         let args: Vec<String> = std::env::args().collect();
         if args.len() > 1 && args[1] == "index" {
             // Re-parse with IndexCli, skipping argv[0] and "index"
-            let index_args = std::iter::once(args[0].clone())
-                .chain(args[2..].iter().cloned());
+            let index_args = std::iter::once(args[0].clone()).chain(args[2..].iter().cloned());
             let index_cli = IndexCli::parse_from(index_args);
             return run_nq_index(index_cli);
         }
@@ -127,19 +126,18 @@ fn main() -> anyhow::Result<()> {
         let query_str = compile_json_query(json_query)?;
         let sources = collect_sources_no_query(&cli)?;
         let backend = resolve_backend(cli.lang.as_deref());
-        let tokens = aq_core::lex(&query_str).map_err(|e| {
-            anyhow::anyhow!("{}", format_lex_error(&query_str, &e))
-        })?;
-        let expr = aq_core::parse(&tokens).map_err(|e| {
-            anyhow::anyhow!("{}", format_parse_error(&query_str, &e))
-        })?;
+        let tokens = aq_core::lex(&query_str)
+            .map_err(|e| anyhow::anyhow!("{}", format_lex_error(&query_str, &e)))?;
+        let expr = aq_core::parse(&tokens)
+            .map_err(|e| anyhow::anyhow!("{}", format_parse_error(&query_str, &e)))?;
         if cli.explain {
             eprintln!("Compiled query: {}", query_str);
             eprintln!("{:#?}", expr);
             return Ok(());
         }
         for (source, lang, file_path) in sources {
-            let (root, _metrics) = parse_source(&*backend, &source, &lang, &file_path, cli.all_nodes, false)?;
+            let (root, _metrics) =
+                parse_source(&*backend, &source, &lang, &file_path, cli.all_nodes, false)?;
             let results = aq_core::eval(&expr, &root).map_err(|e| anyhow::anyhow!("{}", e))?;
             for result in &results {
                 let output = format_result(result, &cli.format);
@@ -162,7 +160,14 @@ fn main() -> anyhow::Result<()> {
         let sources = collect_sources_no_query(&cli)?;
         let backend = resolve_backend(cli.lang.as_deref());
         for (source, lang, file_path) in sources {
-            let (root, metrics) = parse_source(&*backend, &source, &lang, &file_path, cli.all_nodes, cli.confidence)?;
+            let (root, metrics) = parse_source(
+                &*backend,
+                &source,
+                &lang,
+                &file_path,
+                cli.all_nodes,
+                cli.confidence,
+            )?;
             let output = if root.node_type == "document" {
                 format_nlp_skeleton(&root, &file_path, &cli.format)
             } else {
@@ -179,7 +184,14 @@ fn main() -> anyhow::Result<()> {
         let sources = collect_sources_no_query(&cli)?;
         let backend = resolve_backend(cli.lang.as_deref());
         for (source, lang, file_path) in sources {
-            let (root, metrics) = parse_source(&*backend, &source, &lang, &file_path, cli.all_nodes, cli.confidence)?;
+            let (root, metrics) = parse_source(
+                &*backend,
+                &source,
+                &lang,
+                &file_path,
+                cli.all_nodes,
+                cli.confidence,
+            )?;
             let output = format_signatures(&root, &file_path, &cli.format, metrics.as_ref());
             budget_tracker.emit(&output);
         }
@@ -191,7 +203,9 @@ fn main() -> anyhow::Result<()> {
     let query_str = match cli.query {
         Some(ref q) => q.as_str(),
         None => {
-            eprintln!("aq: no query provided. Use --skeleton for structural overview, or pass a query.");
+            eprintln!(
+                "aq: no query provided. Use --skeleton for structural overview, or pass a query."
+            );
             std::process::exit(1);
         }
     };
@@ -199,16 +213,18 @@ fn main() -> anyhow::Result<()> {
     run_query_str(&cli, query_str, &mut budget_tracker)
 }
 
-fn run_query_str(cli: &Cli, query_str: &str, budget_tracker: &mut BudgetTracker) -> anyhow::Result<()> {
+fn run_query_str(
+    cli: &Cli,
+    query_str: &str,
+    budget_tracker: &mut BudgetTracker,
+) -> anyhow::Result<()> {
     // Lex the query — with enhanced error messages
-    let tokens = aq_core::lex(query_str).map_err(|e| {
-        anyhow::anyhow!("{}", format_lex_error(query_str, &e))
-    })?;
+    let tokens = aq_core::lex(query_str)
+        .map_err(|e| anyhow::anyhow!("{}", format_lex_error(query_str, &e)))?;
 
     // Parse the query — with enhanced error messages
-    let expr = aq_core::parse(&tokens).map_err(|e| {
-        anyhow::anyhow!("{}", format_parse_error(query_str, &e))
-    })?;
+    let expr = aq_core::parse(&tokens)
+        .map_err(|e| anyhow::anyhow!("{}", format_parse_error(query_str, &e)))?;
 
     if cli.explain {
         eprintln!("{:#?}", expr);
@@ -221,7 +237,8 @@ fn run_query_str(cli: &Cli, query_str: &str, budget_tracker: &mut BudgetTracker)
 
     // Process each source
     for (source, lang, file_path) in sources {
-        let (root, _metrics) = parse_source(&*backend, &source, &lang, &file_path, cli.all_nodes, false)?;
+        let (root, _metrics) =
+            parse_source(&*backend, &source, &lang, &file_path, cli.all_nodes, false)?;
         let results = aq_core::eval(&expr, &root).map_err(|e| anyhow::anyhow!("{}", e))?;
 
         for result in &results {
@@ -247,8 +264,7 @@ fn run_nq_index(cli: IndexCli) -> anyhow::Result<()> {
     let cache = aq_nlp::nq_cache::NqCache::open()?;
 
     // Discover files from paths/globs
-    let files = aq_nlp::index::expand_globs(&cli.paths)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let files = aq_nlp::index::expand_globs(&cli.paths).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     if files.is_empty() {
         eprintln!("nq index: no indexable files found");
@@ -340,9 +356,9 @@ fn run_corpus_mode(cli: &Cli, budget_tracker: &mut BudgetTracker) -> anyhow::Res
         "name" => file_trees.sort_by(|a, b| {
             let na = std::path::Path::new(&a.1).file_name().unwrap_or_default();
             let nb = std::path::Path::new(&b.1).file_name().unwrap_or_default();
-            na.cmp(&nb)
+            na.cmp(nb)
         }),
-        "natural" => {} // preserve input order
+        "natural" => {}                                // preserve input order
         _ => file_trees.sort_by(|a, b| a.1.cmp(&b.1)), // "path" (default)
     }
 
@@ -366,12 +382,10 @@ fn run_corpus_mode(cli: &Cli, budget_tracker: &mut BudgetTracker) -> anyhow::Res
         let output = format_corpus_skeleton(&merged_tree, &metadata, &cli.format);
         budget_tracker.emit(&output);
     } else if let Some(ref query_str) = cli.query {
-        let tokens = aq_core::lex(query_str).map_err(|e| {
-            anyhow::anyhow!("{}", format_lex_error(query_str, &e))
-        })?;
-        let expr = aq_core::parse(&tokens).map_err(|e| {
-            anyhow::anyhow!("{}", format_parse_error(query_str, &e))
-        })?;
+        let tokens = aq_core::lex(query_str)
+            .map_err(|e| anyhow::anyhow!("{}", format_lex_error(query_str, &e)))?;
+        let expr = aq_core::parse(&tokens)
+            .map_err(|e| anyhow::anyhow!("{}", format_parse_error(query_str, &e)))?;
         if cli.explain {
             eprintln!("{:#?}", expr);
             return Ok(());
@@ -478,7 +492,9 @@ fn format_corpus_skeleton(
                     }
                 }
                 // Read grafted central_conflict from narrative_summary node.
-                if let Some(v) = child.field_indices.get("central_conflict")
+                if let Some(v) = child
+                    .field_indices
+                    .get("central_conflict")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
@@ -494,9 +510,11 @@ fn format_corpus_skeleton(
 
     if central_conflict == "none" {
         // Filter out pronoun-only conflicts when selecting fallback.
-        if let Some(first) = conflict_pairs.iter().find(|pair| {
-            !is_pronoun_conflict_text(pair)
-        }).or_else(|| conflict_pairs.first()) {
+        if let Some(first) = conflict_pairs
+            .iter()
+            .find(|pair| !is_pronoun_conflict_text(pair))
+            .or_else(|| conflict_pairs.first())
+        {
             central_conflict = first.clone();
         }
     }
@@ -636,7 +654,10 @@ fn parse_source(
     file_path: &str,
     all_nodes: bool,
     confidence: bool,
-) -> anyhow::Result<(aq_core::OwnedNode, Option<aq_treesitter::parse::ParseMetrics>)> {
+) -> anyhow::Result<(
+    aq_core::OwnedNode,
+    Option<aq_treesitter::parse::ParseMetrics>,
+)> {
     // Tree-sitter-specific features (all_nodes, confidence) require direct ParsedTree access.
     if all_nodes || confidence {
         if let Some(ts_lang) = aq_treesitter::langs::Language::from_name(lang) {
@@ -646,8 +667,16 @@ fn parse_source(
                 Some(file_path.to_string()),
             )
             .map_err(|e| anyhow::anyhow!("{}", e))?;
-            let metrics = if confidence { Some(parsed.metrics()) } else { None };
-            let root = if all_nodes { parsed.to_owned_node_all() } else { parsed.to_owned_node() };
+            let metrics = if confidence {
+                Some(parsed.metrics())
+            } else {
+                None
+            };
+            let root = if all_nodes {
+                parsed.to_owned_node_all()
+            } else {
+                parsed.to_owned_node()
+            };
             return Ok((root, metrics));
         }
     }
@@ -660,9 +689,7 @@ fn parse_source(
 
 /// Collect sources for skeleton/signatures mode. In these modes, the `query` positional arg
 /// is treated as the first file path (since no query is needed).
-fn collect_sources_no_query(
-    cli: &Cli,
-) -> anyhow::Result<Vec<(String, String, String)>> {
+fn collect_sources_no_query(cli: &Cli) -> anyhow::Result<Vec<(String, String, String)>> {
     // Combine query (if it looks like a file path) and files
     let mut all_files: Vec<String> = Vec::new();
     if let Some(ref q) = cli.query {
@@ -695,9 +722,10 @@ fn collect_sources_no_query(
         }
         Ok(sources)
     } else if !io::stdin().is_terminal() {
-        let lang_str = cli.lang.as_deref().unwrap_or_else(|| {
-            if is_nq_binary() { "english" } else { "" }
-        });
+        let lang_str =
+            cli.lang
+                .as_deref()
+                .unwrap_or_else(|| if is_nq_binary() { "english" } else { "" });
         if lang_str.is_empty() {
             anyhow::bail!("--lang is required when reading from stdin");
         }
@@ -710,9 +738,7 @@ fn collect_sources_no_query(
 }
 
 /// Collect sources from files or stdin. Returns (source_code, language_name, file_path).
-fn collect_sources(
-    cli: &Cli,
-) -> anyhow::Result<Vec<(String, String, String)>> {
+fn collect_sources(cli: &Cli) -> anyhow::Result<Vec<(String, String, String)>> {
     let mut sources = Vec::new();
 
     if !cli.files.is_empty() {
@@ -739,9 +765,10 @@ fn collect_sources(
         }
     } else if !io::stdin().is_terminal() {
         // Read from stdin
-        let lang_str = cli.lang.as_deref().unwrap_or_else(|| {
-            if is_nq_binary() { "english" } else { "" }
-        });
+        let lang_str =
+            cli.lang
+                .as_deref()
+                .unwrap_or_else(|| if is_nq_binary() { "english" } else { "" });
         if lang_str.is_empty() {
             anyhow::bail!("--lang is required when reading from stdin");
         }
@@ -782,17 +809,19 @@ fn collect_sources(
 /// ```
 /// Compiles to: `desc:function_item | [.name | @text, @line, @end - @start] | limit(10)`
 fn compile_json_query(json_str: &str) -> anyhow::Result<String> {
-    let spec: serde_json::Value = serde_json::from_str(json_str)
-        .map_err(|e| anyhow::anyhow!("Invalid JSON query: {}", e))?;
+    let spec: serde_json::Value =
+        serde_json::from_str(json_str).map_err(|e| anyhow::anyhow!("Invalid JSON query: {}", e))?;
 
-    let obj = spec.as_object()
+    let obj = spec
+        .as_object()
         .ok_or_else(|| anyhow::anyhow!("JSON query must be an object"))?;
 
     // Required: type
     let type_filter = match obj.get("type") {
         Some(serde_json::Value::String(t)) => t.clone(),
         Some(serde_json::Value::Array(arr)) => {
-            let types: Vec<String> = arr.iter()
+            let types: Vec<String> = arr
+                .iter()
                 .filter_map(|v| v.as_str().map(String::from))
                 .collect();
             if types.len() == 1 {
@@ -805,7 +834,8 @@ fn compile_json_query(json_str: &str) -> anyhow::Result<String> {
     };
 
     // Optional: traverse (default "desc")
-    let traverse = obj.get("traverse")
+    let traverse = obj
+        .get("traverse")
         .and_then(|v| v.as_str())
         .unwrap_or("desc");
 
@@ -824,7 +854,8 @@ fn compile_json_query(json_str: &str) -> anyhow::Result<String> {
                 query = format!("{} | {}", query, field);
             }
             serde_json::Value::Array(fields) => {
-                let field_strs: Vec<String> = fields.iter()
+                let field_strs: Vec<String> = fields
+                    .iter()
                     .filter_map(|v| v.as_str().map(String::from))
                     .collect();
                 if field_strs.len() == 1 {
@@ -871,9 +902,7 @@ fn format_compact(result: &aq_core::EvalResult) -> String {
 
 fn format_text(result: &aq_core::EvalResult) -> String {
     match result {
-        aq_core::EvalResult::Node(n) => {
-            n.subtree_text().or(n.text()).unwrap_or("").to_string()
-        }
+        aq_core::EvalResult::Node(n) => n.subtree_text().or(n.text()).unwrap_or("").to_string(),
         aq_core::EvalResult::Value(v) => match v {
             serde_json::Value::String(s) => s.clone(),
             serde_json::Value::Null => String::new(),
@@ -968,11 +997,7 @@ fn extract_name(node: &aq_core::OwnedNode) -> Option<String> {
 }
 
 /// NLP-specific skeleton: paragraph/sentence/word counts and entity stats.
-fn format_nlp_skeleton(
-    root: &aq_core::OwnedNode,
-    file_path: &str,
-    format: &str,
-) -> String {
+fn format_nlp_skeleton(root: &aq_core::OwnedNode, file_path: &str, format: &str) -> String {
     use std::collections::HashMap;
 
     let mut paragraphs = 0;
@@ -1067,34 +1092,46 @@ fn format_nlp_skeleton(
             }
             "interaction" => {
                 interaction_count += 1;
-                let agent = child.field_indices.get("agent")
+                let agent = child
+                    .field_indices
+                    .get("agent")
                     .and_then(|indices| indices.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                     .unwrap_or("")
                     .to_string();
-                let verb = child.field_indices.get("verb")
+                let verb = child
+                    .field_indices
+                    .get("verb")
                     .and_then(|indices| indices.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                     .unwrap_or("")
                     .to_string();
-                let patient = child.field_indices.get("patient")
+                let patient = child
+                    .field_indices
+                    .get("patient")
                     .and_then(|indices| indices.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                     .unwrap_or("")
                     .to_string();
-                let voice = child.field_indices.get("voice")
+                let voice = child
+                    .field_indices
+                    .get("voice")
                     .and_then(|indices| indices.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                     .unwrap_or("active");
                 let is_passive = voice == "passive";
-                if is_passive { passive_count += 1; }
+                if is_passive {
+                    passive_count += 1;
+                }
                 top_interactions.push((agent, verb, patient, is_passive));
                 // Role stats
-                if let Some(vc) = child.field_indices.get("verb_class")
+                if let Some(vc) = child
+                    .field_indices
+                    .get("verb_class")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
@@ -1112,7 +1149,9 @@ fn format_nlp_skeleton(
                         }
                     }
                 }
-                if let Some(conf_text) = child.field_indices.get("role_confidence")
+                if let Some(conf_text) = child
+                    .field_indices
+                    .get("role_confidence")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
@@ -1125,19 +1164,25 @@ fn format_nlp_skeleton(
             "discourse" => {
                 discourse_count += 1;
                 // Read type
-                if let Some(type_text) = child.field_indices.get("type")
+                if let Some(type_text) = child
+                    .field_indices
+                    .get("type")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
-                    *discourse_relation_dist.entry(type_text.to_string()).or_default() += 1;
+                    *discourse_relation_dist
+                        .entry(type_text.to_string())
+                        .or_default() += 1;
                 }
                 // Read connective
                 if child.field_indices.contains_key("connective") {
                     discourse_connective_count += 1;
                 }
                 // Read scope
-                if let Some(scope_text) = child.field_indices.get("scope")
+                if let Some(scope_text) = child
+                    .field_indices
+                    .get("scope")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
@@ -1147,7 +1192,9 @@ fn format_nlp_skeleton(
                     }
                 }
                 // Read confidence
-                if let Some(conf_text) = child.field_indices.get("confidence")
+                if let Some(conf_text) = child
+                    .field_indices
+                    .get("confidence")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
@@ -1158,49 +1205,63 @@ fn format_nlp_skeleton(
                 }
             }
             "narrative_summary" => {
-                if let Some(v) = child.field_indices.get("scene_count")
+                if let Some(v) = child
+                    .field_indices
+                    .get("scene_count")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
                     narrative_scene_count = v.parse().unwrap_or(0);
                 }
-                if let Some(v) = child.field_indices.get("character_count")
+                if let Some(v) = child
+                    .field_indices
+                    .get("character_count")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
                     narrative_character_count = v.parse().unwrap_or(0);
                 }
-                if let Some(v) = child.field_indices.get("conflict_count")
+                if let Some(v) = child
+                    .field_indices
+                    .get("conflict_count")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
                     narrative_conflict_count = v.parse().unwrap_or(0);
                 }
-                if let Some(v) = child.field_indices.get("central_conflict")
+                if let Some(v) = child
+                    .field_indices
+                    .get("central_conflict")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
                     narrative_central_conflict = v.to_string();
                 }
-                if let Some(v) = child.field_indices.get("issue_count")
+                if let Some(v) = child
+                    .field_indices
+                    .get("issue_count")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
                     narrative_issue_count = v.parse().unwrap_or(0);
                 }
-                if let Some(v) = child.field_indices.get("unresolved_conflicts")
+                if let Some(v) = child
+                    .field_indices
+                    .get("unresolved_conflicts")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
                 {
                     narrative_unresolved = v.parse().unwrap_or(0);
                 }
-                if let Some(v) = child.field_indices.get("arc_distribution")
+                if let Some(v) = child
+                    .field_indices
+                    .get("arc_distribution")
                     .and_then(|i| i.first())
                     .and_then(|&idx| child.children.get(idx))
                     .and_then(|n| n.text.as_deref())
@@ -1282,7 +1343,10 @@ fn format_nlp_skeleton(
     let avg_conf = if role_confidences.is_empty() {
         serde_json::Value::Null
     } else {
-        serde_json::json!((role_confidences.iter().sum::<f64>() / role_confidences.len() as f64 * 100.0).round() / 100.0)
+        serde_json::json!(
+            (role_confidences.iter().sum::<f64>() / role_confidences.len() as f64 * 100.0).round()
+                / 100.0
+        )
     };
 
     // Build discourse_stats
@@ -1295,7 +1359,12 @@ fn format_nlp_skeleton(
     let avg_discourse_conf = if discourse_confidences.is_empty() {
         serde_json::Value::Null
     } else {
-        serde_json::json!((discourse_confidences.iter().sum::<f64>() / discourse_confidences.len() as f64 * 100.0).round() / 100.0)
+        serde_json::json!(
+            (discourse_confidences.iter().sum::<f64>() / discourse_confidences.len() as f64
+                * 100.0)
+                .round()
+                / 100.0
+        )
     };
 
     let skeleton = serde_json::json!({
@@ -1376,7 +1445,7 @@ fn format_skeleton(
         } else {
             // Declaration: extract metadata
             let name = extract_name(child)
-                .map(|s| serde_json::Value::String(s))
+                .map(serde_json::Value::String)
                 .unwrap_or(serde_json::Value::Null);
 
             let lines = child.end_line.saturating_sub(child.start_line) + 1;
@@ -1443,10 +1512,7 @@ fn format_signatures(
     }
 }
 
-fn collect_signatures(
-    node: &aq_core::OwnedNode,
-    sigs: &mut Vec<serde_json::Value>,
-) {
+fn collect_signatures(node: &aq_core::OwnedNode, sigs: &mut Vec<serde_json::Value>) {
     use aq_core::AqNode;
 
     let node_type = node.node_type.as_str();
@@ -1475,12 +1541,7 @@ fn collect_signatures(
         let params = node
             .child_by_field("parameters")
             .or_else(|| find_child_by_type(node, "formal_parameter_list"))
-            .map(|p| {
-                p.subtree_text()
-                    .or(p.text())
-                    .unwrap_or("")
-                    .to_string()
-            });
+            .map(|p| p.subtree_text().or(p.text()).unwrap_or("").to_string());
 
         let return_type = node
             .child_by_field("return_type")
@@ -1494,7 +1555,10 @@ fn collect_signatures(
 
         let mut sig = serde_json::Map::new();
         sig.insert("type".into(), serde_json::json!(node_type));
-        sig.insert("name".into(), serde_json::json!(name.unwrap_or_else(|| "<anonymous>".to_string())));
+        sig.insert(
+            "name".into(),
+            serde_json::json!(name.unwrap_or_else(|| "<anonymous>".to_string())),
+        );
         if let Some(p) = params {
             sig.insert("params".into(), serde_json::json!(p));
         }
@@ -1512,14 +1576,22 @@ fn collect_signatures(
     }
 }
 
-fn find_child_by_type<'a>(node: &'a aq_core::OwnedNode, type_name: &str) -> Option<&'a dyn aq_core::AqNode> {
-    node.children.iter()
+fn find_child_by_type<'a>(
+    node: &'a aq_core::OwnedNode,
+    type_name: &str,
+) -> Option<&'a dyn aq_core::AqNode> {
+    node.children
+        .iter()
         .find(|c| c.node_type == type_name)
         .map(|c| c as &dyn aq_core::AqNode)
 }
 
 fn is_function_type(t: &str) -> bool {
-    t.contains("function") && (t.contains("declaration") || t.contains("definition") || t.contains("item") || t.contains("signature"))
+    t.contains("function")
+        && (t.contains("declaration")
+            || t.contains("definition")
+            || t.contains("item")
+            || t.contains("signature"))
 }
 
 fn is_method_type(t: &str) -> bool {
@@ -1529,19 +1601,23 @@ fn is_method_type(t: &str) -> bool {
     if t == "method_signature" {
         return false;
     }
-    let suffix = t.contains("declaration") || t.contains("definition") || t.contains("item") || t.contains("signature");
-    (t.contains("method") && suffix)
-        || (t.contains("constructor") && suffix)
-        || (t.contains("getter") && suffix)
-        || (t.contains("setter") && suffix)
-        || (t.contains("operator") && suffix)
+    let suffix = t.contains("declaration")
+        || t.contains("definition")
+        || t.contains("item")
+        || t.contains("signature");
+    (t.contains("method")
+        || t.contains("constructor")
+        || t.contains("getter")
+        || t.contains("setter")
+        || t.contains("operator"))
+        && suffix
 }
 
 fn is_noise_type(node_type: &str) -> bool {
     node_type.contains("comment")
         || node_type == "attribute_item"
         || node_type == "decorator"
-        || node_type == "expression_statement"  // top-level expressions are usually noise
+        || node_type == "expression_statement" // top-level expressions are usually noise
 }
 
 fn is_import_type(node_type: &str) -> bool {
@@ -1591,7 +1667,7 @@ fn format_query_error(query: &str, position: usize, message: &str, kind: &str) -
         }
         // Show caret(s) — extend to end of current token or a few chars
         let remaining = line_end.saturating_sub(position);
-        let caret_len = remaining.min(5).max(1);
+        let caret_len = remaining.clamp(1, 5);
         for _ in 0..caret_len {
             out.push('^');
         }
@@ -1662,5 +1738,5 @@ impl BudgetTracker {
 
 /// Estimate token count for a string (simple heuristic: ~4 chars per token).
 fn estimate_tokens(s: &str) -> usize {
-    (s.len() + 3) / 4 // ceiling division
+    s.len().div_ceil(4) // ceiling division
 }

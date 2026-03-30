@@ -1,17 +1,17 @@
-pub mod model;
 pub mod detect;
-pub mod libtest;
-pub mod libtest_json;
-pub mod pytest;
-pub mod junit;
-pub mod jest;
+pub mod flutter;
 pub mod gotest;
 pub mod gotest_json;
+pub mod jest;
+pub mod junit;
+pub mod libtest;
+pub mod libtest_json;
+pub mod model;
+pub mod pytest;
 pub mod tap;
-pub mod flutter;
 
-pub use model::{TestStatus, TestResult, TestRun, Format};
 pub use detect::detect_format;
+pub use model::{Format, TestResult, TestRun, TestStatus};
 
 /// Parse complete test output into a TestRun.
 pub fn parse_output(input: &str, format: Format) -> TestRun {

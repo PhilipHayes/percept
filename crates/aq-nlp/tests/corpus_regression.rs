@@ -1,7 +1,7 @@
 use aq_core::backend::Backend;
 use aq_core::OwnedNode;
-use aq_nlp::NlpBackend;
 use aq_nlp::corpus::build_corpus;
+use aq_nlp::NlpBackend;
 
 fn spacy_available() -> bool {
     std::process::Command::new("python3")
@@ -42,7 +42,9 @@ fn arc_shapes(tree: &OwnedNode) -> Vec<(String, String)> {
         for &idx in indices {
             if let Some(child) = tree.children.get(idx) {
                 let name = child.text.clone().unwrap_or_default();
-                let shape = child.field_indices.get("shape")
+                let shape = child
+                    .field_indices
+                    .get("shape")
                     .and_then(|si| si.first())
                     .and_then(|&i| child.children.get(i))
                     .and_then(|n| n.text.clone())
@@ -57,7 +59,8 @@ fn arc_shapes(tree: &OwnedNode) -> Vec<(String, String)> {
 
 /// Extract the narrative summary text from the tree.
 fn narrative_summary_text(tree: &OwnedNode) -> String {
-    tree.field_indices.get("narrative_summary")
+    tree.field_indices
+        .get("narrative_summary")
         .and_then(|indices| indices.first())
         .and_then(|&idx| tree.children.get(idx))
         .and_then(|n| n.text.clone())
@@ -71,8 +74,8 @@ fn test_genesis_37_corpus_regression() {
         return;
     }
 
-    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/genesis37");
+    let fixtures =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/genesis37");
 
     let part1 = std::fs::read_to_string(fixtures.join("part1_dreams.txt")).unwrap();
     let part2 = std::fs::read_to_string(fixtures.join("part2_journey.txt")).unwrap();
@@ -130,7 +133,10 @@ fn test_genesis_37_corpus_regression() {
         let found = corpus_entities.iter().any(|e| e.contains(name));
         // Log but don't hard-fail — spaCy entity recognition is model-dependent.
         if !found {
-            eprintln!("WARNING: key entity '{}' not found in corpus entities", name);
+            eprintln!(
+                "WARNING: key entity '{}' not found in corpus entities",
+                name
+            );
         }
     }
 
@@ -151,7 +157,10 @@ fn test_genesis_37_corpus_regression() {
     let corpus_summary = narrative_summary_text(&corpus_tree);
     eprintln!("Single summary: {}", single_summary);
     eprintln!("Corpus summary: {}", corpus_summary);
-    assert!(!corpus_summary.is_empty(), "Corpus should produce narrative summary");
+    assert!(
+        !corpus_summary.is_empty(),
+        "Corpus should produce narrative summary"
+    );
 }
 
 #[test]
@@ -161,8 +170,7 @@ fn test_apollo_13_corpus_regression() {
         return;
     }
 
-    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/apollo13");
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/apollo13");
 
     let part1 = std::fs::read_to_string(fixtures.join("part1_launch.txt")).unwrap();
     let part2 = std::fs::read_to_string(fixtures.join("part2_transit.txt")).unwrap();
@@ -171,12 +179,20 @@ fn test_apollo_13_corpus_regression() {
     // Single-file: concatenated
     let full_text = format!("{}\n\n{}\n\n{}", part1.trim(), part2.trim(), part3.trim());
     let backend = NlpBackend;
-    let single_tree = backend.parse(&full_text, "english", Some("apollo13.txt")).unwrap();
+    let single_tree = backend
+        .parse(&full_text, "english", Some("apollo13.txt"))
+        .unwrap();
 
     // Corpus: 3 separate parses
-    let tree1 = backend.parse(&part1, "english", Some("part1_launch.txt")).unwrap();
-    let tree2 = backend.parse(&part2, "english", Some("part2_transit.txt")).unwrap();
-    let tree3 = backend.parse(&part3, "english", Some("part3_accident.txt")).unwrap();
+    let tree1 = backend
+        .parse(&part1, "english", Some("part1_launch.txt"))
+        .unwrap();
+    let tree2 = backend
+        .parse(&part2, "english", Some("part2_transit.txt"))
+        .unwrap();
+    let tree3 = backend
+        .parse(&part3, "english", Some("part3_accident.txt"))
+        .unwrap();
 
     let file_trees = vec![
         (tree1, "part1_launch.txt".to_string()),
@@ -191,11 +207,15 @@ fn test_apollo_13_corpus_regression() {
     // Scene count
     let single_scenes = scene_count(&single_tree);
     let corpus_scenes = scene_count(&corpus_tree);
-    eprintln!("Apollo13 Scenes: single={}, corpus={}", single_scenes, corpus_scenes);
+    eprintln!(
+        "Apollo13 Scenes: single={}, corpus={}",
+        single_scenes, corpus_scenes
+    );
     assert!(
         corpus_scenes >= single_scenes.saturating_sub(2),
         "Corpus scenes ({}) should not be much less than single-file ({})",
-        corpus_scenes, single_scenes
+        corpus_scenes,
+        single_scenes
     );
 
     // Entities: key personnel
@@ -205,7 +225,10 @@ fn test_apollo_13_corpus_regression() {
     for name in &key_names {
         let found = corpus_entities.iter().any(|e| e.contains(name));
         if !found {
-            eprintln!("WARNING: key entity '{}' not found in corpus entities", name);
+            eprintln!(
+                "WARNING: key entity '{}' not found in corpus entities",
+                name
+            );
         }
     }
 
@@ -218,5 +241,8 @@ fn test_apollo_13_corpus_regression() {
     // Narrative summary
     let corpus_summary = narrative_summary_text(&corpus_tree);
     eprintln!("Apollo13 Corpus summary: {}", corpus_summary);
-    assert!(!corpus_summary.is_empty(), "Corpus should produce narrative summary");
+    assert!(
+        !corpus_summary.is_empty(),
+        "Corpus should produce narrative summary"
+    );
 }

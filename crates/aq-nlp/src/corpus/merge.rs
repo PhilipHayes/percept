@@ -110,27 +110,42 @@ pub fn merge_trees(trees: Vec<(OwnedNode, String)>) -> (OwnedNode, CorpusMetadat
     let mut offset = 0usize;
 
     if num_paras > 0 {
-        field_indices.insert("paragraphs".to_string(), (offset..offset + num_paras).collect());
+        field_indices.insert(
+            "paragraphs".to_string(),
+            (offset..offset + num_paras).collect(),
+        );
     }
     offset += num_paras;
 
     if num_entities > 0 {
-        field_indices.insert("entities".to_string(), (offset..offset + num_entities).collect());
+        field_indices.insert(
+            "entities".to_string(),
+            (offset..offset + num_entities).collect(),
+        );
     }
     offset += num_entities;
 
     if num_interactions > 0 {
-        field_indices.insert("interactions".to_string(), (offset..offset + num_interactions).collect());
+        field_indices.insert(
+            "interactions".to_string(),
+            (offset..offset + num_interactions).collect(),
+        );
     }
     offset += num_interactions;
 
     if num_discourse > 0 {
-        field_indices.insert("discourse".to_string(), (offset..offset + num_discourse).collect());
+        field_indices.insert(
+            "discourse".to_string(),
+            (offset..offset + num_discourse).collect(),
+        );
     }
     offset += num_discourse;
 
     if num_scenes > 0 {
-        field_indices.insert("scenes".to_string(), (offset..offset + num_scenes).collect());
+        field_indices.insert(
+            "scenes".to_string(),
+            (offset..offset + num_scenes).collect(),
+        );
     }
     offset += num_scenes;
 
@@ -140,12 +155,18 @@ pub fn merge_trees(trees: Vec<(OwnedNode, String)>) -> (OwnedNode, CorpusMetadat
     offset += num_arcs;
 
     if num_conflicts > 0 {
-        field_indices.insert("conflicts".to_string(), (offset..offset + num_conflicts).collect());
+        field_indices.insert(
+            "conflicts".to_string(),
+            (offset..offset + num_conflicts).collect(),
+        );
     }
     offset += num_conflicts;
 
     if num_narrative_issues > 0 {
-        field_indices.insert("narrative_issues".to_string(), (offset..offset + num_narrative_issues).collect());
+        field_indices.insert(
+            "narrative_issues".to_string(),
+            (offset..offset + num_narrative_issues).collect(),
+        );
     }
 
     let doc = OwnedNode {
@@ -197,11 +218,7 @@ impl EntityAccumulator {
     }
 
     fn add(&mut self, entity: OwnedNode) {
-        let name_lower = entity
-            .text
-            .as_deref()
-            .unwrap_or("")
-            .to_lowercase();
+        let name_lower = entity.text.as_deref().unwrap_or("").to_lowercase();
 
         if let Some(existing) = self.map.get_mut(&name_lower) {
             // Merge: combine locations from the incoming entity into the existing one.
@@ -267,10 +284,7 @@ mod tests {
 
     /// Build a minimal document node with the given paragraphs (and optional
     /// other field groups).
-    fn doc_with_paragraphs(
-        paras: Vec<OwnedNode>,
-        source_file: Option<&str>,
-    ) -> OwnedNode {
+    fn doc_with_paragraphs(paras: Vec<OwnedNode>, source_file: Option<&str>) -> OwnedNode {
         let num = paras.len();
         let end_line = paras.last().map(|p| p.end_line).unwrap_or(0);
         let mut fi = HashMap::new();
@@ -430,8 +444,14 @@ mod tests {
 
         let para_indices = merged.field_indices.get("paragraphs").unwrap();
         assert_eq!(para_indices.len(), 2);
-        assert_eq!(merged.children[para_indices[0]].text.as_deref(), Some("Para 1"));
-        assert_eq!(merged.children[para_indices[1]].text.as_deref(), Some("Para 2"));
+        assert_eq!(
+            merged.children[para_indices[0]].text.as_deref(),
+            Some("Para 1")
+        );
+        assert_eq!(
+            merged.children[para_indices[1]].text.as_deref(),
+            Some("Para 2")
+        );
         assert_eq!(meta.file_boundaries, vec![(0, 0), (1, 1)]);
     }
 
@@ -454,9 +474,15 @@ mod tests {
         ]);
 
         let paras = merged.field_indices.get("paragraphs").unwrap();
-        assert_eq!(merged.children[paras[0]].source_file.as_deref(), Some("file1.md"));
+        assert_eq!(
+            merged.children[paras[0]].source_file.as_deref(),
+            Some("file1.md")
+        );
         // Paragraph without source_file gets tagged with the filename from the pair.
-        assert_eq!(merged.children[paras[1]].source_file.as_deref(), Some("file2.md"));
+        assert_eq!(
+            merged.children[paras[1]].source_file.as_deref(),
+            Some("file2.md")
+        );
     }
 
     // ── Test: entity deduplication ───────────────────────────────────────────

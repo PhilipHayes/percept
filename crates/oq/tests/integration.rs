@@ -13,8 +13,16 @@ fn setup_test_repo() -> TempDir {
     run_git(path, &["config", "user.email", "test@test.com"]);
     run_git(path, &["config", "user.name", "Test User"]);
 
-    std::fs::write(path.join("hello.rs"), "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
-    std::fs::write(path.join("lib.rs"), "pub fn add(a: i32, b: i32) -> i32 { a + b }\n").unwrap();
+    std::fs::write(
+        path.join("hello.rs"),
+        "fn main() {\n    println!(\"hello\");\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        path.join("lib.rs"),
+        "pub fn add(a: i32, b: i32) -> i32 { a + b }\n",
+    )
+    .unwrap();
     run_git(path, &["add", "."]);
     run_git(path, &["commit", "-m", "Initial commit"]);
 
@@ -66,7 +74,10 @@ fn test_get_miss_then_hit() {
     }
 
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("miss"), "expected cache miss, got: {stderr}");
+    assert!(
+        stderr.contains("miss"),
+        "expected cache miss, got: {stderr}"
+    );
 
     // Parse output as JSON
     let data: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();

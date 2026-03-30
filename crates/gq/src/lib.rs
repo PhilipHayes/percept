@@ -69,11 +69,8 @@ pub fn cmd_log(repo: &Repository, count: usize, paths: &[String]) -> Result<Vec<
             for p in paths {
                 diff_opts.pathspec(p);
             }
-            let diff = repo.diff_tree_to_tree(
-                parent_tree.as_ref(),
-                Some(&tree),
-                Some(&mut diff_opts),
-            )?;
+            let diff =
+                repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
             if diff.deltas().count() == 0 {
                 continue;
             }
@@ -245,8 +242,8 @@ pub fn cmd_blame(repo: &Repository, file: &str) -> Result<Vec<BlameLine>> {
     // Read current file content for line text
     let workdir = repo.workdir().context("bare repository")?;
     let file_path = workdir.join(file);
-    let content = std::fs::read_to_string(&file_path)
-        .with_context(|| format!("cannot read '{file}'"))?;
+    let content =
+        std::fs::read_to_string(&file_path).with_context(|| format!("cannot read '{file}'"))?;
     let lines: Vec<&str> = content.lines().collect();
 
     let mut result = Vec::new();
@@ -288,7 +285,7 @@ pub fn cmd_churn(
     revwalk.set_sorting(Sort::TIME)?;
     revwalk.push_head()?;
 
-    let since_ts = since.and_then(|s| parse_date_to_timestamp(s));
+    let since_ts = since.and_then(parse_date_to_timestamp);
 
     let mut file_stats: HashMap<String, (usize, usize, usize)> = HashMap::new();
 
@@ -311,11 +308,8 @@ pub fn cmd_churn(
             diff_opts.pathspec(p);
         }
 
-        let diff = repo.diff_tree_to_tree(
-            parent_tree.as_ref(),
-            Some(&tree),
-            Some(&mut diff_opts),
-        )?;
+        let diff =
+            repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
 
         // Use Patch API to get per-file stats without borrow conflicts
         let num_deltas = diff.deltas().len();
@@ -373,10 +367,7 @@ pub fn cmd_changed_since(
     let filter = if let Ok(obj) = repo.revparse_single(since) {
         RevOrDate::Rev(obj.id())
     } else {
-        RevOrDate::Date(
-            parse_date_to_timestamp(since)
-                .context("cannot parse as git ref or date")?,
-        )
+        RevOrDate::Date(parse_date_to_timestamp(since).context("cannot parse as git ref or date")?)
     };
 
     let mut file_counts: HashMap<String, usize> = HashMap::new();
@@ -406,11 +397,8 @@ pub fn cmd_changed_since(
             diff_opts.pathspec(p);
         }
 
-        let diff = repo.diff_tree_to_tree(
-            parent_tree.as_ref(),
-            Some(&tree),
-            Some(&mut diff_opts),
-        )?;
+        let diff =
+            repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
 
         for delta in diff.deltas() {
             if let Some(path) = delta.new_file().path() {

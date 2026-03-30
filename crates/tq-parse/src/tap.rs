@@ -1,26 +1,22 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // "ok 1 - test description"
 // "not ok 2 - test description"
 // "ok 3 # SKIP reason"
 // "ok 4 # TODO not yet implemented"
 static TAP_RESULT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(ok|not ok)\s+(\d+)\s*(?:-\s+(.+?))?(?:\s*#\s*(SKIP|TODO|skip|todo)\s*(.*)?)?$").unwrap()
+    Regex::new(r"^(ok|not ok)\s+(\d+)\s*(?:-\s+(.+?))?(?:\s*#\s*(SKIP|TODO|skip|todo)\s*(.*)?)?$")
+        .unwrap()
 });
-
 
 // "Bail out!" — abort
-static TAP_BAIL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^Bail out!\s*(.*)$").unwrap()
-});
+static TAP_BAIL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^Bail out!\s*(.*)$").unwrap());
 
 // "# Diagnostic message" — YAML-like diagnostic (TAP 13+)
-static TAP_DIAGNOSTIC: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^#\s+(.+)$").unwrap()
-});
+static TAP_DIAGNOSTIC: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^#\s+(.+)$").unwrap());
 
 /// Parse TAP (Test Anything Protocol) output.
 pub fn parse_tap(input: &str) -> TestRun {
@@ -33,7 +29,10 @@ pub fn parse_tap(input: &str) -> TestRun {
 
         // Bail out
         if let Some(caps) = TAP_BAIL.captures(trimmed) {
-            let msg = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let msg = caps
+                .get(1)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
             results.push(TestResult {
                 name: "Bail out!".to_string(),
                 status: TestStatus::Errored,

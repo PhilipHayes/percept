@@ -1,4 +1,4 @@
-use super::lexer::{InterpPart, Spanned, Token, lex};
+use super::lexer::{lex, InterpPart, Spanned, Token};
 
 /// AST representation of an aq query.
 ///
@@ -216,10 +216,7 @@ impl<'a> Parser<'a> {
     }
 
     fn current_pos(&self) -> usize {
-        self.tokens
-            .get(self.pos)
-            .map(|s| s.start)
-            .unwrap_or(0)
+        self.tokens.get(self.pos).map(|s| s.start).unwrap_or(0)
     }
 
     fn advance(&mut self) -> &Token {
@@ -393,9 +390,7 @@ impl<'a> Parser<'a> {
                         self.advance();
                         Ok(Expr::Field(name))
                     }
-                    Token::Colon => {
-                        self.parse_type_filter(Axis::Self_)
-                    }
+                    Token::Colon => self.parse_type_filter(Axis::Self_),
                     Token::LBracket => {
                         self.advance();
                         if matches!(self.peek(), Token::RBracket) {
@@ -418,13 +413,25 @@ impl<'a> Parser<'a> {
                 // Extract meta field name — handle both Ident and keyword tokens
                 // since "end", "type" etc. may be lexed as keywords
                 let meta_name = match self.peek().clone() {
-                    Token::Ident(name) => { self.advance(); name }
-                    Token::End => { self.advance(); "end".to_string() }
-                    Token::Not => { self.advance(); "not".to_string() }
+                    Token::Ident(name) => {
+                        self.advance();
+                        name
+                    }
+                    Token::End => {
+                        self.advance();
+                        "end".to_string()
+                    }
+                    Token::Not => {
+                        self.advance();
+                        "not".to_string()
+                    }
                     _ => {
                         return Err(ParseError {
                             position: self.current_pos(),
-                            message: format!("Expected meta field name after '@', got {:?}", self.peek()),
+                            message: format!(
+                                "Expected meta field name after '@', got {:?}",
+                                self.peek()
+                            ),
                         });
                     }
                 };
@@ -868,10 +875,14 @@ impl<'a> Parser<'a> {
         let mut full_name = name;
         loop {
             // Check if next char in source is underscore (adjacent, no whitespace)
-            let current_end = self.tokens.get(self.pos.wrapping_sub(1))
+            let current_end = self
+                .tokens
+                .get(self.pos.wrapping_sub(1))
                 .map(|s| s.end)
                 .unwrap_or(0);
-            let next_start = self.tokens.get(self.pos)
+            let next_start = self
+                .tokens
+                .get(self.pos)
                 .map(|s| s.start)
                 .unwrap_or(usize::MAX);
 
@@ -897,12 +908,21 @@ impl<'a> Parser<'a> {
         // Expect @field
         self.expect(&Token::At)?;
         let field = match self.peek().clone() {
-            Token::Ident(name) => { self.advance(); name }
-            Token::End => { self.advance(); "end".to_string() }
+            Token::Ident(name) => {
+                self.advance();
+                name
+            }
+            Token::End => {
+                self.advance();
+                "end".to_string()
+            }
             _ => {
                 return Err(ParseError {
                     position: self.current_pos(),
-                    message: format!("Expected field name after '@' in predicate, got {:?}", self.peek()),
+                    message: format!(
+                        "Expected field name after '@' in predicate, got {:?}",
+                        self.peek()
+                    ),
                 });
             }
         };
@@ -919,7 +939,10 @@ impl<'a> Parser<'a> {
             _ => {
                 return Err(ParseError {
                     position: self.current_pos(),
-                    message: format!("Expected comparison operator in predicate, got {:?}", self.peek()),
+                    message: format!(
+                        "Expected comparison operator in predicate, got {:?}",
+                        self.peek()
+                    ),
                 });
             }
         };
@@ -927,8 +950,14 @@ impl<'a> Parser<'a> {
 
         // Expect string value
         let value = match self.peek().clone() {
-            Token::String(s) => { self.advance(); s }
-            Token::Number(n) => { self.advance(); n.to_string() }
+            Token::String(s) => {
+                self.advance();
+                s
+            }
+            Token::Number(n) => {
+                self.advance();
+                n.to_string()
+            }
             _ => {
                 return Err(ParseError {
                     position: self.current_pos(),

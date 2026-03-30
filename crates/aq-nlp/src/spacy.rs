@@ -107,7 +107,9 @@ fn find_script() -> Result<PathBuf, SpacyError> {
 
     // Compile-time fallback via CARGO_MANIFEST_DIR.
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let fallback = PathBuf::from(manifest_dir).join("scripts").join("spacy_parse.py");
+    let fallback = PathBuf::from(manifest_dir)
+        .join("scripts")
+        .join("spacy_parse.py");
     if fallback.exists() {
         return Ok(fallback);
     }
@@ -143,16 +145,20 @@ pub fn parse_with_spacy(text: &str) -> Result<SpacyDoc, SpacyError> {
 
     // Write text to stdin and close it.
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(text.as_bytes()).map_err(|e| SpacyError::ParseFailed {
-            message: format!("failed to write stdin: {e}"),
-            stderr: String::new(),
-        })?;
+        stdin
+            .write_all(text.as_bytes())
+            .map_err(|e| SpacyError::ParseFailed {
+                message: format!("failed to write stdin: {e}"),
+                stderr: String::new(),
+            })?;
     }
 
-    let output = child.wait_with_output().map_err(|e| SpacyError::ParseFailed {
-        message: format!("failed to wait for process: {e}"),
-        stderr: String::new(),
-    })?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| SpacyError::ParseFailed {
+            message: format!("failed to wait for process: {e}"),
+            stderr: String::new(),
+        })?;
 
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
@@ -176,10 +182,7 @@ pub fn parse_with_spacy(text: &str) -> Result<SpacyDoc, SpacyError> {
                 })
             }
             _ => Err(SpacyError::ParseFailed {
-                message: format!(
-                    "process exited with code {:?}",
-                    output.status.code()
-                ),
+                message: format!("process exited with code {:?}", output.status.code()),
                 stderr,
             }),
         }
@@ -277,16 +280,32 @@ mod tests {
 
     #[test]
     fn error_messages_include_remediation() {
-        let err = SpacyError::PythonNotFound { message: "not found".into() };
+        let err = SpacyError::PythonNotFound {
+            message: "not found".into(),
+        };
         let msg = err.to_string();
-        assert!(msg.contains("brew install python3"), "PythonNotFound should include install hint: {msg}");
+        assert!(
+            msg.contains("brew install python3"),
+            "PythonNotFound should include install hint: {msg}"
+        );
 
-        let err = SpacyError::SpacyNotInstalled { message: "no module".into() };
+        let err = SpacyError::SpacyNotInstalled {
+            message: "no module".into(),
+        };
         let msg = err.to_string();
-        assert!(msg.contains("pip install spacy"), "SpacyNotInstalled should include install hint: {msg}");
+        assert!(
+            msg.contains("pip install spacy"),
+            "SpacyNotInstalled should include install hint: {msg}"
+        );
 
-        let err = SpacyError::ModelNotFound { model: "en_core_web_sm".into(), message: "not found".into() };
+        let err = SpacyError::ModelNotFound {
+            model: "en_core_web_sm".into(),
+            message: "not found".into(),
+        };
         let msg = err.to_string();
-        assert!(msg.contains("python3 -m spacy download en_core_web_sm"), "ModelNotFound should include download hint: {msg}");
+        assert!(
+            msg.contains("python3 -m spacy download en_core_web_sm"),
+            "ModelNotFound should include download hint: {msg}"
+        );
     }
 }

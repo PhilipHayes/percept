@@ -1,7 +1,7 @@
-/// Markdown preprocessing for corpus NLP pipeline.
-///
-/// Strips formatting artifacts that would confuse spaCy entity extraction:
-/// YAML frontmatter, wiki-links, headers, bold/italic, code blocks/inline.
+//! Markdown preprocessing for corpus NLP pipeline.
+//!
+//! Strips formatting artifacts that would confuse spaCy entity extraction:
+//! YAML frontmatter, wiki-links, headers, bold/italic, code blocks/inline.
 
 /// Preprocess markdown text for NLP parsing.
 /// Returns `(normalized_text, raw_copy)` where `normalized_text` has markup stripped
@@ -32,7 +32,10 @@ fn strip_frontmatter(s: &str) -> String {
     if let Some(end) = rest.find("\n---") {
         let after_close = &rest[end + 4..];
         // Skip any trailing newline right after the closing ---
-        after_close.strip_prefix('\n').unwrap_or(after_close).to_string()
+        after_close
+            .strip_prefix('\n')
+            .unwrap_or(after_close)
+            .to_string()
     } else {
         s.to_string()
     }

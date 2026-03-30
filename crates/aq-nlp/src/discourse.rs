@@ -32,12 +32,14 @@ impl fmt::Display for DiscourseRelation {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub(crate) enum ConnectivePosition {
     SentenceInitial,
     ClauseInitial,
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ConnectiveMatch {
     pub connective: String,
     pub relation: DiscourseRelation,
@@ -211,6 +213,7 @@ static SINGLE_WORD_CONNECTIVES: &[(&str, DiscourseRelation, f32)] = &[
 
 // ── Lookup functions ─────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub(crate) fn connective_to_relation(text: &str) -> Option<(DiscourseRelation, f32)> {
     let lower = text.to_lowercase();
     for &(connective, ref relation, confidence) in MULTI_WORD_CONNECTIVES {
@@ -226,6 +229,7 @@ pub(crate) fn connective_to_relation(text: &str) -> Option<(DiscourseRelation, f
     None
 }
 
+#[allow(dead_code)]
 pub(crate) fn lexicon_size() -> usize {
     MULTI_WORD_CONNECTIVES.len() + SINGLE_WORD_CONNECTIVES.len()
 }
@@ -295,6 +299,7 @@ pub(crate) struct SentenceInfo {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct DiscourseRelationData {
     pub relation: DiscourseRelation,
     pub connective: Option<String>,
@@ -303,8 +308,8 @@ pub(crate) struct DiscourseRelationData {
     pub satellite_sentence_idx: usize,
     pub nucleus_text: String,
     pub satellite_text: String,
-    pub nucleus_line: usize,     // 1-based
-    pub satellite_line: usize,   // 1-based
+    pub nucleus_line: usize,   // 1-based
+    pub satellite_line: usize, // 1-based
     pub nucleus_para_idx: usize,
     pub satellite_para_idx: usize,
 }
@@ -527,7 +532,11 @@ mod tests {
     // detect_discourse_relations tests
 
     fn make_sentence_info(text: &str, para_idx: usize, line: usize) -> SentenceInfo {
-        SentenceInfo { text: text.to_string(), para_idx, line }
+        SentenceInfo {
+            text: text.to_string(),
+            para_idx,
+            line,
+        }
     }
 
     #[test]

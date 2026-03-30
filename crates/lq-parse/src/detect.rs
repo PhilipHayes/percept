@@ -69,7 +69,10 @@ pub fn detect_format(lines: &[&str]) -> Format {
         }
 
         // Build tool: error[Exxxx]: or warning: or --> file:line:col
-        if trimmed.starts_with("error") || trimmed.starts_with("warning:") || trimmed.trim_start().starts_with("--> ") {
+        if trimmed.starts_with("error")
+            || trimmed.starts_with("warning:")
+            || trimmed.trim_start().starts_with("--> ")
+        {
             build_score += 2;
         }
 
@@ -120,17 +123,30 @@ pub fn detect_format(lines: &[&str]) -> Format {
 
 fn contains_level_keyword(s: &str) -> bool {
     let upper = s.to_ascii_uppercase();
-    ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "CRITICAL"]
-        .iter()
-        .any(|kw| upper.contains(kw))
+    [
+        "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "CRITICAL",
+    ]
+    .iter()
+    .any(|kw| upper.contains(kw))
 }
 
 /// Check for level keywords inside brackets, e.g. `[info]`, `[ERROR]`.
 fn contains_bracketed_level(s: &str) -> bool {
     let upper = s.to_ascii_uppercase();
-    ["[TRACE]", "[DEBUG]", "[INFO]", "[WARN]", "[WARNING]", "[ERROR]", "[ERR]", "[FATAL]", "[CRITICAL]", "[VERBOSE]"]
-        .iter()
-        .any(|kw| upper.contains(kw))
+    [
+        "[TRACE]",
+        "[DEBUG]",
+        "[INFO]",
+        "[WARN]",
+        "[WARNING]",
+        "[ERROR]",
+        "[ERR]",
+        "[FATAL]",
+        "[CRITICAL]",
+        "[VERBOSE]",
+    ]
+    .iter()
+    .any(|kw| upper.contains(kw))
 }
 
 #[cfg(test)]

@@ -7,6 +7,7 @@ use std::collections::HashMap;
 /// combining their aliases and mentions.  Chains for characters not
 /// re-mentioned within `window` paragraphs of each other are kept
 /// separate (their mentions simply accumulate).
+#[allow(dead_code)]
 pub(crate) fn merge_coref_chains(
     per_file_chains: &[Vec<CoreferenceChain>],
     window: usize,
@@ -37,6 +38,7 @@ pub(crate) fn merge_coref_chains(
 }
 
 /// Merge `incoming` chain into `target` chain.
+#[allow(dead_code)]
 fn merge_chain_into(target: &mut CoreferenceChain, incoming: &CoreferenceChain, _window: usize) {
     // Merge aliases (dedup).
     for alias in &incoming.aliases {
@@ -59,6 +61,7 @@ fn merge_chain_into(target: &mut CoreferenceChain, incoming: &CoreferenceChain, 
 ///
 /// Returns a map from alias (lowercase) to canonical name, supporting
 /// cross-file alias resolution (e.g., "Israel" → "Jacob").
+#[allow(dead_code)]
 pub(crate) fn build_rescue_map(chains: &[CoreferenceChain]) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for chain in chains {
@@ -78,7 +81,7 @@ pub(crate) fn build_rescue_map(chains: &[CoreferenceChain]) -> HashMap<String, S
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::coref::{CoreferenceChain, CoreferenceData, CorefType};
+    use crate::coref::{CorefType, CoreferenceChain, CoreferenceData};
 
     fn make_chain(
         canonical: &str,

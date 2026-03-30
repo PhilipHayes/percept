@@ -16,25 +16,25 @@ pub enum Token {
     Null,
 
     // Punctuation
-    Dot,          // .
-    Pipe,         // |
-    Colon,        // :
-    At,           // @
-    LParen,       // (
-    RParen,       // )
-    LBracket,     // [
-    RBracket,     // ]
-    LBrace,       // {
-    RBrace,       // }
-    Comma,        // ,
-    Gt,           // >
-    Lt,           // <
-    Gte,          // >=
-    Lte,          // <=
-    Eq,           // ==
-    NotEq,        // !=
-    RegexMatch,   // =~
-    DoubleSlash,  // // (alternative operator)
+    Dot,         // .
+    Pipe,        // |
+    Colon,       // :
+    At,          // @
+    LParen,      // (
+    RParen,      // )
+    LBracket,    // [
+    RBracket,    // ]
+    LBrace,      // {
+    RBrace,      // }
+    Comma,       // ,
+    Gt,          // >
+    Lt,          // <
+    Gte,         // >=
+    Lte,         // <=
+    Eq,          // ==
+    NotEq,       // !=
+    RegexMatch,  // =~
+    DoubleSlash, // // (alternative operator)
 
     // Keywords / Identifiers
     Ident(String),
@@ -95,20 +95,62 @@ pub fn lex(input: &str) -> Result<Vec<Spanned>, LexError> {
         let start = pos;
 
         let token = match b {
-            b'.' => { pos += 1; Token::Dot }
-            b'|' => { pos += 1; Token::Pipe }
-            b':' => { pos += 1; Token::Colon }
-            b'@' => { pos += 1; Token::At }
-            b'(' => { pos += 1; Token::LParen }
-            b')' => { pos += 1; Token::RParen }
-            b'[' => { pos += 1; Token::LBracket }
-            b']' => { pos += 1; Token::RBracket }
-            b'{' => { pos += 1; Token::LBrace }
-            b'}' => { pos += 1; Token::RBrace }
-            b',' => { pos += 1; Token::Comma }
-            b'+' => { pos += 1; Token::Plus }
-            b'-' => { pos += 1; Token::Minus }
-            b'*' => { pos += 1; Token::Star }
+            b'.' => {
+                pos += 1;
+                Token::Dot
+            }
+            b'|' => {
+                pos += 1;
+                Token::Pipe
+            }
+            b':' => {
+                pos += 1;
+                Token::Colon
+            }
+            b'@' => {
+                pos += 1;
+                Token::At
+            }
+            b'(' => {
+                pos += 1;
+                Token::LParen
+            }
+            b')' => {
+                pos += 1;
+                Token::RParen
+            }
+            b'[' => {
+                pos += 1;
+                Token::LBracket
+            }
+            b']' => {
+                pos += 1;
+                Token::RBracket
+            }
+            b'{' => {
+                pos += 1;
+                Token::LBrace
+            }
+            b'}' => {
+                pos += 1;
+                Token::RBrace
+            }
+            b',' => {
+                pos += 1;
+                Token::Comma
+            }
+            b'+' => {
+                pos += 1;
+                Token::Plus
+            }
+            b'-' => {
+                pos += 1;
+                Token::Minus
+            }
+            b'*' => {
+                pos += 1;
+                Token::Star
+            }
 
             // / or //
             b'/' => {
@@ -283,8 +325,10 @@ pub fn lex(input: &str) -> Result<Vec<Spanned>, LexError> {
                 while pos < bytes.len() && bytes[pos].is_ascii_digit() {
                     pos += 1;
                 }
-                if pos < bytes.len() && bytes[pos] == b'.'
-                    && pos + 1 < bytes.len() && bytes[pos + 1].is_ascii_digit()
+                if pos < bytes.len()
+                    && bytes[pos] == b'.'
+                    && pos + 1 < bytes.len()
+                    && bytes[pos + 1].is_ascii_digit()
                 {
                     pos += 1; // skip '.'
                     while pos < bytes.len() && bytes[pos].is_ascii_digit() {

@@ -171,10 +171,7 @@ fn count_by(entries: &[&LogEntry], field: &str) -> Value {
                 .level
                 .map(|l| format!("{:?}", l).to_lowercase())
                 .unwrap_or_else(|| "unknown".into()),
-            "source" => entry
-                .source
-                .clone()
-                .unwrap_or_else(|| "unknown".into()),
+            "source" => entry.source.clone().unwrap_or_else(|| "unknown".into()),
             other => entry
                 .fields
                 .get(other)
@@ -283,9 +280,7 @@ fn apply_context(all: &[LogEntry], matched: &[&LogEntry], n: usize) -> Vec<Value
     for &idx in &match_indices {
         let start = idx.saturating_sub(n);
         let end = (idx + n + 1).min(all.len());
-        for i in start..end {
-            included[i] = true;
-        }
+        included[start..end].fill(true);
     }
 
     all.iter()
@@ -397,9 +392,24 @@ mod tests {
     #[test]
     fn since_until_filters() {
         let entries = vec![
-            make_entry(Some("2026-03-11T08:00:00Z"), Some(Level::Info), None, "early"),
-            make_entry(Some("2026-03-11T12:00:00Z"), Some(Level::Info), None, "noon"),
-            make_entry(Some("2026-03-11T18:00:00Z"), Some(Level::Info), None, "late"),
+            make_entry(
+                Some("2026-03-11T08:00:00Z"),
+                Some(Level::Info),
+                None,
+                "early",
+            ),
+            make_entry(
+                Some("2026-03-11T12:00:00Z"),
+                Some(Level::Info),
+                None,
+                "noon",
+            ),
+            make_entry(
+                Some("2026-03-11T18:00:00Z"),
+                Some(Level::Info),
+                None,
+                "late",
+            ),
         ];
         let filters = parse_query("since:2026-03-11T10:00:00Z until:2026-03-11T14:00:00Z");
         let matched: Vec<&LogEntry> = entries
@@ -413,9 +423,24 @@ mod tests {
     #[test]
     fn patterns_extraction() {
         let entries = vec![
-            make_entry(None, Some(Level::Error), None, "Connection refused to host 10.0.0.1"),
-            make_entry(None, Some(Level::Error), None, "Connection refused to host 10.0.0.2"),
-            make_entry(None, Some(Level::Error), None, "Connection refused to host 10.0.0.3"),
+            make_entry(
+                None,
+                Some(Level::Error),
+                None,
+                "Connection refused to host 10.0.0.1",
+            ),
+            make_entry(
+                None,
+                Some(Level::Error),
+                None,
+                "Connection refused to host 10.0.0.2",
+            ),
+            make_entry(
+                None,
+                Some(Level::Error),
+                None,
+                "Connection refused to host 10.0.0.3",
+            ),
             make_entry(None, Some(Level::Info), None, "Disk full on /dev/sda1"),
             make_entry(None, Some(Level::Info), None, "Disk full on /dev/sdb1"),
         ];
@@ -430,9 +455,24 @@ mod tests {
     #[test]
     fn timeline_sorts_by_timestamp() {
         let entries = vec![
-            make_entry(Some("2026-03-11T12:00:00Z"), Some(Level::Info), None, "second"),
-            make_entry(Some("2026-03-11T08:00:00Z"), Some(Level::Info), None, "first"),
-            make_entry(Some("2026-03-11T18:00:00Z"), Some(Level::Info), None, "third"),
+            make_entry(
+                Some("2026-03-11T12:00:00Z"),
+                Some(Level::Info),
+                None,
+                "second",
+            ),
+            make_entry(
+                Some("2026-03-11T08:00:00Z"),
+                Some(Level::Info),
+                None,
+                "first",
+            ),
+            make_entry(
+                Some("2026-03-11T18:00:00Z"),
+                Some(Level::Info),
+                None,
+                "third",
+            ),
         ];
         let p = parse_pipeline("| timeline");
         let results = execute_pipeline(&entries, &p);

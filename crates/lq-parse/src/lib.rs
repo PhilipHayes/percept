@@ -1,16 +1,16 @@
-pub mod model;
+pub mod access_log;
+pub mod ansi;
+pub mod bracket;
+pub mod build_tool;
 pub mod detect;
+pub mod docker_cri;
 pub mod json;
 pub mod logfmt;
-pub mod bracket;
-pub mod ansi;
-pub mod docker_cri;
+pub mod model;
 pub mod syslog;
-pub mod access_log;
-pub mod build_tool;
 
-pub use model::{LogEntry, Level};
 pub use detect::{detect_format, Format};
+pub use model::{Level, LogEntry};
 
 /// Parse a single raw line into a LogEntry using the given format.
 pub fn parse_line(line: &str, format: Format) -> LogEntry {

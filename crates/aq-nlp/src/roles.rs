@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::spacy::SpacyToken as SpacyTokenData;
-use crate::tree::{collect_span_text, InteractionData, normalize_dep};
+use crate::tree::{collect_span_text, normalize_dep, InteractionData};
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -24,18 +24,18 @@ pub(crate) enum ThematicRole {
 impl fmt::Display for ThematicRole {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            ThematicRole::Agent       => "agent",
-            ThematicRole::Patient     => "patient",
+            ThematicRole::Agent => "agent",
+            ThematicRole::Patient => "patient",
             ThematicRole::Experiencer => "experiencer",
-            ThematicRole::Theme       => "theme",
-            ThematicRole::Instrument  => "instrument",
+            ThematicRole::Theme => "theme",
+            ThematicRole::Instrument => "instrument",
             ThematicRole::Beneficiary => "beneficiary",
-            ThematicRole::Location    => "location",
-            ThematicRole::Goal        => "goal",
-            ThematicRole::Source      => "source",
-            ThematicRole::Recipient   => "recipient",
-            ThematicRole::Cause       => "cause",
-            ThematicRole::Unknown     => "unknown",
+            ThematicRole::Location => "location",
+            ThematicRole::Goal => "goal",
+            ThematicRole::Source => "source",
+            ThematicRole::Recipient => "recipient",
+            ThematicRole::Cause => "cause",
+            ThematicRole::Unknown => "unknown",
         };
         write!(f, "{}", s)
     }
@@ -62,74 +62,69 @@ pub(crate) enum VerbClass {
 pub(crate) fn verb_class(lemma: &str) -> Option<VerbClass> {
     match lemma {
         // Action (~45)
-        "hit" | "kick" | "break" | "push" | "pull" | "throw" | "catch" | "grab"
-        | "strike" | "punch" | "smash" | "crush" | "tear" | "rip" | "cut" | "chop"
-        | "stab" | "shoot" | "kill" | "murder" | "attack" | "fight" | "battle"
-        | "destroy" | "demolish" | "build" | "write" | "draw" | "carve" | "dig"
-        | "lift" | "carry" | "drag" | "drop" | "place" | "put" | "set" | "hold"
-        | "touch" | "bite" | "chew" => Some(VerbClass::Action),
+        "hit" | "kick" | "break" | "push" | "pull" | "throw" | "catch" | "grab" | "strike"
+        | "punch" | "smash" | "crush" | "tear" | "rip" | "cut" | "chop" | "stab" | "shoot"
+        | "kill" | "murder" | "attack" | "fight" | "battle" | "destroy" | "demolish" | "build"
+        | "write" | "draw" | "carve" | "dig" | "lift" | "carry" | "drag" | "drop" | "place"
+        | "put" | "set" | "hold" | "touch" | "bite" | "chew" => Some(VerbClass::Action),
 
         // Perception (~15)
-        "see" | "hear" | "feel" | "smell" | "taste" | "notice" | "observe" | "watch"
-        | "detect" | "sense" | "perceive" | "spot" | "glimpse" | "witness" | "overhear" => {
+        "see" | "hear" | "feel" | "smell" | "taste" | "notice" | "observe" | "watch" | "detect"
+        | "sense" | "perceive" | "spot" | "glimpse" | "witness" | "overhear" => {
             Some(VerbClass::Perception)
         }
 
         // Cognition (~20)
-        "realize" | "recognize" | "understand" | "know" | "believe" | "think"
-        | "consider" | "remember" | "forget" | "recall" | "imagine" | "suppose"
-        | "assume" | "conclude" | "decide" | "determine" | "discover" | "learn"
-        | "wonder" | "doubt" => Some(VerbClass::Cognition),
+        "realize" | "recognize" | "understand" | "know" | "believe" | "think" | "consider"
+        | "remember" | "forget" | "recall" | "imagine" | "suppose" | "assume" | "conclude"
+        | "decide" | "determine" | "discover" | "learn" | "wonder" | "doubt" => {
+            Some(VerbClass::Cognition)
+        }
 
         // Emotion (~24)
-        "fear" | "love" | "hate" | "want" | "need" | "desire" | "enjoy" | "like"
-        | "dislike" | "prefer" | "dread" | "worry" | "hope" | "wish" | "admire"
-        | "respect" | "despise" | "loathe" | "envy" | "pity" | "miss" | "regret"
-        | "appreciate" | "trust" => Some(VerbClass::Emotion),
+        "fear" | "love" | "hate" | "want" | "need" | "desire" | "enjoy" | "like" | "dislike"
+        | "prefer" | "dread" | "worry" | "hope" | "wish" | "admire" | "respect" | "despise"
+        | "loathe" | "envy" | "pity" | "miss" | "regret" | "appreciate" | "trust" => {
+            Some(VerbClass::Emotion)
+        }
 
         // Motion (~35)
-        "go" | "come" | "run" | "walk" | "fall" | "rise" | "move" | "travel"
-        | "arrive" | "depart" | "leave" | "enter" | "exit" | "return" | "fly"
-        | "swim" | "crawl" | "climb" | "jump" | "leap" | "roll" | "slide" | "drift"
-        | "float" | "flow" | "rush" | "hurry" | "wander" | "roam" | "flee" | "escape"
-        | "chase" | "follow" | "approach" | "retreat" => Some(VerbClass::Motion),
+        "go" | "come" | "run" | "walk" | "fall" | "rise" | "move" | "travel" | "arrive"
+        | "depart" | "leave" | "enter" | "exit" | "return" | "fly" | "swim" | "crawl" | "climb"
+        | "jump" | "leap" | "roll" | "slide" | "drift" | "float" | "flow" | "rush" | "hurry"
+        | "wander" | "roam" | "flee" | "escape" | "chase" | "follow" | "approach" | "retreat" => {
+            Some(VerbClass::Motion)
+        }
 
         // Transfer (~23) — "return" goes to Motion above; "tell", "bring", "take" → Transfer
-        "give" | "send" | "tell" | "show" | "teach" | "offer" | "lend" | "bring"
-        | "take" | "pass" | "hand" | "deliver" | "provide" | "supply" | "grant"
-        | "award" | "present" | "sell" | "buy" | "pay" | "owe" | "trade" => {
-            Some(VerbClass::Transfer)
-        }
+        "give" | "send" | "tell" | "show" | "teach" | "offer" | "lend" | "bring" | "take"
+        | "pass" | "hand" | "deliver" | "provide" | "supply" | "grant" | "award" | "present"
+        | "sell" | "buy" | "pay" | "owe" | "trade" => Some(VerbClass::Transfer),
 
         // Creation (~20)
-        "make" | "create" | "compose" | "cook" | "bake" | "paint" | "design"
-        | "produce" | "generate" | "manufacture" | "construct" | "assemble" | "craft"
-        | "forge" | "brew" | "invent" | "develop" | "prepare" | "establish" | "found" => {
-            Some(VerbClass::Creation)
-        }
+        "make" | "create" | "compose" | "cook" | "bake" | "paint" | "design" | "produce"
+        | "generate" | "manufacture" | "construct" | "assemble" | "craft" | "forge" | "brew"
+        | "invent" | "develop" | "prepare" | "establish" | "found" => Some(VerbClass::Creation),
 
         // Communication (~27)
         "say" | "speak" | "talk" | "ask" | "answer" | "reply" | "respond" | "explain"
-        | "describe" | "announce" | "declare" | "claim" | "argue" | "suggest"
-        | "propose" | "state" | "report" | "mention" | "discuss" | "shout" | "whisper"
-        | "murmur" | "sing" | "chant" | "read" | "call" => Some(VerbClass::Communication),
+        | "describe" | "announce" | "declare" | "claim" | "argue" | "suggest" | "propose"
+        | "state" | "report" | "mention" | "discuss" | "shout" | "whisper" | "murmur" | "sing"
+        | "chant" | "read" | "call" => Some(VerbClass::Communication),
 
         // ChangeOfState (~43)
-        "melt" | "freeze" | "boil" | "evaporate" | "dissolve" | "harden" | "soften"
-        | "dry" | "wet" | "warm" | "cool" | "heat" | "burn" | "ignite" | "extinguish"
-        | "open" | "close" | "shut" | "lock" | "unlock" | "tie" | "untie" | "fold"
-        | "unfold" | "bend" | "straighten" | "stretch" | "shrink" | "grow" | "expand"
-        | "contract" | "fill" | "empty" | "clean" | "stain" | "fix" | "repair"
-        | "damage" | "crack" | "shatter" | "split" | "heal" | "cure" | "wake"
-        | "awaken" => Some(VerbClass::ChangeOfState),
+        "melt" | "freeze" | "boil" | "evaporate" | "dissolve" | "harden" | "soften" | "dry"
+        | "wet" | "warm" | "cool" | "heat" | "burn" | "ignite" | "extinguish" | "open"
+        | "close" | "shut" | "lock" | "unlock" | "tie" | "untie" | "fold" | "unfold" | "bend"
+        | "straighten" | "stretch" | "shrink" | "grow" | "expand" | "contract" | "fill"
+        | "empty" | "clean" | "stain" | "fix" | "repair" | "damage" | "crack" | "shatter"
+        | "split" | "heal" | "cure" | "wake" | "awaken" => Some(VerbClass::ChangeOfState),
 
         // Stative (~30)
-        "be" | "have" | "seem" | "appear" | "belong" | "contain" | "exist" | "remain"
-        | "stay" | "last" | "endure" | "persist" | "consist" | "comprise" | "include"
-        | "involve" | "resemble" | "equal" | "lack" | "own" | "possess" | "deserve"
-        | "matter" | "mean" | "signify" | "represent" | "constitute" | "form" => {
-            Some(VerbClass::Stative)
-        }
+        "be" | "have" | "seem" | "appear" | "belong" | "contain" | "exist" | "remain" | "stay"
+        | "last" | "endure" | "persist" | "consist" | "comprise" | "include" | "involve"
+        | "resemble" | "equal" | "lack" | "own" | "possess" | "deserve" | "matter" | "mean"
+        | "signify" | "represent" | "constitute" | "form" => Some(VerbClass::Stative),
 
         // Consumption (~12)
         "eat" | "drink" | "consume" | "devour" | "swallow" | "gulp" | "sip" | "nibble"
@@ -149,79 +144,79 @@ pub(crate) fn role_frame(class: VerbClass, dep: &str, is_passive: bool) -> Thema
     match class {
         VerbClass::Action => match dep {
             "nsubj" if !is_passive => ThematicRole::Agent,
-            "nsubj" if is_passive  => ThematicRole::Patient,
-            "dobj"                 => ThematicRole::Patient,
-            "iobj" | "dative"      => ThematicRole::Recipient,
-            "agent"                => ThematicRole::Agent,
-            _                      => ThematicRole::Unknown,
+            "nsubj" if is_passive => ThematicRole::Patient,
+            "dobj" => ThematicRole::Patient,
+            "iobj" | "dative" => ThematicRole::Recipient,
+            "agent" => ThematicRole::Agent,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Perception => match dep {
             "nsubj" => ThematicRole::Experiencer,
-            "dobj"  => ThematicRole::Theme,
-            _       => ThematicRole::Unknown,
+            "dobj" => ThematicRole::Theme,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Cognition => match dep {
             "nsubj" => ThematicRole::Experiencer,
-            "dobj"  => ThematicRole::Theme,
-            _       => ThematicRole::Unknown,
+            "dobj" => ThematicRole::Theme,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Emotion => match dep {
             "nsubj" => ThematicRole::Experiencer,
-            "dobj"  => ThematicRole::Theme,
-            _       => ThematicRole::Unknown,
+            "dobj" => ThematicRole::Theme,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Motion => match dep {
-            "nsubj"           => ThematicRole::Theme,
-            "dobj"            => ThematicRole::Goal,
+            "nsubj" => ThematicRole::Theme,
+            "dobj" => ThematicRole::Goal,
             "iobj" | "dative" => ThematicRole::Goal,
-            _                 => ThematicRole::Unknown,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Transfer => match dep {
             "nsubj" if !is_passive => ThematicRole::Agent,
-            "nsubj" if is_passive  => ThematicRole::Theme,
-            "dobj"                 => ThematicRole::Theme,
-            "iobj" | "dative"      => ThematicRole::Recipient,
-            "agent"                => ThematicRole::Agent,
-            _                      => ThematicRole::Unknown,
+            "nsubj" if is_passive => ThematicRole::Theme,
+            "dobj" => ThematicRole::Theme,
+            "iobj" | "dative" => ThematicRole::Recipient,
+            "agent" => ThematicRole::Agent,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Creation => match dep {
-            "nsubj"           => ThematicRole::Agent,
-            "dobj"            => ThematicRole::Theme,
+            "nsubj" => ThematicRole::Agent,
+            "dobj" => ThematicRole::Theme,
             "iobj" | "dative" => ThematicRole::Beneficiary,
-            _                 => ThematicRole::Unknown,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Communication => match dep {
-            "nsubj"           => ThematicRole::Agent,
-            "dobj"            => ThematicRole::Theme,
+            "nsubj" => ThematicRole::Agent,
+            "dobj" => ThematicRole::Theme,
             "iobj" | "dative" => ThematicRole::Recipient,
-            _                 => ThematicRole::Unknown,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::ChangeOfState => match dep {
             "nsubj" if !is_passive => ThematicRole::Agent,
-            "nsubj" if is_passive  => ThematicRole::Patient,
-            "dobj"                 => ThematicRole::Patient,
-            "agent"                => ThematicRole::Cause,
-            _                      => ThematicRole::Unknown,
+            "nsubj" if is_passive => ThematicRole::Patient,
+            "dobj" => ThematicRole::Patient,
+            "agent" => ThematicRole::Cause,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Stative => match dep {
             "nsubj" => ThematicRole::Experiencer,
-            "dobj"  => ThematicRole::Theme,
-            _       => ThematicRole::Unknown,
+            "dobj" => ThematicRole::Theme,
+            _ => ThematicRole::Unknown,
         },
 
         VerbClass::Consumption => match dep {
             "nsubj" => ThematicRole::Agent,
-            "dobj"  => ThematicRole::Patient,
-            _       => ThematicRole::Unknown,
+            "dobj" => ThematicRole::Patient,
+            _ => ThematicRole::Unknown,
         },
     }
 }
@@ -239,6 +234,7 @@ pub(crate) fn is_ergative_use(verb_class: VerbClass, has_agent: bool, has_patien
 // ── RoleAnnotation ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct RoleAnnotation {
     pub participant: String,
     pub dep_relation: String,
@@ -263,11 +259,11 @@ pub(crate) fn classify_roles(
 
     const LIGHT_VERB_LEMMAS: &[&str] = &["take", "make", "have", "give", "do"];
     const LIGHT_VERB_COMPLEMENTS: &[&str] = &[
-        "walk", "decision", "look", "attempt", "turn", "break", "step",
-        "run", "bath", "nap", "rest", "bite", "sip", "ride", "trip",
+        "walk", "decision", "look", "attempt", "turn", "break", "step", "run", "bath", "nap",
+        "rest", "bite", "sip", "ride", "trip",
     ];
     let is_light_verb = LIGHT_VERB_LEMMAS.contains(&interaction.verb_lemma.as_str())
-        && interaction.patient.as_ref().map_or(false, |p| {
+        && interaction.patient.as_ref().is_some_and(|p| {
             let p_lower = p.to_lowercase();
             p_lower
                 .split_whitespace()
@@ -444,8 +440,8 @@ pub(crate) fn classify_roles(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use VerbClass::*;
     use ThematicRole::*;
+    use VerbClass::*;
 
     // ── verb_class spot tests ─────────────────────────────────────────────────
 
@@ -512,47 +508,99 @@ mod tests {
     #[test]
     fn verb_class_coverage_spot_check() {
         // Action — 10+
-        for v in &["hit", "push", "pull", "throw", "catch", "smash", "cut", "shoot", "destroy", "lift"] {
+        for v in &[
+            "hit", "push", "pull", "throw", "catch", "smash", "cut", "shoot", "destroy", "lift",
+        ] {
             assert_eq!(verb_class(v), Some(Action), "Action: {v}");
         }
         // Perception — 10+
-        for v in &["see", "feel", "smell", "taste", "notice", "observe", "watch", "detect", "sense", "perceive"] {
+        for v in &[
+            "see", "feel", "smell", "taste", "notice", "observe", "watch", "detect", "sense",
+            "perceive",
+        ] {
             assert_eq!(verb_class(v), Some(Perception), "Perception: {v}");
         }
         // Cognition — 10+
-        for v in &["realize", "recognize", "know", "believe", "think", "consider", "remember", "forget", "recall", "imagine"] {
+        for v in &[
+            "realize",
+            "recognize",
+            "know",
+            "believe",
+            "think",
+            "consider",
+            "remember",
+            "forget",
+            "recall",
+            "imagine",
+        ] {
             assert_eq!(verb_class(v), Some(Cognition), "Cognition: {v}");
         }
         // Emotion — 10+
-        for v in &["love", "hate", "want", "need", "desire", "enjoy", "like", "dislike", "prefer", "dread"] {
+        for v in &[
+            "love", "hate", "want", "need", "desire", "enjoy", "like", "dislike", "prefer", "dread",
+        ] {
             assert_eq!(verb_class(v), Some(Emotion), "Emotion: {v}");
         }
         // Motion — 10+
-        for v in &["go", "come", "walk", "fall", "rise", "move", "travel", "arrive", "depart", "fly"] {
+        for v in &[
+            "go", "come", "walk", "fall", "rise", "move", "travel", "arrive", "depart", "fly",
+        ] {
             assert_eq!(verb_class(v), Some(Motion), "Motion: {v}");
         }
         // Transfer — 10+
-        for v in &["send", "tell", "show", "teach", "offer", "lend", "bring", "take", "pass", "hand"] {
+        for v in &[
+            "send", "tell", "show", "teach", "offer", "lend", "bring", "take", "pass", "hand",
+        ] {
             assert_eq!(verb_class(v), Some(Transfer), "Transfer: {v}");
         }
         // Creation — 10+
-        for v in &["make", "create", "compose", "cook", "paint", "design", "produce", "generate", "manufacture", "construct"] {
+        for v in &[
+            "make",
+            "create",
+            "compose",
+            "cook",
+            "paint",
+            "design",
+            "produce",
+            "generate",
+            "manufacture",
+            "construct",
+        ] {
             assert_eq!(verb_class(v), Some(Creation), "Creation: {v}");
         }
         // Communication — 10+
-        for v in &["speak", "talk", "ask", "answer", "reply", "respond", "explain", "describe", "announce", "declare"] {
+        for v in &[
+            "speak", "talk", "ask", "answer", "reply", "respond", "explain", "describe",
+            "announce", "declare",
+        ] {
             assert_eq!(verb_class(v), Some(Communication), "Communication: {v}");
         }
         // ChangeOfState — 10+
-        for v in &["melt", "boil", "evaporate", "dissolve", "harden", "soften", "dry", "burn", "open", "close"] {
+        for v in &[
+            "melt",
+            "boil",
+            "evaporate",
+            "dissolve",
+            "harden",
+            "soften",
+            "dry",
+            "burn",
+            "open",
+            "close",
+        ] {
             assert_eq!(verb_class(v), Some(ChangeOfState), "ChangeOfState: {v}");
         }
         // Stative — 10+
-        for v in &["be", "have", "seem", "appear", "belong", "contain", "remain", "stay", "last", "endure"] {
+        for v in &[
+            "be", "have", "seem", "appear", "belong", "contain", "remain", "stay", "last", "endure",
+        ] {
             assert_eq!(verb_class(v), Some(Stative), "Stative: {v}");
         }
         // Consumption — all 12
-        for v in &["eat", "consume", "devour", "swallow", "gulp", "sip", "nibble", "feast", "dine", "gorge", "inhale"] {
+        for v in &[
+            "eat", "consume", "devour", "swallow", "gulp", "sip", "nibble", "feast", "dine",
+            "gorge", "inhale",
+        ] {
             assert_eq!(verb_class(v), Some(Consumption), "Consumption: {v}");
         }
     }
@@ -645,8 +693,8 @@ mod tests {
 
     // ── classify_roles tests ──────────────────────────────────────────────────
 
-    use crate::tree::InteractionData;
     use crate::spacy::SpacyToken as SpacyTokenData;
+    use crate::tree::InteractionData;
 
     fn make_interaction(
         verb_lemma: &str,
@@ -725,7 +773,14 @@ mod tests {
 
     #[test]
     fn classify_transfer_verb_give() {
-        let i = make_interaction("give", Some("Sarah"), Some("the book"), None, Some("Tom"), false);
+        let i = make_interaction(
+            "give",
+            Some("Sarah"),
+            Some("the book"),
+            None,
+            Some("Tom"),
+            false,
+        );
         let ann = super::classify_roles(&i, &[]);
         assert_eq!(ann.len(), 3);
         assert_eq!(ann[0].participant, "Sarah");
@@ -779,7 +834,14 @@ mod tests {
 
     #[test]
     fn classify_change_of_state_with_agent() {
-        let i = make_interaction("break", Some("Sarah"), Some("the window"), None, None, false);
+        let i = make_interaction(
+            "break",
+            Some("Sarah"),
+            Some("the window"),
+            None,
+            None,
+            false,
+        );
         let ann = super::classify_roles(&i, &[]);
         assert_eq!(ann.len(), 2);
         assert_eq!(ann[0].participant, "Sarah");
@@ -808,7 +870,14 @@ mod tests {
 
     #[test]
     fn classify_unknown_verb() {
-        let i = make_interaction("defenestrate", Some("Sarah"), Some("the villain"), None, None, false);
+        let i = make_interaction(
+            "defenestrate",
+            Some("Sarah"),
+            Some("the villain"),
+            None,
+            None,
+            false,
+        );
         let ann = super::classify_roles(&i, &[]);
         assert_eq!(ann.len(), 2);
         assert_eq!(ann[0].thematic_role, Unknown);
@@ -821,7 +890,11 @@ mod tests {
     fn classify_copular_be() {
         let i = make_interaction("be", Some("Sarah"), Some("a detective"), None, None, false);
         let ann = super::classify_roles(&i, &[]);
-        assert_eq!(ann.len(), 1, "No Patient annotation expected for copular complement");
+        assert_eq!(
+            ann.len(),
+            1,
+            "No Patient annotation expected for copular complement"
+        );
         assert_eq!(ann[0].participant, "Sarah");
         assert_eq!(ann[0].thematic_role, Theme);
         assert!((ann[0].confidence - 0.8).abs() < 1e-6);
@@ -831,7 +904,11 @@ mod tests {
     fn classify_light_verb_take_walk() {
         let i = make_interaction("take", Some("Sarah"), Some("a walk"), None, None, false);
         let ann = super::classify_roles(&i, &[]);
-        assert_eq!(ann.len(), 1, "No Patient annotation expected for light verb complement");
+        assert_eq!(
+            ann.len(),
+            1,
+            "No Patient annotation expected for light verb complement"
+        );
         assert_eq!(ann[0].participant, "Sarah");
         assert_eq!(ann[0].thematic_role, Agent);
         assert!((ann[0].confidence - 0.6).abs() < 1e-6);
@@ -843,10 +920,10 @@ mod tests {
         // [0]=Sarah nsubj h=1, [1]=ran ROOT h=1, [2]=to prep h=1, [3]=the det h=4, [4]=store pobj h=2
         let tokens = vec![
             make_token("Sarah", "Sarah", "PROPN", "nsubj", 1, 0),
-            make_token("ran",   "run",   "VERB",  "ROOT",  1, 1),
-            make_token("to",    "to",    "ADP",   "prep",  1, 2),
-            make_token("the",   "the",   "DET",   "det",   4, 3),
-            make_token("store", "store", "NOUN",  "pobj",  2, 4),
+            make_token("ran", "run", "VERB", "ROOT", 1, 1),
+            make_token("to", "to", "ADP", "prep", 1, 2),
+            make_token("the", "the", "DET", "det", 4, 3),
+            make_token("store", "store", "NOUN", "pobj", 2, 4),
         ];
         let i = InteractionData {
             verb: "ran".to_string(),
@@ -861,7 +938,9 @@ mod tests {
             ..InteractionData::default()
         };
         let ann = super::classify_roles(&i, &tokens);
-        let goal = ann.iter().find(|a| a.thematic_role == Goal)
+        let goal = ann
+            .iter()
+            .find(|a| a.thematic_role == Goal)
             .expect("Expected a Goal annotation");
         assert_eq!(goal.participant, "the store");
         assert!((goal.confidence - 0.9).abs() < 1e-6);
@@ -872,10 +951,10 @@ mod tests {
         // "Sarah fled from the city"
         let tokens = vec![
             make_token("Sarah", "Sarah", "PROPN", "nsubj", 1, 0),
-            make_token("fled",  "flee",  "VERB",  "ROOT",  1, 1),
-            make_token("from",  "from",  "ADP",   "prep",  1, 2),
-            make_token("the",   "the",   "DET",   "det",   4, 3),
-            make_token("city",  "city",  "NOUN",  "pobj",  2, 4),
+            make_token("fled", "flee", "VERB", "ROOT", 1, 1),
+            make_token("from", "from", "ADP", "prep", 1, 2),
+            make_token("the", "the", "DET", "det", 4, 3),
+            make_token("city", "city", "NOUN", "pobj", 2, 4),
         ];
         let i = InteractionData {
             verb: "fled".to_string(),
@@ -890,7 +969,9 @@ mod tests {
             ..InteractionData::default()
         };
         let ann = super::classify_roles(&i, &tokens);
-        let src = ann.iter().find(|a| a.thematic_role == Source)
+        let src = ann
+            .iter()
+            .find(|a| a.thematic_role == Source)
             .expect("Expected a Source annotation");
         assert_eq!(src.participant, "the city");
         assert!((src.confidence - 0.9).abs() < 1e-6);
@@ -900,11 +981,11 @@ mod tests {
     fn classify_prep_at_location() {
         // "Sarah waited at the park"
         let tokens = vec![
-            make_token("Sarah",  "Sarah",  "PROPN", "nsubj", 1, 0),
-            make_token("waited", "wait",   "VERB",  "ROOT",  1, 1),
-            make_token("at",     "at",     "ADP",   "prep",  1, 2),
-            make_token("the",    "the",    "DET",   "det",   4, 3),
-            make_token("park",   "park",   "NOUN",  "pobj",  2, 4),
+            make_token("Sarah", "Sarah", "PROPN", "nsubj", 1, 0),
+            make_token("waited", "wait", "VERB", "ROOT", 1, 1),
+            make_token("at", "at", "ADP", "prep", 1, 2),
+            make_token("the", "the", "DET", "det", 4, 3),
+            make_token("park", "park", "NOUN", "pobj", 2, 4),
         ];
         let i = InteractionData {
             verb: "waited".to_string(),
@@ -919,7 +1000,9 @@ mod tests {
             ..InteractionData::default()
         };
         let ann = super::classify_roles(&i, &tokens);
-        let loc = ann.iter().find(|a| a.thematic_role == Location)
+        let loc = ann
+            .iter()
+            .find(|a| a.thematic_role == Location)
             .expect("Expected a Location annotation");
         assert_eq!(loc.participant, "the park");
         assert!((loc.confidence - 0.85).abs() < 1e-6);

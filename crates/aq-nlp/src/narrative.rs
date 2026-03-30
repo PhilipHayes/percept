@@ -37,6 +37,7 @@ pub(crate) struct SceneBoundary {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ParagraphEntityData {
     pub para_idx: usize,
     pub start_line: usize,
@@ -55,7 +56,11 @@ pub(crate) fn entity_set_jaccard(a: &[String], b: &[String]) -> f64 {
     let set_b: HashSet<&str> = b.iter().map(|s| s.as_str()).collect();
     let intersection = set_a.intersection(&set_b).count();
     let union = set_a.union(&set_b).count();
-    if union == 0 { 1.0 } else { intersection as f64 / union as f64 }
+    if union == 0 {
+        1.0
+    } else {
+        intersection as f64 / union as f64
+    }
 }
 
 pub(crate) fn detect_scene_boundaries(
@@ -82,17 +87,25 @@ pub(crate) fn detect_scene_boundaries(
 
     let all_empty = paragraphs.iter().all(|p| p.entity_names.is_empty());
     if all_empty {
-        return paragraphs.iter().enumerate().map(|(i, p)| SceneBoundary {
-            scene_index: i,
-            start_para_idx: i,
-            end_para_idx: i,
-            start_line: p.start_line,
-            end_line: p.end_line,
-            location: None,
-            temporal_marker: None,
-            entity_names: vec![],
-            boundary_signals: if i == 0 { vec![] } else { vec![BoundarySignal::ParagraphBreak] },
-        }).collect();
+        return paragraphs
+            .iter()
+            .enumerate()
+            .map(|(i, p)| SceneBoundary {
+                scene_index: i,
+                start_para_idx: i,
+                end_para_idx: i,
+                start_line: p.start_line,
+                end_line: p.end_line,
+                location: None,
+                temporal_marker: None,
+                entity_names: vec![],
+                boundary_signals: if i == 0 {
+                    vec![]
+                } else {
+                    vec![BoundarySignal::ParagraphBreak]
+                },
+            })
+            .collect();
     }
 
     // Pass 1: Find boundary points and their signals
@@ -107,7 +120,10 @@ pub(crate) fn detect_scene_boundaries(
 
         // Location change
         if !next.location_entities.is_empty()
-            && next.location_entities.iter().any(|l| !scene_locations.contains(l))
+            && next
+                .location_entities
+                .iter()
+                .any(|l| !scene_locations.contains(l))
         {
             signals.push(BoundarySignal::LocationChange);
         }
@@ -118,10 +134,10 @@ pub(crate) fn detect_scene_boundaries(
         }
 
         // Entity set shift (Fix 3: lowered threshold from 0.25 to 0.15)
-        if !scene_entities.is_empty() || !next.entity_names.is_empty() {
-            if entity_set_jaccard(&scene_entities, &next.entity_names) < 0.15 {
-                signals.push(BoundarySignal::EntitySetShift);
-            }
+        if (!scene_entities.is_empty() || !next.entity_names.is_empty())
+            && entity_set_jaccard(&scene_entities, &next.entity_names) < 0.15
+        {
+            signals.push(BoundarySignal::EntitySetShift);
         }
 
         // Discourse break
@@ -292,36 +308,92 @@ fn dominant_role_in_range(interactions: &[(f64, String)], start: f64, end: f64) 
             *counts.entry(role.as_str()).or_default() += 1;
         }
     }
-    counts.into_iter().max_by_key(|(_, c)| *c).map(|(r, _)| r.to_string())
+    counts
+        .into_iter()
+        .max_by_key(|(_, c)| *c)
+        .map(|(r, _)| r.to_string())
 }
 
-pub(crate) fn compute_character_arcs(
-    profiles: &[EntityInteractionProfile],
-) -> Vec<CharacterArc> {
-    profiles.iter().filter_map(|p| {
-        let total_interactions = p.interaction_positions.len();
-        let total_mentions = p.mention_positions.len();
+pub(crate) fn compute_character_arcs(profiles: &[EntityInteractionProfile]) -> Vec<CharacterArc> {
+    profiles
+        .iter()
+        .filter_map(|p| {
+            let total_interactions = p.interaction_positions.len();
+            let total_mentions = p.mention_positions.len();
 
-        if total_mentions == 0 && total_interactions == 0 {
-            return None;
-        }
+            if total_mentions == 0 && total_interactions == 0 {
+                return None;
+            }
 
-        let first_mention = p.mention_positions.first().copied().unwrap_or(0.0);
-        let last_mention = p.mention_positions.last().copied().unwrap_or(1.0);
+            let first_mention = p.mention_positions.first().copied().unwrap_or(0.0);
+            let last_mention = p.mention_positions.last().copied().unwrap_or(1.0);
 
-        // Compute peak as median of interaction positions
-        let peak_position = if total_interactions > 0 {
-            let mut sorted = p.interaction_positions.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            sorted[sorted.len() / 2]
-        } else {
-            0.5
-        };
+            // Compute peak as median of interaction positions
+            let peak_position = if total_interactions > 0 {
+                let mut sorted = p.interaction_positions.clone();
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                sorted[sorted.len() / 2]
+            } else {
+                0.5
+            };
 
-        if total_interactions < 2 {
-            return Some(CharacterArc {
+            if total_interactions < 2 {
+                return Some(CharacterArc {
+                    entity_name: p.entity_name.clone(),
+                    arc_shape: ArcShape::Flat,
+                    total_mentions,
+                    total_interactions,
+                    mention_positions: p.mention_positions.clone(),
+                    role_distribution: p.role_counts.clone(),
+                    first_mention_position: first_mention,
+                    last_mention_position: last_mention,
+                    peak_position,
+                    confidence: 0.40,
+                });
+            }
+
+            let begin = segment_count(&p.interaction_positions, 0.0, 0.33);
+            let middle = segment_count(&p.interaction_positions, 0.33, 0.67);
+            let end_count = segment_count(&p.interaction_positions, 0.67, 1.01);
+
+            // Check Transformative first (role shift)
+            let first_half_role = dominant_role_in_range(&p.interaction_roles, 0.0, 0.5);
+            let second_half_role = dominant_role_in_range(&p.interaction_roles, 0.5, 1.01);
+
+            let (arc_shape, confidence) = if first_half_role.is_some()
+                && second_half_role.is_some()
+                && first_half_role != second_half_role
+            {
+                (ArcShape::Transformative, 0.75)
+            } else if end_count as f64 > begin as f64 * 1.5 && end_count > middle {
+                let ratio = if begin > 0 {
+                    end_count as f32 / begin as f32
+                } else {
+                    3.0
+                };
+                (
+                    ArcShape::Rising,
+                    (0.6 + (ratio - 1.5).min(2.0) * 0.1).min(0.95),
+                )
+            } else if begin as f64 > end_count as f64 * 1.5 && begin > middle {
+                let ratio = if end_count > 0 {
+                    begin as f32 / end_count as f32
+                } else {
+                    3.0
+                };
+                (
+                    ArcShape::Falling,
+                    (0.6 + (ratio - 1.5).min(2.0) * 0.1).min(0.95),
+                )
+            } else if middle as f64 > begin as f64 * 1.5 && middle as f64 > end_count as f64 * 1.5 {
+                (ArcShape::Peak, 0.80)
+            } else {
+                (ArcShape::Flat, 0.60)
+            };
+
+            Some(CharacterArc {
                 entity_name: p.entity_name.clone(),
-                arc_shape: ArcShape::Flat,
+                arc_shape,
                 total_mentions,
                 total_interactions,
                 mention_positions: p.mention_positions.clone(),
@@ -329,48 +401,10 @@ pub(crate) fn compute_character_arcs(
                 first_mention_position: first_mention,
                 last_mention_position: last_mention,
                 peak_position,
-                confidence: 0.40,
-            });
-        }
-
-        let begin = segment_count(&p.interaction_positions, 0.0, 0.33);
-        let middle = segment_count(&p.interaction_positions, 0.33, 0.67);
-        let end_count = segment_count(&p.interaction_positions, 0.67, 1.01);
-
-        // Check Transformative first (role shift)
-        let first_half_role = dominant_role_in_range(&p.interaction_roles, 0.0, 0.5);
-        let second_half_role = dominant_role_in_range(&p.interaction_roles, 0.5, 1.01);
-
-        let (arc_shape, confidence) = if first_half_role.is_some()
-            && second_half_role.is_some()
-            && first_half_role != second_half_role
-        {
-            (ArcShape::Transformative, 0.75)
-        } else if end_count as f64 > begin as f64 * 1.5 && end_count > middle {
-            let ratio = if begin > 0 { end_count as f32 / begin as f32 } else { 3.0 };
-            (ArcShape::Rising, (0.6 + (ratio - 1.5).min(2.0) * 0.1).min(0.95))
-        } else if begin as f64 > end_count as f64 * 1.5 && begin > middle {
-            let ratio = if end_count > 0 { begin as f32 / end_count as f32 } else { 3.0 };
-            (ArcShape::Falling, (0.6 + (ratio - 1.5).min(2.0) * 0.1).min(0.95))
-        } else if middle as f64 > begin as f64 * 1.5 && middle as f64 > end_count as f64 * 1.5 {
-            (ArcShape::Peak, 0.80)
-        } else {
-            (ArcShape::Flat, 0.60)
-        };
-
-        Some(CharacterArc {
-            entity_name: p.entity_name.clone(),
-            arc_shape,
-            total_mentions,
-            total_interactions,
-            mention_positions: p.mention_positions.clone(),
-            role_distribution: p.role_counts.clone(),
-            first_mention_position: first_mention,
-            last_mention_position: last_mention,
-            peak_position,
-            confidence,
+                confidence,
+            })
         })
-    }).collect()
+        .collect()
 }
 
 // ============================================================
@@ -397,6 +431,7 @@ impl fmt::Display for ConflictTrend {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ConflictEdge {
     pub entity_a: String,
     pub entity_b: String,
@@ -441,19 +476,40 @@ fn classify_conflict_trend(positions: &[f64]) -> ConflictTrend {
 pub fn is_bare_pronoun_text(s: &str) -> bool {
     matches!(
         s.to_lowercase().as_str(),
-        "i" | "me" | "my" | "mine" | "myself"
-            | "you" | "your" | "yours" | "yourself" | "yourselves"
-            | "he" | "him" | "his" | "himself"
-            | "she" | "her" | "hers" | "herself"
-            | "it" | "its" | "itself"
-            | "we" | "us" | "our" | "ours" | "ourselves"
-            | "they" | "them" | "their" | "theirs" | "themselves"
+        "i" | "me"
+            | "my"
+            | "mine"
+            | "myself"
+            | "you"
+            | "your"
+            | "yours"
+            | "yourself"
+            | "yourselves"
+            | "he"
+            | "him"
+            | "his"
+            | "himself"
+            | "she"
+            | "her"
+            | "hers"
+            | "herself"
+            | "it"
+            | "its"
+            | "itself"
+            | "we"
+            | "us"
+            | "our"
+            | "ours"
+            | "ourselves"
+            | "they"
+            | "them"
+            | "their"
+            | "theirs"
+            | "themselves"
     )
 }
 
-pub(crate) fn build_conflict_graph(
-    interactions: &[OpposingInteraction],
-) -> Vec<ConflictEdge> {
+pub(crate) fn build_conflict_graph(interactions: &[OpposingInteraction]) -> Vec<ConflictEdge> {
     use std::collections::HashMap;
 
     // Group by canonical pair (sorted alphabetically)
@@ -468,36 +524,42 @@ pub(crate) fn build_conflict_graph(
         } else {
             (inter.patient.clone(), inter.agent.clone())
         };
-        pairs.entry((a, b)).or_default().push((inter.position, inter.verb.clone()));
+        pairs
+            .entry((a, b))
+            .or_default()
+            .push((inter.position, inter.verb.clone()));
     }
 
-    let mut edges: Vec<ConflictEdge> = pairs.into_iter().map(|((a, b), mut entries)| {
-        entries.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
-        let positions: Vec<f64> = entries.iter().map(|(p, _)| *p).collect();
-        let trend = classify_conflict_trend(&positions);
+    let mut edges: Vec<ConflictEdge> = pairs
+        .into_iter()
+        .map(|((a, b), mut entries)| {
+            entries.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+            let positions: Vec<f64> = entries.iter().map(|(p, _)| *p).collect();
+            let trend = classify_conflict_trend(&positions);
 
-        // Collect up to 5 unique verbs
-        let mut sample_verbs = Vec::new();
-        for (_, verb) in &entries {
-            if !sample_verbs.contains(verb) {
-                sample_verbs.push(verb.clone());
-                if sample_verbs.len() >= 5 {
-                    break;
+            // Collect up to 5 unique verbs
+            let mut sample_verbs = Vec::new();
+            for (_, verb) in &entries {
+                if !sample_verbs.contains(verb) {
+                    sample_verbs.push(verb.clone());
+                    if sample_verbs.len() >= 5 {
+                        break;
+                    }
                 }
             }
-        }
 
-        ConflictEdge {
-            entity_a: a,
-            entity_b: b,
-            interaction_count: entries.len(),
-            first_position: positions.first().copied().unwrap_or(0.0),
-            last_position: positions.last().copied().unwrap_or(1.0),
-            positions,
-            trend,
-            sample_verbs,
-        }
-    }).collect();
+            ConflictEdge {
+                entity_a: a,
+                entity_b: b,
+                interaction_count: entries.len(),
+                first_position: positions.first().copied().unwrap_or(0.0),
+                last_position: positions.last().copied().unwrap_or(1.0),
+                positions,
+                trend,
+                sample_verbs,
+            }
+        })
+        .collect();
 
     // Sort by interaction_count descending
     edges.sort_by(|a, b| b.interaction_count.cmp(&a.interaction_count));
@@ -571,19 +633,25 @@ pub(crate) fn detect_setup_payoff(
                     "{} introduced early (pos {:.2}) and pays off{}{}",
                     arc.entity_name,
                     arc.first_mention_position,
-                    if in_climactic_conflict { " in climactic conflict" } else { "" },
+                    if in_climactic_conflict {
+                        " in climactic conflict"
+                    } else {
+                        ""
+                    },
                     &arc_suffix,
                 ),
-                confidence: if in_climactic_conflict && has_rising_peak { 0.90 } else { 0.75 },
+                confidence: if in_climactic_conflict && has_rising_peak {
+                    0.90
+                } else {
+                    0.75
+                },
                 attribute: None,
                 expected: None,
                 actual: None,
             });
         } else if arc.total_interactions > 0 {
             // Entity introduced early but no payoff in last 50%
-            let late_interactions = arc.mention_positions.iter()
-                .filter(|&&p| p >= 0.50)
-                .count();
+            let late_interactions = arc.mention_positions.iter().filter(|&&p| p >= 0.50).count();
             if late_interactions < 2 {
                 issues.push(NarrativeIssue {
                     issue_type: NarrativeIssueType::SetupWithoutPayoff,
@@ -607,34 +675,43 @@ pub(crate) fn detect_setup_payoff(
     issues
 }
 
-pub(crate) fn detect_foreshadowing(
-    arcs: &[CharacterArc],
-) -> Vec<NarrativeIssue> {
-    let mut issues: Vec<NarrativeIssue> = arcs.iter().filter_map(|arc| {
-        let first_half = arc.mention_positions.iter().filter(|&&p| p < 0.50).count();
-        let last_half = arc.mention_positions.iter().filter(|&&p| p >= 0.50).count();
+pub(crate) fn detect_foreshadowing(arcs: &[CharacterArc]) -> Vec<NarrativeIssue> {
+    let mut issues: Vec<NarrativeIssue> = arcs
+        .iter()
+        .filter_map(|arc| {
+            let first_half = arc.mention_positions.iter().filter(|&&p| p < 0.50).count();
+            let last_half = arc.mention_positions.iter().filter(|&&p| p >= 0.50).count();
 
-        if first_half <= 2 && last_half >= 4 {
-            let ratio = if first_half > 0 { last_half as f32 / first_half as f32 } else { last_half as f32 };
-            let confidence = (0.5 + (ratio - 2.0).min(3.0) * 0.1).min(0.95);
-            Some(NarrativeIssue {
-                issue_type: NarrativeIssueType::Foreshadowing,
-                entity_name: arc.entity_name.clone(),
-                description: format!(
-                    "{} foreshadowed: {} mentions in first half, {} in second half",
-                    arc.entity_name, first_half, last_half,
-                ),
-                confidence,
-                attribute: None,
-                expected: None,
-                actual: None,
-            })
-        } else {
-            None
-        }
-    }).collect();
+            if first_half <= 2 && last_half >= 4 {
+                let ratio = if first_half > 0 {
+                    last_half as f32 / first_half as f32
+                } else {
+                    last_half as f32
+                };
+                let confidence = (0.5 + (ratio - 2.0).min(3.0) * 0.1).min(0.95);
+                Some(NarrativeIssue {
+                    issue_type: NarrativeIssueType::Foreshadowing,
+                    entity_name: arc.entity_name.clone(),
+                    description: format!(
+                        "{} foreshadowed: {} mentions in first half, {} in second half",
+                        arc.entity_name, first_half, last_half,
+                    ),
+                    confidence,
+                    attribute: None,
+                    expected: None,
+                    actual: None,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    issues.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+    issues.sort_by(|a, b| {
+        b.confidence
+            .partial_cmp(&a.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     issues
 }
 
@@ -660,11 +737,8 @@ pub(crate) fn detect_consistency_issues(
             }
 
             if loc_a != loc_b {
-                let has_movement = movement_interactions.contains(&(
-                    entity_name.clone(),
-                    *scene_a,
-                    *scene_b,
-                ));
+                let has_movement =
+                    movement_interactions.contains(&(entity_name.clone(), *scene_a, *scene_b));
                 if !has_movement {
                     issues.push(NarrativeIssue {
                         issue_type: NarrativeIssueType::ConsistencyViolation,
@@ -691,6 +765,7 @@ pub(crate) fn detect_consistency_issues(
 // ============================================================
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct NarrativeSummary {
     pub scene_count: usize,
     pub character_count: usize,
@@ -722,12 +797,27 @@ pub(crate) fn build_narrative_summary(
         .or_else(|| conflicts.first())
         .map(|c| (c.entity_a.clone(), c.entity_b.clone()));
 
-    let unresolved = conflicts.iter().filter(|c| matches!(c.trend, ConflictTrend::Escalating)).count();
+    let unresolved = conflicts
+        .iter()
+        .filter(|c| matches!(c.trend, ConflictTrend::Escalating))
+        .count();
 
-    let setup_payoff = issues.iter().filter(|i| i.issue_type == NarrativeIssueType::SetupWithPayoff).count();
-    let setup_without = issues.iter().filter(|i| i.issue_type == NarrativeIssueType::SetupWithoutPayoff).count();
-    let foreshadowing = issues.iter().filter(|i| i.issue_type == NarrativeIssueType::Foreshadowing).count();
-    let consistency = issues.iter().filter(|i| i.issue_type == NarrativeIssueType::ConsistencyViolation).count();
+    let setup_payoff = issues
+        .iter()
+        .filter(|i| i.issue_type == NarrativeIssueType::SetupWithPayoff)
+        .count();
+    let setup_without = issues
+        .iter()
+        .filter(|i| i.issue_type == NarrativeIssueType::SetupWithoutPayoff)
+        .count();
+    let foreshadowing = issues
+        .iter()
+        .filter(|i| i.issue_type == NarrativeIssueType::Foreshadowing)
+        .count();
+    let consistency = issues
+        .iter()
+        .filter(|i| i.issue_type == NarrativeIssueType::ConsistencyViolation)
+        .count();
 
     NarrativeSummary {
         scene_count: scenes.len(),
@@ -825,7 +915,9 @@ mod tests {
         assert_eq!(scenes.len(), 2);
         assert_eq!(scenes[0].location.as_deref(), Some("kitchen"));
         assert_eq!(scenes[1].location.as_deref(), Some("garden"));
-        assert!(scenes[1].boundary_signals.contains(&BoundarySignal::LocationChange));
+        assert!(scenes[1]
+            .boundary_signals
+            .contains(&BoundarySignal::LocationChange));
     }
 
     #[test]
@@ -905,8 +997,12 @@ mod tests {
         let scenes = detect_scene_boundaries(&paras, &[]);
         assert_eq!(scenes.len(), 3);
         assert!(scenes[0].boundary_signals.is_empty());
-        assert!(scenes[1].boundary_signals.contains(&BoundarySignal::ParagraphBreak));
-        assert!(scenes[2].boundary_signals.contains(&BoundarySignal::ParagraphBreak));
+        assert!(scenes[1]
+            .boundary_signals
+            .contains(&BoundarySignal::ParagraphBreak));
+        assert!(scenes[2]
+            .boundary_signals
+            .contains(&BoundarySignal::ParagraphBreak));
     }
 
     #[test]
@@ -945,9 +1041,16 @@ mod tests {
     // === Arc tests ===
     use std::collections::HashMap;
 
-    fn make_profile(name: &str, interactions: &[f64], roles: &[(&str, usize)], int_roles: &[(f64, &str)]) -> EntityInteractionProfile {
-        let role_counts: HashMap<String, usize> = roles.iter().map(|(k, v)| (k.to_string(), *v)).collect();
-        let interaction_roles: Vec<(f64, String)> = int_roles.iter().map(|(p, r)| (*p, r.to_string())).collect();
+    fn make_profile(
+        name: &str,
+        interactions: &[f64],
+        roles: &[(&str, usize)],
+        int_roles: &[(f64, &str)],
+    ) -> EntityInteractionProfile {
+        let role_counts: HashMap<String, usize> =
+            roles.iter().map(|(k, v)| (k.to_string(), *v)).collect();
+        let interaction_roles: Vec<(f64, String)> =
+            int_roles.iter().map(|(p, r)| (*p, r.to_string())).collect();
         EntityInteractionProfile {
             entity_name: name.to_string(),
             mention_positions: interactions.to_vec(),
@@ -995,10 +1098,16 @@ mod tests {
             entity_name: "Eve".to_string(),
             mention_positions: vec![0.1, 0.2, 0.3, 0.7, 0.8, 0.9],
             interaction_positions: vec![0.1, 0.2, 0.3, 0.7, 0.8, 0.9],
-            role_counts: [("patient".to_string(), 3), ("agent".to_string(), 3)].into_iter().collect(),
+            role_counts: [("patient".to_string(), 3), ("agent".to_string(), 3)]
+                .into_iter()
+                .collect(),
             interaction_roles: vec![
-                (0.1, "patient".to_string()), (0.2, "patient".to_string()), (0.3, "patient".to_string()),
-                (0.7, "agent".to_string()), (0.8, "agent".to_string()), (0.9, "agent".to_string()),
+                (0.1, "patient".to_string()),
+                (0.2, "patient".to_string()),
+                (0.3, "patient".to_string()),
+                (0.7, "agent".to_string()),
+                (0.8, "agent".to_string()),
+                (0.9, "agent".to_string()),
             ],
         };
         let arcs = compute_character_arcs(&[p]);
@@ -1145,9 +1254,9 @@ mod tests {
 
     #[test]
     fn conflict_sample_verbs_capped() {
-        let ints: Vec<OpposingInteraction> = (0..7).map(|i| {
-            make_opposing("A", "B", &format!("v{}", i + 1), i as f64 * 0.1 + 0.1)
-        }).collect();
+        let ints: Vec<OpposingInteraction> = (0..7)
+            .map(|i| make_opposing("A", "B", &format!("v{}", i + 1), i as f64 * 0.1 + 0.1))
+            .collect();
         let edges = build_conflict_graph(&ints);
         assert_eq!(edges[0].sample_verbs.len(), 5);
     }
@@ -1221,7 +1330,10 @@ mod tests {
             confidence: 0.80,
         }];
         let issues = detect_setup_payoff(&arcs, &[]);
-        assert!(issues.is_empty(), "Entity introduced at 0.5 should be ignored (>= 0.30)");
+        assert!(
+            issues.is_empty(),
+            "Entity introduced at 0.5 should be ignored (>= 0.30)"
+        );
     }
 
     #[test]
@@ -1259,113 +1371,161 @@ mod tests {
             confidence: 0.60,
         }];
         let issues = detect_foreshadowing(&arcs);
-        assert!(issues.is_empty(), "Balanced mentions should not trigger foreshadowing");
+        assert!(
+            issues.is_empty(),
+            "Balanced mentions should not trigger foreshadowing"
+        );
     }
 
     #[test]
     fn consistency_location_violation() {
         let mut entity_scene_locations: HashMap<String, Vec<(usize, String)>> = HashMap::new();
-        entity_scene_locations.insert("Sarah".to_string(), vec![
-            (0, "kitchen".to_string()),
-            (1, "garden".to_string()),
-            (2, "kitchen".to_string()),
-        ]);
+        entity_scene_locations.insert(
+            "Sarah".to_string(),
+            vec![
+                (0, "kitchen".to_string()),
+                (1, "garden".to_string()),
+                (2, "kitchen".to_string()),
+            ],
+        );
         let movement: HashSet<(String, usize, usize)> = HashSet::new();
         let issues = detect_consistency_issues(&[], &entity_scene_locations, &movement);
         assert_eq!(issues.len(), 2); // kitchen→garden, garden→kitchen
-        assert!(issues.iter().all(|i| i.issue_type == NarrativeIssueType::ConsistencyViolation));
+        assert!(issues
+            .iter()
+            .all(|i| i.issue_type == NarrativeIssueType::ConsistencyViolation));
         assert!(issues.iter().all(|i| i.entity_name == "Sarah"));
     }
 
     #[test]
     fn consistency_location_with_movement() {
         let mut entity_scene_locations: HashMap<String, Vec<(usize, String)>> = HashMap::new();
-        entity_scene_locations.insert("Sarah".to_string(), vec![
-            (0, "kitchen".to_string()),
-            (1, "garden".to_string()),
-        ]);
+        entity_scene_locations.insert(
+            "Sarah".to_string(),
+            vec![(0, "kitchen".to_string()), (1, "garden".to_string())],
+        );
         let mut movement: HashSet<(String, usize, usize)> = HashSet::new();
         movement.insert(("Sarah".to_string(), 0, 1));
         let issues = detect_consistency_issues(&[], &entity_scene_locations, &movement);
-        assert!(issues.is_empty(), "Movement interaction accounts for location change");
+        assert!(
+            issues.is_empty(),
+            "Movement interaction accounts for location change"
+        );
     }
 
     #[test]
     fn consistency_no_location_data() {
         let mut entity_scene_locations: HashMap<String, Vec<(usize, String)>> = HashMap::new();
-        entity_scene_locations.insert("Sarah".to_string(), vec![
-            (0, "".to_string()),
-            (1, "".to_string()),
-        ]);
+        entity_scene_locations.insert(
+            "Sarah".to_string(),
+            vec![(0, "".to_string()), (1, "".to_string())],
+        );
         let movement: HashSet<(String, usize, usize)> = HashSet::new();
         let issues = detect_consistency_issues(&[], &entity_scene_locations, &movement);
-        assert!(issues.is_empty(), "No issue when no location data to compare");
+        assert!(
+            issues.is_empty(),
+            "No issue when no location data to compare"
+        );
     }
 
     #[test]
     fn issue_type_display() {
-        assert_eq!(NarrativeIssueType::SetupWithPayoff.to_string(), "setup_with_payoff");
-        assert_eq!(NarrativeIssueType::SetupWithoutPayoff.to_string(), "setup_without_payoff");
-        assert_eq!(NarrativeIssueType::Foreshadowing.to_string(), "foreshadowing");
-        assert_eq!(NarrativeIssueType::ConsistencyViolation.to_string(), "consistency_violation");
+        assert_eq!(
+            NarrativeIssueType::SetupWithPayoff.to_string(),
+            "setup_with_payoff"
+        );
+        assert_eq!(
+            NarrativeIssueType::SetupWithoutPayoff.to_string(),
+            "setup_without_payoff"
+        );
+        assert_eq!(
+            NarrativeIssueType::Foreshadowing.to_string(),
+            "foreshadowing"
+        );
+        assert_eq!(
+            NarrativeIssueType::ConsistencyViolation.to_string(),
+            "consistency_violation"
+        );
     }
 
     #[test]
     fn narrative_summary_aggregation() {
         let scenes = vec![
             SceneBoundary {
-                scene_index: 0, start_para_idx: 0, end_para_idx: 1,
-                start_line: 1, end_line: 5, location: Some("kitchen".into()),
-                temporal_marker: None, entity_names: vec!["Sarah".into()],
+                scene_index: 0,
+                start_para_idx: 0,
+                end_para_idx: 1,
+                start_line: 1,
+                end_line: 5,
+                location: Some("kitchen".into()),
+                temporal_marker: None,
+                entity_names: vec!["Sarah".into()],
                 boundary_signals: vec![],
             },
             SceneBoundary {
-                scene_index: 1, start_para_idx: 2, end_para_idx: 3,
-                start_line: 6, end_line: 10, location: Some("garden".into()),
-                temporal_marker: None, entity_names: vec!["Bob".into()],
+                scene_index: 1,
+                start_para_idx: 2,
+                end_para_idx: 3,
+                start_line: 6,
+                end_line: 10,
+                location: Some("garden".into()),
+                temporal_marker: None,
+                entity_names: vec!["Bob".into()],
                 boundary_signals: vec![BoundarySignal::LocationChange],
             },
         ];
         let arcs = vec![
             CharacterArc {
-                entity_name: "Sarah".into(), arc_shape: ArcShape::Rising,
-                total_mentions: 5, total_interactions: 3,
+                entity_name: "Sarah".into(),
+                arc_shape: ArcShape::Rising,
+                total_mentions: 5,
+                total_interactions: 3,
                 mention_positions: vec![0.1, 0.3, 0.5, 0.7, 0.9],
                 role_distribution: HashMap::new(),
-                first_mention_position: 0.1, last_mention_position: 0.9,
-                peak_position: 0.7, confidence: 0.80,
+                first_mention_position: 0.1,
+                last_mention_position: 0.9,
+                peak_position: 0.7,
+                confidence: 0.80,
             },
             CharacterArc {
-                entity_name: "Bob".into(), arc_shape: ArcShape::Flat,
-                total_mentions: 3, total_interactions: 1,
+                entity_name: "Bob".into(),
+                arc_shape: ArcShape::Flat,
+                total_mentions: 3,
+                total_interactions: 1,
                 mention_positions: vec![0.3, 0.5, 0.7],
                 role_distribution: HashMap::new(),
-                first_mention_position: 0.3, last_mention_position: 0.7,
-                peak_position: 0.5, confidence: 0.40,
+                first_mention_position: 0.3,
+                last_mention_position: 0.7,
+                peak_position: 0.5,
+                confidence: 0.40,
             },
         ];
-        let conflicts = vec![
-            ConflictEdge {
-                entity_a: "Bob".into(), entity_b: "Sarah".into(),
-                interaction_count: 3, positions: vec![0.3, 0.5, 0.8],
-                trend: ConflictTrend::Escalating,
-                first_position: 0.3, last_position: 0.8,
-                sample_verbs: vec!["argued".into()],
-            },
-        ];
-        let issues = vec![
-            NarrativeIssue {
-                issue_type: NarrativeIssueType::SetupWithPayoff,
-                entity_name: "Sarah".into(),
-                description: "test".into(),
-                confidence: 0.90,
-                attribute: None, expected: None, actual: None,
-            },
-        ];
+        let conflicts = vec![ConflictEdge {
+            entity_a: "Bob".into(),
+            entity_b: "Sarah".into(),
+            interaction_count: 3,
+            positions: vec![0.3, 0.5, 0.8],
+            trend: ConflictTrend::Escalating,
+            first_position: 0.3,
+            last_position: 0.8,
+            sample_verbs: vec!["argued".into()],
+        }];
+        let issues = vec![NarrativeIssue {
+            issue_type: NarrativeIssueType::SetupWithPayoff,
+            entity_name: "Sarah".into(),
+            description: "test".into(),
+            confidence: 0.90,
+            attribute: None,
+            expected: None,
+            actual: None,
+        }];
         let summary = build_narrative_summary(&scenes, &arcs, &conflicts, &issues);
         assert_eq!(summary.scene_count, 2);
         assert_eq!(summary.character_count, 2);
-        assert_eq!(summary.central_conflict, Some(("Bob".into(), "Sarah".into())));
+        assert_eq!(
+            summary.central_conflict,
+            Some(("Bob".into(), "Sarah".into()))
+        );
         assert_eq!(summary.conflict_count, 1);
         assert_eq!(summary.unresolved_conflicts, 1);
         assert_eq!(summary.issue_count, 1);

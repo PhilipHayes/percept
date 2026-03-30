@@ -79,7 +79,10 @@ mod tests {
     #[test]
     fn dot_not_decimal() {
         // `.5` should be Dot followed by Number
-        assert_eq!(tokens(".5"), vec![Token::Dot, Token::Number(5.0), Token::Eof]);
+        assert_eq!(
+            tokens(".5"),
+            vec![Token::Dot, Token::Number(5.0), Token::Eof]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -96,10 +99,7 @@ mod tests {
 
     #[test]
     fn empty_string() {
-        assert_eq!(
-            tokens(r#""""#),
-            vec![Token::String("".into()), Token::Eof]
-        );
+        assert_eq!(tokens(r#""""#), vec![Token::String("".into()), Token::Eof]);
     }
 
     #[test]
@@ -238,7 +238,13 @@ mod tests {
     fn pipe_expression() {
         assert_eq!(
             tokens(". | @type"),
-            vec![Token::Dot, Token::Pipe, Token::At, Token::Ident("type".into()), Token::Eof]
+            vec![
+                Token::Dot,
+                Token::Pipe,
+                Token::At,
+                Token::Ident("type".into()),
+                Token::Eof
+            ]
         );
     }
 

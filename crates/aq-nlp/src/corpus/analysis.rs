@@ -1,11 +1,10 @@
-use aq_core::OwnedNode;
-use crate::narrative::{
-    ParagraphEntityData, SceneBoundary, detect_scene_boundaries,
-    EntityInteractionProfile, CharacterArc, compute_character_arcs,
-    OpposingInteraction, ConflictEdge, build_conflict_graph,
-    NarrativeIssue, NarrativeSummary, build_narrative_summary,
-};
 use crate::discourse::DiscourseRelationData;
+use crate::narrative::{
+    build_conflict_graph, build_narrative_summary, compute_character_arcs, detect_scene_boundaries,
+    CharacterArc, ConflictEdge, EntityInteractionProfile, NarrativeIssue, NarrativeSummary,
+    OpposingInteraction, ParagraphEntityData, SceneBoundary,
+};
+use aq_core::OwnedNode;
 use std::collections::HashMap;
 
 /// Extract `ParagraphEntityData` from a merged tree's paragraph nodes.
@@ -236,14 +235,10 @@ pub(crate) fn extract_corpus_interactions(
     let profiles: Vec<EntityInteractionProfile> = all_names
         .into_iter()
         .map(|name| {
-            let mut mention_positions = entity_mentions
-                .remove(&name)
-                .unwrap_or_default();
+            let mut mention_positions = entity_mentions.remove(&name).unwrap_or_default();
             mention_positions.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            let interactions = entity_interactions
-                .remove(&name)
-                .unwrap_or_default();
+            let interactions = entity_interactions.remove(&name).unwrap_or_default();
             let mut interaction_positions: Vec<f64> =
                 interactions.iter().map(|(p, _)| *p).collect();
             interaction_positions.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -273,7 +268,12 @@ pub(crate) fn extract_corpus_interactions(
 pub(crate) fn compute_corpus_narrative(
     merged_tree: &OwnedNode,
     discourse_relations: &[DiscourseRelationData],
-) -> (Vec<SceneBoundary>, Vec<CharacterArc>, Vec<ConflictEdge>, NarrativeSummary) {
+) -> (
+    Vec<SceneBoundary>,
+    Vec<CharacterArc>,
+    Vec<ConflictEdge>,
+    NarrativeSummary,
+) {
     let scenes = detect_corpus_scenes(merged_tree, discourse_relations);
     let (profiles, opposing) = extract_corpus_interactions(merged_tree);
     let arcs = compute_character_arcs(&profiles);
@@ -305,12 +305,7 @@ mod tests {
         }
     }
 
-    fn make_entity(
-        name: &str,
-        etype: &str,
-        line: usize,
-        source: &str,
-    ) -> OwnedNode {
+    fn make_entity(name: &str, etype: &str, line: usize, source: &str) -> OwnedNode {
         let type_node = OwnedNode {
             node_type: "entity_type".to_string(),
             text: Some(etype.to_string()),
@@ -449,7 +444,11 @@ mod tests {
         let doc = build_merged_doc(paras, entities);
         let scenes = detect_corpus_scenes(&doc, &[]);
 
-        assert_eq!(scenes.len(), 1, "Continuous entity presence should produce 1 scene");
+        assert_eq!(
+            scenes.len(),
+            1,
+            "Continuous entity presence should produce 1 scene"
+        );
     }
 
     // ── test: extract_paragraph_entity_data ──────────────────────────────────

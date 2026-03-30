@@ -4,7 +4,10 @@ use clap::{Parser, Subcommand};
 mod commands;
 
 #[derive(Parser)]
-#[command(name = "mq", about = "Semantic query tool for the Agent Perception Layer")]
+#[command(
+    name = "mq",
+    about = "Semantic query tool for the Agent Perception Layer"
+)]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]

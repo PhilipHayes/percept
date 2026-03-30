@@ -1,5 +1,5 @@
-use aq_nlp::nq_cache::NqCache;
 use aq_nlp::index::{self, IndexOptions, IndexStatus};
+use aq_nlp::nq_cache::NqCache;
 use std::fs;
 
 fn spacy_available() -> bool {
@@ -22,7 +22,9 @@ fn make_options(cache_dir: &std::path::Path) -> IndexOptions {
 
 #[test]
 fn test_index_single_file() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     let file = tmp.path().join("story.txt");
@@ -45,11 +47,17 @@ fn test_index_single_file() {
 
 #[test]
 fn test_index_directory() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     fs::write(tmp.path().join("a.txt"), "Jacob sent Joseph to Shechem.").unwrap();
-    fs::write(tmp.path().join("b.txt"), "The brothers cast Joseph into a pit.").unwrap();
+    fs::write(
+        tmp.path().join("b.txt"),
+        "The brothers cast Joseph into a pit.",
+    )
+    .unwrap();
     fs::write(tmp.path().join("c.txt"), "Reuben returned to the pit.").unwrap();
 
     let files = index::discover_files(tmp.path());
@@ -62,10 +70,16 @@ fn test_index_directory() {
 
 #[test]
 fn test_index_skips_cached() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
-    fs::write(tmp.path().join("story.txt"), "Joseph interpreted Pharaoh's dream.").unwrap();
+    fs::write(
+        tmp.path().join("story.txt"),
+        "Joseph interpreted Pharaoh's dream.",
+    )
+    .unwrap();
 
     let files = index::discover_files(tmp.path());
 
@@ -90,7 +104,9 @@ fn test_index_skips_cached() {
 
 #[test]
 fn test_index_md_preprocessing() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     let file = tmp.path().join("note.md");
@@ -123,12 +139,17 @@ fn test_index_md_preprocessing() {
     let mut texts = Vec::new();
     collect_text(&cached, &mut texts);
     let all_text = texts.join(" ");
-    assert!(!all_text.contains("tags:"), "Frontmatter key should not appear in NLP tree");
+    assert!(
+        !all_text.contains("tags:"),
+        "Frontmatter key should not appear in NLP tree"
+    );
 }
 
 #[test]
 fn test_index_error_handling() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     fs::write(tmp.path().join("good.txt"), "Joseph went to Egypt.").unwrap();
@@ -149,7 +170,9 @@ fn test_index_error_handling() {
 
 #[test]
 fn test_index_result_structure() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     fs::write(tmp.path().join("test.txt"), "Joseph dreamed a dream.").unwrap();
@@ -169,10 +192,16 @@ fn test_index_result_structure() {
 
 #[test]
 fn test_incremental_skips_unchanged() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
-    fs::write(tmp.path().join("story.txt"), "Joseph interpreted Pharaoh's dream.").unwrap();
+    fs::write(
+        tmp.path().join("story.txt"),
+        "Joseph interpreted Pharaoh's dream.",
+    )
+    .unwrap();
 
     let files = index::discover_files(tmp.path());
 
@@ -202,7 +231,9 @@ fn test_incremental_skips_unchanged() {
 
 #[test]
 fn test_incremental_detects_change() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     let file_a = tmp.path().join("a.txt");
@@ -239,7 +270,9 @@ fn test_incremental_detects_change() {
 
 #[test]
 fn test_incremental_detects_pipeline_change() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
     fs::write(tmp.path().join("story.txt"), "Joseph dreamed a dream.").unwrap();
@@ -270,10 +303,16 @@ fn test_incremental_detects_pipeline_change() {
 
 #[test]
 fn test_non_incremental_always_reindexes() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let cache_dir = tempfile::tempdir().unwrap();
-    fs::write(tmp.path().join("story.txt"), "Jacob sent Joseph to his brothers.").unwrap();
+    fs::write(
+        tmp.path().join("story.txt"),
+        "Jacob sent Joseph to his brothers.",
+    )
+    .unwrap();
 
     let files = index::discover_files(tmp.path());
 

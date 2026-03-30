@@ -29,7 +29,11 @@ pub fn search_top_k(
         .filter(|r| r.score >= threshold)
         .collect();
 
-    scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     scored.truncate(k);
     scored
 }
@@ -65,9 +69,9 @@ mod tests {
     fn search_top_k_respects_threshold() {
         let query = vec![1.0, 0.0, 0.0];
         let items = vec![
-            ("a".to_string(), vec![1.0, 0.0, 0.0], None),  // sim = 1.0
-            ("b".to_string(), vec![0.0, 1.0, 0.0], None),  // sim = 0.0
-            ("c".to_string(), vec![0.7, 0.7, 0.0], None),  // sim ~= 0.707
+            ("a".to_string(), vec![1.0, 0.0, 0.0], None), // sim = 1.0
+            ("b".to_string(), vec![0.0, 1.0, 0.0], None), // sim = 0.0
+            ("c".to_string(), vec![0.7, 0.7, 0.0], None), // sim ~= 0.707
         ];
         let results = search_top_k(&query, &items, 10, 0.5);
         assert_eq!(results.len(), 2); // a and c

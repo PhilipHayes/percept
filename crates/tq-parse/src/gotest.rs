@@ -1,20 +1,16 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 // "--- PASS: TestAdd (0.00s)"
 // "--- FAIL: TestDiv (0.01s)"
 // "--- SKIP: TestSlow (0.00s)"
-static GO_RESULT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^---\s+(PASS|FAIL|SKIP):\s+(\S+)\s+\((\d+\.\d+)s\)").unwrap()
-});
-
+static GO_RESULT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^---\s+(PASS|FAIL|SKIP):\s+(\S+)\s+\((\d+\.\d+)s\)").unwrap());
 
 // Failure output lines after "--- FAIL:" until next "---" or "==="
-static GO_INDENT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s{4,}(.+)$").unwrap()
-});
+static GO_INDENT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s{4,}(.+)$").unwrap());
 
 /// Parse `go test -v` text output.
 pub fn parse_gotest(input: &str) -> TestRun {
@@ -32,7 +28,11 @@ pub fn parse_gotest(input: &str) -> TestRun {
                     if !msg.is_empty() {
                         r.message = Some(
                             msg.lines()
-                                .find(|l| l.contains("Error") || l.contains("expected") || l.contains("got"))
+                                .find(|l| {
+                                    l.contains("Error")
+                                        || l.contains("expected")
+                                        || l.contains("got")
+                                })
                                 .unwrap_or(msg.lines().next().unwrap_or(""))
                                 .trim()
                                 .to_string(),
@@ -73,10 +73,8 @@ pub fn parse_gotest(input: &str) -> TestRun {
         }
 
         // Collect indented failure output
-        if current_fail.is_some() {
-            if GO_INDENT.is_match(line) {
-                failure_lines.push(line.trim().to_string());
-            }
+        if current_fail.is_some() && GO_INDENT.is_match(line) {
+            failure_lines.push(line.trim().to_string());
         }
     }
 

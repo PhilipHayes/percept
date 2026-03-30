@@ -12,10 +12,7 @@ fn nq_bin() -> Command {
 }
 
 fn write_temp_file(name: &str, content: &str) -> tempfile::NamedTempFile {
-    let mut f = tempfile::Builder::new()
-        .suffix(name)
-        .tempfile()
-        .unwrap();
+    let mut f = tempfile::Builder::new().suffix(name).tempfile().unwrap();
     f.write_all(content.as_bytes()).unwrap();
     f
 }
@@ -92,8 +89,10 @@ fn nq_index_help() {
         .expect("failed to run nq index --help");
     assert!(output.status.success(), "nq index --help should exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("index") || stdout.contains("Index"),
-        "help output should mention 'index': {stdout}");
+    assert!(
+        stdout.contains("index") || stdout.contains("Index"),
+        "help output should mention 'index': {stdout}"
+    );
 }
 
 #[test]
@@ -102,7 +101,10 @@ fn nq_index_no_args_errors() {
         .arg("index")
         .output()
         .expect("failed to run nq index");
-    assert!(!output.status.success(), "nq index with no paths should exit non-zero");
+    assert!(
+        !output.status.success(),
+        "nq index with no paths should exit non-zero"
+    );
 }
 
 #[test]
@@ -113,22 +115,33 @@ fn nq_index_accepts_directory() {
         .output()
         .expect("failed to run nq index <dir>");
     // Should not crash — stub implementation succeeds
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "nq index <dir> should not crash; stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
 fn nq_existing_query_unchanged() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let f = write_temp_file(".txt", "Joseph went to Egypt.");
     let output = nq_bin()
-        .args(["--format", "json", "desc:entity", f.path().to_str().unwrap()])
+        .args([
+            "--format",
+            "json",
+            "desc:entity",
+            f.path().to_str().unwrap(),
+        ])
         .output()
         .expect("failed to run nq query");
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "existing nq query should still work; stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
@@ -139,13 +152,17 @@ fn aq_does_not_have_index() {
         .expect("failed to run aq index");
     // aq treats "index" as a query expression, not a subcommand
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(!stderr.contains("nq index"),
-        "aq should not dispatch to nq index; stderr: {stderr}");
+    assert!(
+        !stderr.contains("nq index"),
+        "aq should not dispatch to nq index; stderr: {stderr}"
+    );
 }
 
 #[test]
 fn nq_index_real_directory() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "Joseph went to Egypt.").unwrap();
     std::fs::write(tmp.path().join("b.txt"), "Jacob mourned for days.").unwrap();
@@ -155,16 +172,22 @@ fn nq_index_real_directory() {
         .output()
         .expect("failed to run nq index <dir>");
 
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "nq index should exit 0; stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("\"status\": \"indexed\"") || stdout.contains("\"status\":\"indexed\""),
-        "output should contain indexed status; stdout: {stdout}");
+    assert!(
+        stdout.contains("\"status\": \"indexed\"") || stdout.contains("\"status\":\"indexed\""),
+        "output should contain indexed status; stdout: {stdout}"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("2 files") || stderr.contains("found 2"),
-        "stderr should report file count; stderr: {stderr}");
+    assert!(
+        stderr.contains("2 files") || stderr.contains("found 2"),
+        "stderr should report file count; stderr: {stderr}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -180,17 +203,23 @@ fn nq_index_status_empty() {
         .output()
         .expect("failed to run nq index --status");
 
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "nq index --status should exit 0; stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("no indexable files"),
-        "stderr should say no files; stderr: {stderr}");
+    assert!(
+        stderr.contains("no indexable files"),
+        "stderr should say no files; stderr: {stderr}"
+    );
 }
 
 #[test]
 fn nq_index_status_json() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "Joseph went to Egypt.").unwrap();
 
@@ -208,8 +237,14 @@ fn nq_index_status_json() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("\"files\""), "status should have files field: {stdout}");
-    assert!(stdout.contains("\"pipeline_current\""), "status should have pipeline_current: {stdout}");
+    assert!(
+        stdout.contains("\"files\""),
+        "status should have files field: {stdout}"
+    );
+    assert!(
+        stdout.contains("\"pipeline_current\""),
+        "status should have pipeline_current: {stdout}"
+    );
 }
 
 #[test]
@@ -224,13 +259,21 @@ fn nq_index_dry_run_json() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("\"files_to_index\""), "dry-run should have files_to_index: {stdout}");
-    assert!(stdout.contains("\"estimated_words\""), "dry-run should have estimated_words: {stdout}");
+    assert!(
+        stdout.contains("\"files_to_index\""),
+        "dry-run should have files_to_index: {stdout}"
+    );
+    assert!(
+        stdout.contains("\"estimated_words\""),
+        "dry-run should have estimated_words: {stdout}"
+    );
 }
 
 #[test]
 fn nq_index_prune() {
-    if !spacy_available() { return; }
+    if !spacy_available() {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.txt"), "Joseph went to Egypt.").unwrap();
     std::fs::write(tmp.path().join("b.txt"), "Jacob mourned for days.").unwrap();
@@ -252,7 +295,10 @@ fn nq_index_prune() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("\"pruned\""), "prune output should contain pruned count: {stdout}");
+    assert!(
+        stdout.contains("\"pruned\""),
+        "prune output should contain pruned count: {stdout}"
+    );
 }
 
 // ── S16: --corpus CLI tests ─────────────────────────────────────────────────
@@ -317,17 +363,36 @@ fn nq_corpus_skeleton_has_corpus_fields() {
         .output()
         .expect("failed to run nq --corpus --skeleton");
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout)
         .unwrap_or_else(|e| panic!("Invalid JSON: {e}\nstdout: {stdout}"));
 
     assert_eq!(json["mode"], "corpus");
     assert!(json["files"].is_array(), "should have files array");
-    assert!(json["file_count"].as_u64().unwrap() >= 2, "should have >= 2 files");
-    assert!(json["total_paragraphs"].is_number(), "should have total_paragraphs");
-    assert!(json["characters"].is_array(), "should have characters array");
-    assert!(json["arc_distribution"].is_object(), "should have arc_distribution");
-    assert!(json.get("central_conflict").is_some(), "should have central_conflict");
+    assert!(
+        json["file_count"].as_u64().unwrap() >= 2,
+        "should have >= 2 files"
+    );
+    assert!(
+        json["total_paragraphs"].is_number(),
+        "should have total_paragraphs"
+    );
+    assert!(
+        json["characters"].is_array(),
+        "should have characters array"
+    );
+    assert!(
+        json["arc_distribution"].is_object(),
+        "should have arc_distribution"
+    );
+    assert!(
+        json.get("central_conflict").is_some(),
+        "should have central_conflict"
+    );
     assert!(json.get("scenes").is_some(), "should have scenes");
 }

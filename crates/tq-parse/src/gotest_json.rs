@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::model::{TestResult, TestRun, TestStatus, Format};
+use crate::model::{Format, TestResult, TestRun, TestStatus};
 
 /// A single event from `go test -json`.
 /// {"Time":"...","Action":"run","Package":"math","Test":"TestAdd"}
@@ -23,7 +23,8 @@ struct GoTestEvent {
 /// Parse `go test -json` NDJSON output.
 pub fn parse_gotest_json(input: &str) -> TestRun {
     let mut results: Vec<TestResult> = Vec::new();
-    let mut outputs: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut outputs: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
 
     for line in input.lines() {
         let trimmed = line.trim();
@@ -56,7 +57,9 @@ pub fn parse_gotest_json(input: &str) -> TestRun {
                 };
                 let duration_ms = event.elapsed.map(|e| (e * 1000.0) as u64);
                 let test_output = outputs.remove(test_name);
-                let stdout = test_output.as_ref().map(|lines| lines.join("").trim().to_string());
+                let stdout = test_output
+                    .as_ref()
+                    .map(|lines| lines.join("").trim().to_string());
                 let message = if status == TestStatus::Failed {
                     stdout.clone()
                 } else {

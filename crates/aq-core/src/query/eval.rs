@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use super::parser::{
+    ArithOp, Axis, CmpOp, Combinator, Expr, LogicOp, MetaField, Pattern, PatternPredicate,
+    PatternStep, SiblingKind, StringPart, Value,
+};
 use crate::node::AqNode;
-use super::parser::{ArithOp, Axis, CmpOp, Combinator, Expr, LogicOp, MetaField, Pattern, PatternPredicate, PatternStep, SiblingKind, StringPart, Value};
+use std::collections::HashMap;
 
 /// Evaluation context holding the parent map for navigating up the tree.
 struct EvalContext<'a> {
@@ -13,7 +16,7 @@ fn node_key(node: &dyn AqNode) -> usize {
 }
 
 /// Build a map from child node key → parent node reference.
-fn build_parent_map<'a>(root: &'a dyn AqNode) -> HashMap<usize, &'a dyn AqNode> {
+fn build_parent_map(root: &dyn AqNode) -> HashMap<usize, &dyn AqNode> {
     let mut map = HashMap::new();
     build_parent_map_inner(root, &mut map);
     map
@@ -27,10 +30,7 @@ fn build_parent_map_inner<'a>(node: &'a dyn AqNode, map: &mut HashMap<usize, &'a
 }
 
 /// Evaluate an aq expression against a root node, producing a stream of results.
-pub fn eval<'a>(
-    expr: &Expr,
-    root: &'a dyn AqNode,
-) -> Result<Vec<EvalResult<'a>>, EvalError> {
+pub fn eval<'a>(expr: &Expr, root: &'a dyn AqNode) -> Result<Vec<EvalResult<'a>>, EvalError> {
     let parent_map = build_parent_map(root);
     let ctx = EvalContext { parent_map };
     eval_filter(expr, &EvalResult::Node(root), &ctx)
@@ -55,7 +55,13 @@ impl<'a> std::fmt::Debug for EvalResult<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EvalResult::Node(n) => {
-                write!(f, "Node({}, {}..{})", n.node_type(), n.start_line(), n.end_line())
+                write!(
+                    f,
+                    "Node({}, {}..{})",
+                    n.node_type(),
+                    n.start_line(),
+                    n.end_line()
+                )
             }
             EvalResult::Value(v) => write!(f, "Value({})", v),
         }
@@ -132,7 +138,8 @@ fn eval_filter<'a>(
                 match kind {
                     SiblingKind::All => {
                         if let Some(&parent) = ctx.parent_map.get(&self_key) {
-                            Ok(parent.named_children()
+                            Ok(parent
+                                .named_children()
                                 .into_iter()
                                 .filter(|c| node_key(*c) != self_key)
                                 .map(EvalResult::Node)
@@ -217,8 +224,14 @@ fn eval_filter<'a>(
         Expr::Compare(left, op, right) => {
             let l_results = eval_filter(left, input, ctx)?;
             let r_results = eval_filter(right, input, ctx)?;
-            let l_val = l_results.first().map(result_to_json).unwrap_or(serde_json::Value::Null);
-            let r_val = r_results.first().map(result_to_json).unwrap_or(serde_json::Value::Null);
+            let l_val = l_results
+                .first()
+                .map(result_to_json)
+                .unwrap_or(serde_json::Value::Null);
+            let r_val = r_results
+                .first()
+                .map(result_to_json)
+                .unwrap_or(serde_json::Value::Null);
             let result = compare_values(&l_val, op, &r_val)?;
             Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
         }
@@ -289,38 +302,36 @@ fn eval_filter<'a>(
 
         Expr::Match(pattern) => eval_match(pattern, input),
 
-        Expr::Iterate => {
-            match input {
-                EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    Ok(arr.iter().map(|v| EvalResult::Value(v.clone())).collect())
-                }
-                EvalResult::Value(serde_json::Value::Object(obj)) => {
-                    Ok(obj.values().map(|v| EvalResult::Value(v.clone())).collect())
-                }
-                EvalResult::Node(n) => {
-                    Ok(n.named_children().into_iter().map(EvalResult::Node).collect())
-                }
-                _ => Ok(vec![]),
+        Expr::Iterate => match input {
+            EvalResult::Value(serde_json::Value::Array(arr)) => {
+                Ok(arr.iter().map(|v| EvalResult::Value(v.clone())).collect())
             }
-        }
+            EvalResult::Value(serde_json::Value::Object(obj)) => {
+                Ok(obj.values().map(|v| EvalResult::Value(v.clone())).collect())
+            }
+            EvalResult::Node(n) => Ok(n
+                .named_children()
+                .into_iter()
+                .map(EvalResult::Node)
+                .collect()),
+            _ => Ok(vec![]),
+        },
 
-        Expr::Index(idx) => {
-            match input {
-                EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    let i = if *idx < 0 {
-                        (arr.len() as isize + idx) as usize
-                    } else {
-                        *idx as usize
-                    };
-                    if i < arr.len() {
-                        Ok(vec![EvalResult::Value(arr[i].clone())])
-                    } else {
-                        Ok(vec![EvalResult::Value(serde_json::Value::Null)])
-                    }
+        Expr::Index(idx) => match input {
+            EvalResult::Value(serde_json::Value::Array(arr)) => {
+                let i = if *idx < 0 {
+                    (arr.len() as isize + idx) as usize
+                } else {
+                    *idx as usize
+                };
+                if i < arr.len() {
+                    Ok(vec![EvalResult::Value(arr[i].clone())])
+                } else {
+                    Ok(vec![EvalResult::Value(serde_json::Value::Null)])
                 }
-                _ => Ok(vec![EvalResult::Value(serde_json::Value::Null)]),
             }
-        }
+            _ => Ok(vec![EvalResult::Value(serde_json::Value::Null)]),
+        },
 
         Expr::Concat(exprs) => {
             let mut results = Vec::new();
@@ -385,7 +396,11 @@ fn eval_field<'a>(name: &str, input: &EvalResult<'a>) -> Result<Vec<EvalResult<'
     }
 }
 
-fn eval_meta<'a>(field: &MetaField, input: &EvalResult<'a>, ctx: &EvalContext<'a>) -> Result<Vec<EvalResult<'a>>, EvalError> {
+fn eval_meta<'a>(
+    field: &MetaField,
+    input: &EvalResult<'a>,
+    ctx: &EvalContext<'a>,
+) -> Result<Vec<EvalResult<'a>>, EvalError> {
     // Format meta fields work on any input (nodes or values)
     match field {
         MetaField::Csv => return format_csv(input),
@@ -564,7 +579,10 @@ fn eval_match<'a>(
 
     if pattern.steps.len() == 1 {
         // Only one step — return all matches
-        return Ok(initial_candidates.into_iter().map(EvalResult::Node).collect());
+        return Ok(initial_candidates
+            .into_iter()
+            .map(EvalResult::Node)
+            .collect());
     }
 
     // For subsequent steps, traverse from each candidate
@@ -631,10 +649,7 @@ fn find_matching_nodes<'a>(
 }
 
 /// Check if a node fully matches a pattern step (type + field constraint + predicates).
-fn node_matches_step(
-    node: &dyn AqNode,
-    step: &PatternStep,
-) -> Result<bool, EvalError> {
+fn node_matches_step(node: &dyn AqNode, step: &PatternStep) -> Result<bool, EvalError> {
     // Check type
     if node.node_type() != step.node_type {
         return Ok(false);
@@ -655,10 +670,7 @@ fn node_matches_step(
 }
 
 /// Check if a node satisfies all predicates.
-fn check_predicates(
-    node: &dyn AqNode,
-    predicates: &[PatternPredicate],
-) -> Result<bool, EvalError> {
+fn check_predicates(node: &dyn AqNode, predicates: &[PatternPredicate]) -> Result<bool, EvalError> {
     for pred in predicates {
         let node_val = match pred.field.as_str() {
             "type" => serde_json::Value::String(node.node_type().to_string()),
@@ -810,7 +822,7 @@ fn eval_builtin<'a>(
                     })
                 }
             };
-            let result = input_str.map_or(false, |s| s.starts_with(&prefix));
+            let result = input_str.is_some_and(|s| s.starts_with(&prefix));
             Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
         }
 
@@ -830,7 +842,7 @@ fn eval_builtin<'a>(
                     })
                 }
             };
-            let result = input_str.map_or(false, |s| s.ends_with(&suffix));
+            let result = input_str.is_some_and(|s| s.ends_with(&suffix));
             Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
         }
 
@@ -850,7 +862,7 @@ fn eval_builtin<'a>(
                     })
                 }
             };
-            let result = input_str.map_or(false, |s| s.contains(&needle));
+            let result = input_str.is_some_and(|s| s.contains(&needle));
             Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
         }
 
@@ -908,7 +920,9 @@ fn eval_builtin<'a>(
 
         "sort_by" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "sort_by() requires exactly one argument".into() });
+                return Err(EvalError {
+                    message: "sort_by() requires exactly one argument".into(),
+                });
             }
             match input {
                 EvalResult::Value(serde_json::Value::Array(arr)) => {
@@ -916,20 +930,28 @@ fn eval_builtin<'a>(
                     for item in arr {
                         let item_result = EvalResult::Value(item.clone());
                         let key_results = eval_filter(&args[0], &item_result, ctx)?;
-                        let key = key_results.first().map(result_to_json).unwrap_or(serde_json::Value::Null);
+                        let key = key_results
+                            .first()
+                            .map(result_to_json)
+                            .unwrap_or(serde_json::Value::Null);
                         keyed.push((key, item.clone()));
                     }
                     keyed.sort_by(|(a, _), (b, _)| compare_json_values(a, b));
-                    let sorted: Vec<serde_json::Value> = keyed.into_iter().map(|(_, v)| v).collect();
+                    let sorted: Vec<serde_json::Value> =
+                        keyed.into_iter().map(|(_, v)| v).collect();
                     Ok(vec![EvalResult::Value(serde_json::Value::Array(sorted))])
                 }
-                _ => Err(EvalError { message: "sort_by() requires array input".into() }),
+                _ => Err(EvalError {
+                    message: "sort_by() requires array input".into(),
+                }),
             }
         }
 
         "group_by" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "group_by() requires exactly one argument".into() });
+                return Err(EvalError {
+                    message: "group_by() requires exactly one argument".into(),
+                });
             }
             match input {
                 EvalResult::Value(serde_json::Value::Array(arr)) => {
@@ -939,8 +961,13 @@ fn eval_builtin<'a>(
                     for item in arr {
                         let item_result = EvalResult::Value(item.clone());
                         let key_results = eval_filter(&args[0], &item_result, ctx)?;
-                        let key = key_results.first().map(result_to_json).unwrap_or(serde_json::Value::Null);
-                        if let Some(group) = groups.iter_mut().find(|(k, _)| json_values_equal(k, &key)) {
+                        let key = key_results
+                            .first()
+                            .map(result_to_json)
+                            .unwrap_or(serde_json::Value::Null);
+                        if let Some(group) =
+                            groups.iter_mut().find(|(k, _)| json_values_equal(k, &key))
+                        {
                             group.1.push(item.clone());
                         } else {
                             key_order.push(key.clone());
@@ -953,13 +980,17 @@ fn eval_builtin<'a>(
                         .collect();
                     Ok(vec![EvalResult::Value(serde_json::Value::Array(result))])
                 }
-                _ => Err(EvalError { message: "group_by() requires array input".into() }),
+                _ => Err(EvalError {
+                    message: "group_by() requires array input".into(),
+                }),
             }
         }
 
         "unique_by" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "unique_by() requires exactly one argument".into() });
+                return Err(EvalError {
+                    message: "unique_by() requires exactly one argument".into(),
+                });
             }
             match input {
                 EvalResult::Value(serde_json::Value::Array(arr)) => {
@@ -968,7 +999,10 @@ fn eval_builtin<'a>(
                     for item in arr {
                         let item_result = EvalResult::Value(item.clone());
                         let key_results = eval_filter(&args[0], &item_result, ctx)?;
-                        let key = key_results.first().map(result_to_json).unwrap_or(serde_json::Value::Null);
+                        let key = key_results
+                            .first()
+                            .map(result_to_json)
+                            .unwrap_or(serde_json::Value::Null);
                         if !seen_keys.iter().any(|k| json_values_equal(k, &key)) {
                             seen_keys.push(key);
                             result.push(item.clone());
@@ -976,13 +1010,17 @@ fn eval_builtin<'a>(
                     }
                     Ok(vec![EvalResult::Value(serde_json::Value::Array(result))])
                 }
-                _ => Err(EvalError { message: "unique_by() requires array input".into() }),
+                _ => Err(EvalError {
+                    message: "unique_by() requires array input".into(),
+                }),
             }
         }
 
         "limit" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "limit() requires exactly one argument".into() });
+                return Err(EvalError {
+                    message: "limit() requires exactly one argument".into(),
+                });
             }
             let n = match &args[0] {
                 Expr::Literal(Value::Number(n)) => *n as usize,
@@ -990,9 +1028,14 @@ fn eval_builtin<'a>(
                     // Evaluate the argument to get a number
                     let results = eval_filter(&args[0], input, ctx)?;
                     match results.first() {
-                        Some(EvalResult::Value(serde_json::Value::Number(n))) =>
-                            n.as_f64().unwrap_or(0.0) as usize,
-                        _ => return Err(EvalError { message: "limit() argument must be a number".into() }),
+                        Some(EvalResult::Value(serde_json::Value::Number(n))) => {
+                            n.as_f64().unwrap_or(0.0) as usize
+                        }
+                        _ => {
+                            return Err(EvalError {
+                                message: "limit() argument must be a number".into(),
+                            })
+                        }
                     }
                 }
             };
@@ -1001,27 +1044,28 @@ fn eval_builtin<'a>(
                     let limited: Vec<serde_json::Value> = arr.iter().take(n).cloned().collect();
                     Ok(vec![EvalResult::Value(serde_json::Value::Array(limited))])
                 }
-                _ => Err(EvalError { message: "limit() requires array input".into() }),
+                _ => Err(EvalError {
+                    message: "limit() requires array input".into(),
+                }),
             }
         }
 
         // --- Additional builtins ---
-
-        "flatten" => {
-            match input {
-                EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    let mut result = Vec::new();
-                    for item in arr {
-                        match item {
-                            serde_json::Value::Array(inner) => result.extend(inner.iter().cloned()),
-                            other => result.push(other.clone()),
-                        }
+        "flatten" => match input {
+            EvalResult::Value(serde_json::Value::Array(arr)) => {
+                let mut result = Vec::new();
+                for item in arr {
+                    match item {
+                        serde_json::Value::Array(inner) => result.extend(inner.iter().cloned()),
+                        other => result.push(other.clone()),
                     }
-                    Ok(vec![EvalResult::Value(serde_json::Value::Array(result))])
                 }
-                _ => Err(EvalError { message: "flatten requires array input".into() }),
+                Ok(vec![EvalResult::Value(serde_json::Value::Array(result))])
             }
-        }
+            _ => Err(EvalError {
+                message: "flatten requires array input".into(),
+            }),
+        },
 
         "add" => {
             match input {
@@ -1032,9 +1076,7 @@ fn eval_builtin<'a>(
                     // Detect type from first element
                     match &arr[0] {
                         serde_json::Value::Number(_) => {
-                            let sum: f64 = arr.iter().map(|v| {
-                                v.as_f64().unwrap_or(0.0)
-                            }).sum();
+                            let sum: f64 = arr.iter().map(|v| v.as_f64().unwrap_or(0.0)).sum();
                             Ok(vec![EvalResult::Value(json_number(sum))])
                         }
                         serde_json::Value::String(_) => {
@@ -1058,48 +1100,56 @@ fn eval_builtin<'a>(
                         _ => Ok(vec![EvalResult::Value(serde_json::Value::Null)]),
                     }
                 }
-                _ => Err(EvalError { message: "add requires array input".into() }),
+                _ => Err(EvalError {
+                    message: "add requires array input".into(),
+                }),
             }
         }
 
-        "any" => {
-            match input {
-                EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    let result = arr.iter().any(|v| !matches!(v, serde_json::Value::Null | serde_json::Value::Bool(false)));
-                    Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
-                }
-                _ => Err(EvalError { message: "any requires array input".into() }),
+        "any" => match input {
+            EvalResult::Value(serde_json::Value::Array(arr)) => {
+                let result = arr.iter().any(|v| {
+                    !matches!(v, serde_json::Value::Null | serde_json::Value::Bool(false))
+                });
+                Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
             }
-        }
+            _ => Err(EvalError {
+                message: "any requires array input".into(),
+            }),
+        },
 
-        "all" => {
-            match input {
-                EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    let result = arr.iter().all(|v| !matches!(v, serde_json::Value::Null | serde_json::Value::Bool(false)));
-                    Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
-                }
-                _ => Err(EvalError { message: "all requires array input".into() }),
+        "all" => match input {
+            EvalResult::Value(serde_json::Value::Array(arr)) => {
+                let result = arr.iter().all(|v| {
+                    !matches!(v, serde_json::Value::Null | serde_json::Value::Bool(false))
+                });
+                Ok(vec![EvalResult::Value(serde_json::Value::Bool(result))])
             }
-        }
+            _ => Err(EvalError {
+                message: "all requires array input".into(),
+            }),
+        },
 
-        "reverse" => {
-            match input {
-                EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    let mut result = arr.clone();
-                    result.reverse();
-                    Ok(vec![EvalResult::Value(serde_json::Value::Array(result))])
-                }
-                EvalResult::Value(serde_json::Value::String(s)) => {
-                    let result: String = s.chars().rev().collect();
-                    Ok(vec![EvalResult::Value(serde_json::Value::String(result))])
-                }
-                _ => Err(EvalError { message: "reverse requires array or string input".into() }),
+        "reverse" => match input {
+            EvalResult::Value(serde_json::Value::Array(arr)) => {
+                let mut result = arr.clone();
+                result.reverse();
+                Ok(vec![EvalResult::Value(serde_json::Value::Array(result))])
             }
-        }
+            EvalResult::Value(serde_json::Value::String(s)) => {
+                let result: String = s.chars().rev().collect();
+                Ok(vec![EvalResult::Value(serde_json::Value::String(result))])
+            }
+            _ => Err(EvalError {
+                message: "reverse requires array or string input".into(),
+            }),
+        },
 
         "join" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "join() requires exactly one argument (separator)".into() });
+                return Err(EvalError {
+                    message: "join() requires exactly one argument (separator)".into(),
+                });
             }
             let sep = match &args[0] {
                 Expr::Literal(Value::String(s)) => s.clone(),
@@ -1107,26 +1157,39 @@ fn eval_builtin<'a>(
                     let results = eval_filter(&args[0], input, ctx)?;
                     match results.first() {
                         Some(EvalResult::Value(serde_json::Value::String(s))) => s.clone(),
-                        _ => return Err(EvalError { message: "join() separator must be a string".into() }),
+                        _ => {
+                            return Err(EvalError {
+                                message: "join() separator must be a string".into(),
+                            })
+                        }
                     }
                 }
             };
             match input {
                 EvalResult::Value(serde_json::Value::Array(arr)) => {
-                    let parts: Vec<String> = arr.iter().map(|v| match v {
-                        serde_json::Value::String(s) => s.clone(),
-                        serde_json::Value::Null => String::new(),
-                        other => other.to_string(),
-                    }).collect();
-                    Ok(vec![EvalResult::Value(serde_json::Value::String(parts.join(&sep)))])
+                    let parts: Vec<String> = arr
+                        .iter()
+                        .map(|v| match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Null => String::new(),
+                            other => other.to_string(),
+                        })
+                        .collect();
+                    Ok(vec![EvalResult::Value(serde_json::Value::String(
+                        parts.join(&sep),
+                    ))])
                 }
-                _ => Err(EvalError { message: "join() requires array input".into() }),
+                _ => Err(EvalError {
+                    message: "join() requires array input".into(),
+                }),
             }
         }
 
         "split" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "split() requires exactly one argument (delimiter)".into() });
+                return Err(EvalError {
+                    message: "split() requires exactly one argument (delimiter)".into(),
+                });
             }
             let delim = match &args[0] {
                 Expr::Literal(Value::String(s)) => s.clone(),
@@ -1134,14 +1197,26 @@ fn eval_builtin<'a>(
                     let results = eval_filter(&args[0], input, ctx)?;
                     match results.first() {
                         Some(EvalResult::Value(serde_json::Value::String(s))) => s.clone(),
-                        _ => return Err(EvalError { message: "split() delimiter must be a string".into() }),
+                        _ => {
+                            return Err(EvalError {
+                                message: "split() delimiter must be a string".into(),
+                            })
+                        }
                     }
                 }
             };
             let input_str = match input {
                 EvalResult::Value(serde_json::Value::String(s)) => s.clone(),
-                EvalResult::Node(n) => n.text().or_else(|| n.subtree_text()).unwrap_or("").to_string(),
-                _ => return Err(EvalError { message: "split() requires string input".into() }),
+                EvalResult::Node(n) => n
+                    .text()
+                    .or_else(|| n.subtree_text())
+                    .unwrap_or("")
+                    .to_string(),
+                _ => {
+                    return Err(EvalError {
+                        message: "split() requires string input".into(),
+                    })
+                }
             };
             let parts: Vec<serde_json::Value> = input_str
                 .split(&delim)
@@ -1152,7 +1227,9 @@ fn eval_builtin<'a>(
 
         "test" => {
             if args.len() != 1 {
-                return Err(EvalError { message: "test() requires exactly one argument (regex)".into() });
+                return Err(EvalError {
+                    message: "test() requires exactly one argument (regex)".into(),
+                });
             }
             let pattern = match &args[0] {
                 Expr::Literal(Value::String(s)) => s.clone(),
@@ -1160,40 +1237,58 @@ fn eval_builtin<'a>(
                     let results = eval_filter(&args[0], input, ctx)?;
                     match results.first() {
                         Some(EvalResult::Value(serde_json::Value::String(s))) => s.clone(),
-                        _ => return Err(EvalError { message: "test() pattern must be a string".into() }),
+                        _ => {
+                            return Err(EvalError {
+                                message: "test() pattern must be a string".into(),
+                            })
+                        }
                     }
                 }
             };
             let input_str = match input {
                 EvalResult::Value(serde_json::Value::String(s)) => s.clone(),
-                EvalResult::Node(n) => n.text().or_else(|| n.subtree_text()).unwrap_or("").to_string(),
-                _ => return Err(EvalError { message: "test() requires string input".into() }),
+                EvalResult::Node(n) => n
+                    .text()
+                    .or_else(|| n.subtree_text())
+                    .unwrap_or("")
+                    .to_string(),
+                _ => {
+                    return Err(EvalError {
+                        message: "test() requires string input".into(),
+                    })
+                }
             };
             let re = regex::Regex::new(&pattern).map_err(|e| EvalError {
                 message: format!("Invalid regex in test(): {}", e),
             })?;
-            Ok(vec![EvalResult::Value(serde_json::Value::Bool(re.is_match(&input_str)))])
+            Ok(vec![EvalResult::Value(serde_json::Value::Bool(
+                re.is_match(&input_str),
+            ))])
         }
 
-        "to_number" | "tonumber" => {
-            match input {
-                EvalResult::Value(serde_json::Value::Number(_)) => Ok(vec![input.clone()]),
-                EvalResult::Value(serde_json::Value::String(s)) => {
-                    let n: f64 = s.parse().map_err(|_| EvalError {
-                        message: format!("Cannot convert to number: {:?}", s),
-                    })?;
-                    Ok(vec![EvalResult::Value(json_number(n))])
-                }
-                _ => Err(EvalError { message: "to_number requires number or string input".into() }),
+        "to_number" | "tonumber" => match input {
+            EvalResult::Value(serde_json::Value::Number(_)) => Ok(vec![input.clone()]),
+            EvalResult::Value(serde_json::Value::String(s)) => {
+                let n: f64 = s.parse().map_err(|_| EvalError {
+                    message: format!("Cannot convert to number: {:?}", s),
+                })?;
+                Ok(vec![EvalResult::Value(json_number(n))])
             }
-        }
+            _ => Err(EvalError {
+                message: "to_number requires number or string input".into(),
+            }),
+        },
 
         "to_string" | "tostring" => {
             let s = match input {
                 EvalResult::Value(serde_json::Value::String(s)) => s.clone(),
                 EvalResult::Value(serde_json::Value::Null) => "null".into(),
                 EvalResult::Value(v) => v.to_string(),
-                EvalResult::Node(n) => n.text().or_else(|| n.subtree_text()).unwrap_or("").to_string(),
+                EvalResult::Node(n) => n
+                    .text()
+                    .or_else(|| n.subtree_text())
+                    .unwrap_or("")
+                    .to_string(),
             };
             Ok(vec![EvalResult::Value(serde_json::Value::String(s))])
         }
@@ -1201,8 +1296,16 @@ fn eval_builtin<'a>(
         "ascii_downcase" => {
             let s = match input {
                 EvalResult::Value(serde_json::Value::String(s)) => s.to_lowercase(),
-                EvalResult::Node(n) => n.text().or_else(|| n.subtree_text()).unwrap_or("").to_lowercase(),
-                _ => return Err(EvalError { message: "ascii_downcase requires string input".into() }),
+                EvalResult::Node(n) => n
+                    .text()
+                    .or_else(|| n.subtree_text())
+                    .unwrap_or("")
+                    .to_lowercase(),
+                _ => {
+                    return Err(EvalError {
+                        message: "ascii_downcase requires string input".into(),
+                    })
+                }
             };
             Ok(vec![EvalResult::Value(serde_json::Value::String(s))])
         }
@@ -1210,8 +1313,16 @@ fn eval_builtin<'a>(
         "ascii_upcase" => {
             let s = match input {
                 EvalResult::Value(serde_json::Value::String(s)) => s.to_uppercase(),
-                EvalResult::Node(n) => n.text().or_else(|| n.subtree_text()).unwrap_or("").to_uppercase(),
-                _ => return Err(EvalError { message: "ascii_upcase requires string input".into() }),
+                EvalResult::Node(n) => n
+                    .text()
+                    .or_else(|| n.subtree_text())
+                    .unwrap_or("")
+                    .to_uppercase(),
+                _ => {
+                    return Err(EvalError {
+                        message: "ascii_upcase requires string input".into(),
+                    })
+                }
             };
             Ok(vec![EvalResult::Value(serde_json::Value::String(s))])
         }
@@ -1219,18 +1330,25 @@ fn eval_builtin<'a>(
         "count_desc" => {
             // count_desc("type_name") — count descendants of a given type
             if args.len() != 1 {
-                return Err(EvalError { message: "count_desc() requires exactly 1 argument".into() });
+                return Err(EvalError {
+                    message: "count_desc() requires exactly 1 argument".into(),
+                });
             }
             let type_results = eval_filter(&args[0], input, ctx)?;
             let type_name = match type_results.first() {
                 Some(EvalResult::Value(serde_json::Value::String(s))) => s.clone(),
-                _ => return Err(EvalError { message: "count_desc() argument must be a string".into() }),
+                _ => {
+                    return Err(EvalError {
+                        message: "count_desc() argument must be a string".into(),
+                    })
+                }
             };
             match input {
                 EvalResult::Node(n) => {
                     let mut all_desc = Vec::new();
                     collect_descendants_raw(*n, None, 0, &mut all_desc);
-                    let count = all_desc.iter()
+                    let count = all_desc
+                        .iter()
                         .filter(|d| d.node_type() == type_name.as_str())
                         .count();
                     Ok(vec![EvalResult::Value(json_number(count as f64))])
@@ -1256,9 +1374,8 @@ fn eval_builtin<'a>(
                         key = node_key(p);
                     }
                     types.reverse();
-                    let arr: Vec<serde_json::Value> = types.into_iter()
-                        .map(serde_json::Value::String)
-                        .collect();
+                    let arr: Vec<serde_json::Value> =
+                        types.into_iter().map(serde_json::Value::String).collect();
                     Ok(vec![EvalResult::Value(serde_json::Value::Array(arr))])
                 }
                 _ => Ok(vec![EvalResult::Value(serde_json::Value::Array(vec![]))]),
@@ -1280,7 +1397,10 @@ pub fn result_to_json(r: &EvalResult) -> serde_json::Value {
     match r {
         EvalResult::Node(n) => {
             let mut map = serde_json::Map::new();
-            map.insert("@type".into(), serde_json::Value::String(n.node_type().to_string()));
+            map.insert(
+                "@type".into(),
+                serde_json::Value::String(n.node_type().to_string()),
+            );
             map.insert("@start".into(), json_number(n.start_line() as f64));
             map.insert("@end".into(), json_number(n.end_line() as f64));
             if let Some(t) = n.text() {
@@ -1311,7 +1431,9 @@ fn json_is_truthy(v: &serde_json::Value) -> bool {
 }
 
 fn all_null(results: &[EvalResult]) -> bool {
-    results.iter().all(|r| matches!(r, EvalResult::Value(serde_json::Value::Null)))
+    results
+        .iter()
+        .all(|r| matches!(r, EvalResult::Value(serde_json::Value::Null)))
 }
 
 fn value_to_json(val: &Value) -> serde_json::Value {
@@ -1467,10 +1589,14 @@ fn json_values_equal(a: &serde_json::Value, b: &serde_json::Value) -> bool {
 fn format_csv<'a>(input: &EvalResult<'a>) -> Result<Vec<EvalResult<'a>>, EvalError> {
     match input {
         EvalResult::Value(serde_json::Value::Array(arr)) => {
-            let fields: Vec<String> = arr.iter().map(|v| csv_escape(v)).collect();
-            Ok(vec![EvalResult::Value(serde_json::Value::String(fields.join(",")))])
+            let fields: Vec<String> = arr.iter().map(csv_escape).collect();
+            Ok(vec![EvalResult::Value(serde_json::Value::String(
+                fields.join(","),
+            ))])
         }
-        _ => Err(EvalError { message: "@csv requires array input".into() }),
+        _ => Err(EvalError {
+            message: "@csv requires array input".into(),
+        }),
     }
 }
 
@@ -1484,7 +1610,13 @@ fn csv_escape(v: &serde_json::Value) -> String {
             }
         }
         serde_json::Value::Null => String::new(),
-        serde_json::Value::Bool(b) => if *b { "true".into() } else { "false".into() },
+        serde_json::Value::Bool(b) => {
+            if *b {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
         serde_json::Value::Number(n) => n.to_string(),
         other => other.to_string(),
     }
@@ -1493,18 +1625,31 @@ fn csv_escape(v: &serde_json::Value) -> String {
 fn format_tsv<'a>(input: &EvalResult<'a>) -> Result<Vec<EvalResult<'a>>, EvalError> {
     match input {
         EvalResult::Value(serde_json::Value::Array(arr)) => {
-            let fields: Vec<String> = arr.iter().map(|v| tsv_escape(v)).collect();
-            Ok(vec![EvalResult::Value(serde_json::Value::String(fields.join("\t")))])
+            let fields: Vec<String> = arr.iter().map(tsv_escape).collect();
+            Ok(vec![EvalResult::Value(serde_json::Value::String(
+                fields.join("\t"),
+            ))])
         }
-        _ => Err(EvalError { message: "@tsv requires array input".into() }),
+        _ => Err(EvalError {
+            message: "@tsv requires array input".into(),
+        }),
     }
 }
 
 fn tsv_escape(v: &serde_json::Value) -> String {
     match v {
-        serde_json::Value::String(s) => s.replace('\t', "\\t").replace('\n', "\\n").replace('\r', "\\r"),
+        serde_json::Value::String(s) => s
+            .replace('\t', "\\t")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r"),
         serde_json::Value::Null => String::new(),
-        serde_json::Value::Bool(b) => if *b { "true".into() } else { "false".into() },
+        serde_json::Value::Bool(b) => {
+            if *b {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
         serde_json::Value::Number(n) => n.to_string(),
         other => other.to_string(),
     }

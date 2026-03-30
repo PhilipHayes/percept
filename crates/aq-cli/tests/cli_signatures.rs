@@ -1,20 +1,17 @@
+use std::io::Write;
 /// CLI integration tests for --signatures output.
 ///
 /// Validates that:
 /// - The `name` field is ALWAYS present in every signature entry
 /// - Dart-specific constructs (operators, constructors, getters, setters) produce correct names
 use std::process::Command;
-use std::io::Write;
 
 fn aq_bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_aq"))
 }
 
 fn write_temp_file(name: &str, content: &str) -> tempfile::NamedTempFile {
-    let mut f = tempfile::Builder::new()
-        .suffix(name)
-        .tempfile()
-        .unwrap();
+    let mut f = tempfile::Builder::new().suffix(name).tempfile().unwrap();
     f.write_all(content.as_bytes()).unwrap();
     f
 }
@@ -25,7 +22,11 @@ fn run_signatures(file: &tempfile::NamedTempFile) -> serde_json::Value {
         .arg(file.path())
         .output()
         .expect("failed to run aq");
-    assert!(output.status.success(), "aq failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "aq failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     serde_json::from_slice(&output.stdout).expect("invalid JSON output")
 }
 
@@ -106,12 +107,28 @@ fn signatures_name_values_are_correct_dart() {
     assert!(names.contains(&"main"), "missing 'main': {:?}", names);
 
     // Constructors
-    assert!(names.contains(&"Person"), "missing constructor 'Person': {:?}", names);
+    assert!(
+        names.contains(&"Person"),
+        "missing constructor 'Person': {:?}",
+        names
+    );
 
     // Getters & setters
-    assert!(names.contains(&"displayName"), "missing getter 'displayName': {:?}", names);
-    assert!(names.contains(&"nickname"), "missing setter 'nickname': {:?}", names);
-    assert!(names.contains(&"hashCode"), "missing getter 'hashCode': {:?}", names);
+    assert!(
+        names.contains(&"displayName"),
+        "missing getter 'displayName': {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"nickname"),
+        "missing setter 'nickname': {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"hashCode"),
+        "missing getter 'hashCode': {:?}",
+        names
+    );
 
     // Operator — should have "operator ==" as name
     assert!(

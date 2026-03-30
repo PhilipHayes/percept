@@ -2,12 +2,11 @@
 ///
 /// Discovers text files in directories, parses each through the NLP pipeline,
 /// and caches the resulting OwnedNode trees for corpus-mode queries.
-
 use aq_core::node::OwnedNode;
 use std::path::{Path, PathBuf};
 
-use crate::nq_cache::{NqCache, NqCacheStatus, ManifestEntry, CorpusManifest};
 use crate::markdown;
+use crate::nq_cache::{CorpusManifest, ManifestEntry, NqCache, NqCacheStatus};
 use crate::spacy;
 use crate::tree;
 
@@ -76,8 +75,8 @@ pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     for pattern in patterns {
         if pattern.contains('*') || pattern.contains('?') || pattern.contains('[') {
-            let entries = glob::glob(pattern)
-                .map_err(|e| format!("Invalid glob '{}': {}", pattern, e))?;
+            let entries =
+                glob::glob(pattern).map_err(|e| format!("Invalid glob '{}': {}", pattern, e))?;
             for entry in entries {
                 let path = entry.map_err(|e| format!("Glob error: {}", e))?;
                 if path.is_file() && is_indexable(&path) {
@@ -249,10 +248,22 @@ pub fn print_results(results: &[IndexResult]) {
 
 /// Summary of indexing results.
 pub fn summarize(results: &[IndexResult]) -> (usize, usize, usize, usize) {
-    let indexed = results.iter().filter(|r| r.status == IndexStatus::Indexed).count();
-    let cached = results.iter().filter(|r| r.status == IndexStatus::Cached).count();
-    let stale = results.iter().filter(|r| r.status == IndexStatus::StalePipeline).count();
-    let errors = results.iter().filter(|r| r.status == IndexStatus::Error).count();
+    let indexed = results
+        .iter()
+        .filter(|r| r.status == IndexStatus::Indexed)
+        .count();
+    let cached = results
+        .iter()
+        .filter(|r| r.status == IndexStatus::Cached)
+        .count();
+    let stale = results
+        .iter()
+        .filter(|r| r.status == IndexStatus::StalePipeline)
+        .count();
+    let errors = results
+        .iter()
+        .filter(|r| r.status == IndexStatus::Error)
+        .count();
     (indexed, cached, stale, errors)
 }
 
@@ -292,8 +303,12 @@ pub fn status(files: &[PathBuf], cache: &NqCache) -> StatusReport {
         let hash = NqCache::content_hash(&content);
 
         match cache.get_status(file, &hash) {
-            Ok(NqCacheStatus::Hit) => { indexed += 1; }
-            Ok(NqCacheStatus::StalePipeline(_)) => { stale += 1; }
+            Ok(NqCacheStatus::Hit) => {
+                indexed += 1;
+            }
+            Ok(NqCacheStatus::StalePipeline(_)) => {
+                stale += 1;
+            }
             Ok(NqCacheStatus::Miss) | Err(_) => {}
         }
     }
@@ -357,11 +372,7 @@ pub fn prune(_files: &[PathBuf], _cache: &NqCache) -> usize {
 }
 
 /// Build and write a corpus manifest from index results.
-pub fn write_manifest(
-    results: &[IndexResult],
-    files: &[PathBuf],
-    cache: &NqCache,
-) {
+pub fn write_manifest(results: &[IndexResult], files: &[PathBuf], cache: &NqCache) {
     let entries: Vec<ManifestEntry> = results
         .iter()
         .filter(|r| r.status != IndexStatus::Error)
@@ -403,7 +414,10 @@ mod tests {
     fn test_discover_files_txt_only() {
         let tmp = make_test_dir();
         let files = discover_files(tmp.path());
-        let names: Vec<&str> = files.iter().filter_map(|f| f.file_name()?.to_str()).collect();
+        let names: Vec<&str> = files
+            .iter()
+            .filter_map(|f| f.file_name()?.to_str())
+            .collect();
         assert!(names.contains(&"file1.txt"));
         assert!(names.contains(&"file2.txt"));
         assert!(!names.contains(&"skip.rs"));
