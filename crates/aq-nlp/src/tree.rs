@@ -99,6 +99,8 @@ fn build_token_node(
         children,
         start_line: line,
         end_line: line,
+        start_byte: 0,
+        end_byte: 0,
         source_file: source_file.clone(),
     }
 }
@@ -153,6 +155,8 @@ fn build_sentence_node(
         children,
         start_line,
         end_line,
+        start_byte: 0,
+        end_byte: 0,
         source_file: source_file.clone(),
     };
 
@@ -240,6 +244,8 @@ fn build_entity_nodes(
                         children: alias_children,
                         start_line: first_line,
                         end_line: first_line,
+                        start_byte: 0,
+                        end_byte: 0,
                         source_file: source_file.clone(),
                     };
                     field_indices.insert("aliases".to_string(), vec![children.len()]);
@@ -310,6 +316,8 @@ fn build_entity_nodes(
                             children: mention_children,
                             start_line: m.source_line,
                             end_line: m.source_line,
+                            start_byte: 0,
+                            end_byte: 0,
                             source_file: source_file.clone(),
                         };
                         coref_children.push(coref_mention_node);
@@ -329,6 +337,8 @@ fn build_entity_nodes(
                             .last()
                             .map(|m| m.source_line)
                             .unwrap_or(first_line),
+                        start_byte: 0,
+                        end_byte: 0,
                         source_file: source_file.clone(),
                     };
                     field_indices.insert("coreference_chain".to_string(), vec![children.len()]);
@@ -395,6 +405,8 @@ fn build_entity_nodes(
                 children,
                 start_line: first_line,
                 end_line: last_line,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -791,6 +803,8 @@ fn build_verb_phrase_node(
         children,
         start_line: line,
         end_line: line,
+        start_byte: 0,
+        end_byte: 0,
         source_file: source_file.clone(),
     }
 }
@@ -1033,6 +1047,8 @@ fn build_interaction_doc_nodes(
                     .last()
                     .map(|m| m.source_line)
                     .unwrap_or(first.source_line),
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1178,6 +1194,8 @@ fn build_discourse_nodes(
                 children,
                 start_line,
                 end_line,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1258,6 +1276,8 @@ fn build_scene_nodes(scenes: &[SceneBoundary], source_file: &Option<String>) -> 
                 children,
                 start_line: scene.start_line,
                 end_line: scene.end_line,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1348,6 +1368,8 @@ fn build_arc_nodes(arcs: &[CharacterArc], source_file: &Option<String>) -> Vec<O
                 children,
                 start_line: 1,
                 end_line: 1,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1422,6 +1444,8 @@ fn build_conflict_nodes(edges: &[ConflictEdge], source_file: &Option<String>) ->
                 children,
                 start_line: 1,
                 end_line: 1,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1492,6 +1516,8 @@ fn build_narrative_issue_nodes(
                 children,
                 start_line: 1,
                 end_line: 1,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1569,6 +1595,8 @@ fn build_narrative_summary_node(
         children,
         start_line: 1,
         end_line: 1,
+        start_byte: 0,
+        end_byte: 0,
         source_file: source_file.clone(),
     }
 }
@@ -1681,6 +1709,8 @@ fn build_requirement_nodes(
                 children: vec![modal_node, strength_node],
                 start_line: req.source_line,
                 end_line: req.end_line,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1764,6 +1794,8 @@ fn build_question_nodes(
                 children: vec![qtype_node],
                 start_line: q.source_line,
                 end_line: q.end_line,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -1822,6 +1854,8 @@ pub fn spacy_doc_to_owned_tree(
                 children: sentences,
                 start_line: para_start_line,
                 end_line: para_end_line,
+                start_byte: 0,
+                end_byte: 0,
                 source_file: source_file.clone(),
             }
         })
@@ -2349,6 +2383,8 @@ pub fn spacy_doc_to_owned_tree(
         children,
         start_line: 1,
         end_line: total_lines,
+        start_byte: 0,
+        end_byte: 0,
         source_file: source_file.clone(),
     }
 }

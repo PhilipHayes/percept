@@ -177,6 +177,8 @@ pub fn merge_trees(trees: Vec<(OwnedNode, String)>) -> (OwnedNode, CorpusMetadat
         children,
         start_line: if max_end_line > 0 { 1 } else { 0 },
         end_line: max_end_line,
+        start_byte: 0,
+        end_byte: 0,
         source_file: None,
     };
 
@@ -299,6 +301,8 @@ mod tests {
             children: paras,
             start_line: 1,
             end_line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source_file.map(|s| s.to_string()),
         }
     }
@@ -312,6 +316,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source.map(|s| s.to_string()),
         }
     }
@@ -325,6 +331,8 @@ mod tests {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source.map(|s| s.to_string()),
         };
         let loc_node = OwnedNode {
@@ -335,6 +343,8 @@ mod tests {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source.map(|s| s.to_string()),
         };
         let mut fi = HashMap::new();
@@ -348,6 +358,8 @@ mod tests {
             children: vec![type_node, loc_node],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source.map(|s| s.to_string()),
         }
     }
@@ -361,6 +373,8 @@ mod tests {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source.map(|s| s.to_string()),
         }
     }
@@ -403,6 +417,8 @@ mod tests {
             children,
             start_line: 1,
             end_line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: source_file.map(|s| s.to_string()),
         }
     }
@@ -647,6 +663,8 @@ mod tests {
             children: vec![],
             start_line: 1,
             end_line: 2,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some("a.txt".to_string()),
         };
         let scene_node = OwnedNode {
@@ -657,6 +675,8 @@ mod tests {
             children: vec![],
             start_line: 1,
             end_line: 2,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some("a.txt".to_string()),
         };
         let di = doc1.children.len();

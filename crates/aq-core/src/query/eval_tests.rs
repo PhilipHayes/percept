@@ -29,6 +29,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         };
         let mut field_indices = HashMap::new();
@@ -42,6 +44,8 @@ mod tests {
             children: vec![name_node, body_node],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some("test.rs".into()),
         }
     }
@@ -59,6 +63,8 @@ mod tests {
             children: vec![fn1, fn2, fn3],
             start_line: 1,
             end_line: 35,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some("test.rs".into()),
         }
     }

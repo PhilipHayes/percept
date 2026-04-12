@@ -50,6 +50,8 @@ fn graft_narrative_nodes(
             children: vec![],
             start_line: 0,
             end_line: 0,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         };
         fi.insert("shape".to_string(), vec![0]);
@@ -61,6 +63,8 @@ fn graft_narrative_nodes(
             children: vec![shape_node],
             start_line: 0,
             end_line: 0,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         });
     }
@@ -82,6 +86,8 @@ fn graft_narrative_nodes(
             children: vec![],
             start_line: 0,
             end_line: 0,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         });
     }
@@ -105,6 +111,8 @@ fn graft_narrative_nodes(
         children: vec![],
         start_line: 0,
         end_line: 0,
+        start_byte: 0,
+        end_byte: 0,
         source_file: None,
     };
     let mut ns_fi = HashMap::new();
@@ -121,6 +129,8 @@ fn graft_narrative_nodes(
         children: vec![central_child],
         start_line: 0,
         end_line: 0,
+        start_byte: 0,
+        end_byte: 0,
         source_file: None,
     });
     tree.field_indices
@@ -140,6 +150,8 @@ mod tests {
             children: vec![],
             start_line: 1,
             end_line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.into()),
         };
         let mut fi = HashMap::new();
@@ -152,6 +164,8 @@ mod tests {
             children: vec![para],
             start_line: 1,
             end_line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.into()),
         }
     }

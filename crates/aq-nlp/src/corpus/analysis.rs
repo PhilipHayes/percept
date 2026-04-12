@@ -301,6 +301,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -314,6 +316,8 @@ mod tests {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let loc_node = OwnedNode {
@@ -324,6 +328,8 @@ mod tests {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let mut fi = HashMap::new();
@@ -337,6 +343,8 @@ mod tests {
             children: vec![type_node, loc_node],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -366,6 +374,8 @@ mod tests {
             children,
             start_line: 1,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         }
     }
@@ -496,6 +506,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: start,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let patient_node = OwnedNode {
@@ -506,6 +518,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: start,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let verb_node = OwnedNode {
@@ -516,6 +530,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: start,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let mut fi = HashMap::new();
@@ -530,6 +546,8 @@ mod tests {
             children: vec![agent_node, patient_node, verb_node],
             start_line: start,
             end_line: start,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -575,6 +593,8 @@ mod tests {
             children,
             start_line: 1,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         }
     }
@@ -678,6 +698,8 @@ mod tests {
             children: vec![],
             start_line: 0,
             end_line: 0,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         };
         let (profiles, opposing) = extract_corpus_interactions(&doc);

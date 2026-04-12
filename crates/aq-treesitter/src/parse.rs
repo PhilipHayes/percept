@@ -178,6 +178,8 @@ impl ParsedTree {
             children,
             start_line: ts_node.start_position().row + 1, // tree-sitter is 0-indexed
             end_line: ts_node.end_position().row + 1,
+            start_byte: ts_node.start_byte(),
+            end_byte: ts_node.end_byte(),
             source_file: self.file_path.clone(),
         }
     }

@@ -121,6 +121,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -134,6 +136,8 @@ mod tests {
             children: vec![],
             start_line: start,
             end_line: start,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let mut fi = HashMap::new();
@@ -146,6 +150,8 @@ mod tests {
             children: vec![token],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -167,6 +173,8 @@ mod tests {
             children: vec![sent],
             start_line: start,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -185,6 +193,8 @@ mod tests {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let mut fi = HashMap::new();
@@ -197,6 +207,8 @@ mod tests {
             children: vec![loc_node],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -210,6 +222,8 @@ mod tests {
             children: vec![],
             start_line: source_line,
             end_line: source_line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         };
         let mut fi = HashMap::new();
@@ -222,6 +236,8 @@ mod tests {
             children: vec![line_node],
             start_line: source_line,
             end_line: source_line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some(source.to_string()),
         }
     }
@@ -236,6 +252,8 @@ mod tests {
             children,
             start_line: 1,
             end_line: end,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None, // merged doc has no single source
         }
     }

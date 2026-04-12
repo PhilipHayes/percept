@@ -271,6 +271,8 @@ mod tests {
             children: vec![OwnedNode::leaf("entity", "Joseph", 1)],
             start_line: 1,
             end_line: 1,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some("genesis.txt".into()),
         }
     }

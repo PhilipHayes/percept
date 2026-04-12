@@ -48,6 +48,16 @@ pub trait AqNode {
     /// End line (1-indexed).
     fn end_line(&self) -> usize;
 
+    /// Start byte offset in source file.
+    fn start_byte(&self) -> usize {
+        0
+    }
+
+    /// End byte offset in source file.
+    fn end_byte(&self) -> usize {
+        0
+    }
+
     /// Source file path, if known.
     fn source_file(&self) -> Option<&str>;
 
@@ -73,6 +83,10 @@ pub struct OwnedNode {
     pub children: Vec<OwnedNode>,
     pub start_line: usize,
     pub end_line: usize,
+    #[serde(default)]
+    pub start_byte: usize,
+    #[serde(default)]
+    pub end_byte: usize,
     pub source_file: Option<String>,
 }
 
@@ -86,6 +100,8 @@ impl OwnedNode {
             children: vec![],
             start_line: line,
             end_line: line,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         }
     }
@@ -128,6 +144,14 @@ impl AqNode for OwnedNode {
         self.end_line
     }
 
+    fn start_byte(&self) -> usize {
+        self.start_byte
+    }
+
+    fn end_byte(&self) -> usize {
+        self.end_byte
+    }
+
     fn source_file(&self) -> Option<&str> {
         self.source_file.as_deref()
     }
@@ -163,6 +187,8 @@ mod tests {
             children: vec![child_a, child_b],
             start_line: 1,
             end_line: 3,
+            start_byte: 0,
+            end_byte: 0,
             source_file: Some("genesis.txt".into()),
         };
         let restored = roundtrip(&parent);
@@ -187,6 +213,8 @@ mod tests {
             ],
             start_line: 1,
             end_line: 2,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         };
         let restored = roundtrip(&node);
@@ -203,6 +231,8 @@ mod tests {
             children: vec![],
             start_line: 0,
             end_line: 0,
+            start_byte: 0,
+            end_byte: 0,
             source_file: None,
         };
         let json = serde_json::to_string(&node).expect("serialize");
