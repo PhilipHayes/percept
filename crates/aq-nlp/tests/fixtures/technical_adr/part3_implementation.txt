@@ -1,0 +1,9 @@
+The implementation proceeds in five phases. Phase one fixes three blocking bugs in the prose navigation system: substrate misclassification where all entries are tagged as Code, frontmatter bleed where YAML metadata corrupts heading names, and missing prose collections in the URI parser.
+
+Phase two updates the architecture decision records. ADR-017 is superseded by ADR-022. ADR-015 and ADR-016 receive status updates reflecting the current implementation state of the natural language query pipeline.
+
+Phase three adds technical documentation test fixtures to validate aq-nlp against ADR-like text before integration. The existing test corpora cover fiction and encyclopedic prose but not technical specifications or architectural documents.
+
+Phase four addresses the tree-sitter Dart grammar coverage gap. The bgc_server and innovative_access projects use sealed classes and enhanced enums that the current parser cannot handle.
+
+Phase five wires aq-nlp into canopy behind the feature gate, implementing the two-tier pipeline with pulldown-cmark as the structural foundation and spaCy-backed entity extraction as the enrichment overlay.

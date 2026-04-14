@@ -1,0 +1,7 @@
+Canopy is a structural corpus visualization tool built in Rust using eframe and egui. It renders abstract syntax trees as interactive treemaps, allowing developers to navigate large codebases by zooming from project level down to individual declarations.
+
+The original implementation used TypeScript with Tauri for the backend and Pixi.js for rendering. After 280 stories and 2178 tests, the architecture was superseded by a pure Rust implementation that eliminated the IPC boundary between frontend and backend.
+
+Philip Hayes designed the system as part of the Agent Perception Layer, a suite of developer tools including aq for code queries, nq for natural language analysis, gq for git history, oq for observation caching, and mq for semantic search. Each tool produces OwnedNode trees that canopy renders as visual maps.
+
+The key architectural decision was to use tree-sitter for code parsing and pulldown-cmark for markdown structure. This keeps the default binary free of external dependencies while allowing optional NLP enrichment through a feature-gated spaCy integration.

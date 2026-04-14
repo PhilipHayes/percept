@@ -1,0 +1,5 @@
+Three integration options were evaluated for adding natural language processing to the prose pipeline. Option A would integrate aq-nlp unconditionally, requiring every user to install Python and spaCy. Option B would feature-gate the dependency behind a Cargo feature flag, keeping the default build pure Rust. Option C would replace the spaCy subprocess with a Rust-native ONNX inference engine.
+
+The team selected Option B because it preserves the zero-dependency installation story for most users while unlocking entity extraction and interaction graphs for those who opt in. The two-tier pipeline runs pulldown-cmark for structural skeleton extraction and overlays aq-nlp enrichment when the feature is enabled.
+
+Houston from Mission Control participated in the review process. Representatives from the Rust and Python communities provided feedback on the cross-language boundary design. Sarah Chen led the performance benchmarking effort, comparing spaCy inference latency against the ONNX alternative proposed by James Rodriguez.
