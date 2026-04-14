@@ -706,7 +706,7 @@ fn dart_find_classes() {
     let results = query_source(
         DART_SOURCE,
         Language::Dart,
-        "desc:class_definition | .name | @text",
+        "desc:class_declaration | .name | @text",
     );
     assert_eq!(results, vec![serde_json::json!("Calculator")]);
 }
@@ -740,8 +740,148 @@ fn dart_import_statements() {
 fn dart_top_level_types() {
     let results = query_source(DART_SOURCE, Language::Dart, "children | @type");
     let types: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
-    assert!(types.contains(&"class_definition"));
+    assert!(types.contains(&"class_declaration"));
     assert!(types.contains(&"import_or_export"));
+}
+
+// ---------------------------------------------------------------------------
+// Dart 3.x (RED tests — require tree-sitter-dart 0.1.0+)
+// ---------------------------------------------------------------------------
+
+const DART3_SOURCE: &str = r#"
+sealed class Shape {
+  double get area;
+}
+
+final class Circle extends Shape {
+  final double radius;
+  Circle(this.radius);
+
+  @override
+  double get area => 3.14159 * radius * radius;
+}
+
+base class Animal {
+  final String name;
+  Animal(this.name);
+}
+
+enum Color {
+  red,
+  green,
+  blue;
+
+  String get hex => switch (this) {
+    Color.red => '#FF0000',
+    Color.green => '#00FF00',
+    Color.blue => '#0000FF',
+  };
+}
+
+mixin Printable {
+  void printSelf() => print(toString());
+}
+
+extension StringExt on String {
+  bool get isBlank => trim().isEmpty;
+}
+"#;
+
+/// sealed/final/base class bodies are parsed as class_definition nodes with 0.1.0+.
+/// With 0.0.4 they produce ERROR nodes, so "Shape", "Circle", and "Animal" are missing.
+#[test]
+fn dart3_sealed_class_parses() {
+    let results = query_source(
+        DART3_SOURCE,
+        Language::Dart,
+        "desc:class_declaration | .name | @text",
+    );
+    let names: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        names.contains(&"Shape"),
+        "expected 'Shape' in class names, got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"Circle"),
+        "expected 'Circle' in class names, got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"Animal"),
+        "expected 'Animal' in class names, got {:?}",
+        names
+    );
+}
+
+/// With 0.1.0+ the tree should be error-free. With 0.0.4 there are ERROR nodes
+/// wherever sealed/final/base class modifiers appear.
+#[test]
+fn dart3_no_error_nodes() {
+    let tree = ParsedTree::parse(
+        DART3_SOURCE.to_string(),
+        Language::Dart,
+        Some("test.dart".into()),
+    )
+    .unwrap();
+    let m = tree.metrics();
+    assert_eq!(
+        m.error_nodes,
+        0,
+        "Dart 3.x source should have zero ERROR nodes (got {}); upgrade to tree-sitter-dart 0.1.0+",
+        m.error_nodes
+    );
+}
+
+/// Enhanced enum (with method body) requires 0.1.0+.
+/// With 0.0.4 the `Color` enum may also produce ERROR nodes due to the `hex` getter.
+#[test]
+fn dart3_enhanced_enum() {
+    let results = query_source(
+        DART3_SOURCE,
+        Language::Dart,
+        "desc:enum_declaration | .name | @text",
+    );
+    let names: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        names.contains(&"Color"),
+        "expected 'Color' in enum names, got {:?}",
+        names
+    );
+}
+
+/// mixin declaration — supported since Dart 2.1, present in tree-sitter-dart 0.0.4.
+/// Expected to PASS even on 0.0.4.
+#[test]
+fn dart3_mixin_declaration() {
+    let results = query_source(
+        DART3_SOURCE,
+        Language::Dart,
+        "desc:mixin_declaration | .name | @text",
+    );
+    let names: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        names.contains(&"Printable"),
+        "expected 'Printable' in mixin names, got {:?}",
+        names
+    );
+}
+
+/// extension declaration — supported since Dart 2.7, present in tree-sitter-dart 0.0.4.
+/// Expected to PASS even on 0.0.4.
+#[test]
+fn dart3_extension_declaration() {
+    let results = query_source(
+        DART3_SOURCE,
+        Language::Dart,
+        "desc:extension_declaration | .name | @text",
+    );
+    let names: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        names.contains(&"StringExt"),
+        "expected 'StringExt' in extension names, got {:?}",
+        names
+    );
 }
 
 // ---------------------------------------------------------------------------

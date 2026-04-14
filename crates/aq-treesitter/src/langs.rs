@@ -76,7 +76,7 @@ impl Language {
             Self::Java => tree_sitter_java::LANGUAGE.into(),
             Self::C => tree_sitter_c::LANGUAGE.into(),
             Self::Cpp => tree_sitter_cpp::LANGUAGE.into(),
-            Self::Dart => tree_sitter_dart::language(),
+            Self::Dart => tree_sitter_dart::LANGUAGE.into(),
             Self::Swift => tree_sitter_swift::LANGUAGE.into(),
         }
     }
