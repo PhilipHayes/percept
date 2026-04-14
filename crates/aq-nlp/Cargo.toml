@@ -3,6 +3,9 @@ name = "aq-nlp"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+
 [dependencies]
 aq-core = { path = "../aq-core" }
 oq = { path = "../oq" }
