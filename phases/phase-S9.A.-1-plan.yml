@@ -314,9 +314,57 @@ spike_notes:
       No named fields on table or pair (fields: {}) — queries use
       desc:bare_key and children traversal rather than .field_name access.
   yaml_pick: |
-    (S9.A.-1.0 TODO — same shape as toml_pick. Additionally document one
-    fallback fork name + crates.io URL in case the primary pick regresses
-    during S9.A.-1.3 RED.)
+    Filled S9.A.-1.0 (2026-05-21).
+
+    Chosen crate:     tree-sitter-yaml = "0.7.2"
+    crates.io URL:    https://crates.io/crates/tree-sitter-yaml/0.7.2
+    repo:             https://github.com/tree-sitter-grammars/tree-sitter-yaml
+    maintainer:       tree-sitter-grammars org (Ika / ikatyang + Amaan Qureshi)
+
+    LANGUAGE const confirmed:
+      bindings/rust/lib.rs exports:
+        pub const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_yaml) };
+      Identical pattern to tree-sitter-toml-ng and tree-sitter-dart.
+      Usage:  use tree_sitter_yaml::LANGUAGE; LANGUAGE.into()
+      No abstraction needed. R-S9.A.-1-3 NOT triggered.
+
+    tree-sitter workspace compat:
+      tree-sitter-yaml Cargo.toml: [dependencies] = tree-sitter-language = "0.1"
+      (NOT a direct tree-sitter dep — same pattern as tree-sitter-toml-ng)
+      percept Cargo.lock already has tree-sitter-language = "0.1.7" (resolved
+      via tree-sitter-dart + tree-sitter-toml-ng). tree-sitter-yaml requires
+      "0.1" → resolved to same "0.1.7" entry. Zero version conflict.
+
+    Fallback fork (for regression):
+      tree-sitter-yaml (ikatyang original) — stale; not updated for ts 0.25.
+      No viable fallback with LANGUAGE const besides the chosen crate.
+      If tree-sitter-yaml 0.7.2 regresses, escalate; do not silently wrap.
+
+    Rejected candidates:
+      - ikatyang/tree-sitter-yaml (original)  — stale pre-LANGUAGE API
+      - No -ng variant exists for YAML (unlike TOML); the tree-sitter-grammars
+        org published under the plain name tree-sitter-yaml for 0.7.x.
+      - treesitter-types-yaml = "0.2.0"        — type generator, not a grammar
+
+    Build compat method: inspected ~/.cargo/registry/src/.../tree-sitter-yaml-0.7.2/
+    Cargo.toml + bindings/rust/lib.rs directly; dep version matches already-
+    resolved entry in percept's Cargo.lock. No scratch branch needed.
+
+    Node types of interest (from node-types.json inspection):
+      stream, document, block_mapping, block_mapping_pair, block_node,
+      block_sequence, block_sequence_item, plain_scalar, double_quote_scalar,
+      single_quote_scalar, flow_mapping, flow_pair, flow_sequence, flow_node,
+      integer_scalar, float_scalar, boolean_scalar, null_scalar.
+      Key-value pair = block_mapping_pair; keys and unquoted values are
+      plain_scalar. List items = block_sequence_item → block_node → plain_scalar.
+      No named fields on block_mapping_pair (use desc: child traversal, not
+      .field_name access). YAML AST is shallower than TOML's — top-level keys
+      are nested as: stream > document > block_node > block_mapping >
+      block_mapping_pair > plain_scalar (key).
+
+    Note: uses-material-design (hyphenated key) is a valid YAML plain_scalar
+    because the hyphen is not preceded by a space (no ambiguity with block
+    sequence indicator `- `). Confirmed by node-types.json inspection.
   api_compat_confirmed: |
     TOML (S9.A.-1.0 confirmed 2026-05-21):
       use tree_sitter_toml_ng::LANGUAGE;
@@ -324,7 +372,11 @@ spike_notes:
       Confirmed — identical incantation to tree-sitter-dart::LANGUAGE.
       R-S9.A.-1-3 NOT triggered.
 
-    YAML (S9.A.-1.0 TODO — fill during YAML spike before S9.A.-1.3 RED).
+    YAML (S9.A.-1.0 confirmed 2026-05-21):
+      use tree_sitter_yaml::LANGUAGE;
+      LANGUAGE.into()
+      Confirmed — tree-sitter-yaml 0.7.2 exposes identical LanguageFn const API.
+      R-S9.A.-1-3 NOT triggered.
   skeleton_observations: |
     (S9.A.-1.0 TODO — after S9.A.-1.2 GREEN, run
        cargo run --bin aq -- --skeleton crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml
