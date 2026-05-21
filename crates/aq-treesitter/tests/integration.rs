@@ -1226,3 +1226,106 @@ fn toml_in_supported_languages() {
         langs
     );
 }
+
+// ---------------------------------------------------------------------------
+// YAML (S9.A.-1.3 RED — Language::Yaml does not exist yet; these tests
+// fail at compile time, which is the correct RED state for TDD.
+// S9.A.-1.4 GREEN will wire the 6-touchpoint implementation.)
+// ---------------------------------------------------------------------------
+
+const YAML_FIXTURE: &str = include_str!("fixtures/yaml/pubspec.sample.yaml");
+
+/// Parse the synthetic YAML fixture and assert zero tree-sitter ERROR nodes.
+#[test]
+fn yaml_parses_without_error_nodes() {
+    let tree = ParsedTree::parse(
+        YAML_FIXTURE.to_string(),
+        Language::Yaml,
+        Some("pubspec.sample.yaml".into()),
+    )
+    .unwrap();
+    let m = tree.metrics();
+    assert_eq!(
+        m.error_nodes, 0,
+        "YAML fixture should parse with zero ERROR nodes"
+    );
+}
+
+/// Top-level YAML keys must appear as plain_scalar nodes in the walked tree.
+#[test]
+fn yaml_find_top_level_keys() {
+    let results = query_source(YAML_FIXTURE, Language::Yaml, "desc:plain_scalar | @text");
+    let texts: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    for expected in &[
+        "name",
+        "dependencies",
+        "dev_dependencies",
+        "flutter",
+        "environment",
+    ] {
+        assert!(
+            texts.contains(expected),
+            "expected top-level key '{}' in plain_scalar results, got {:?}",
+            expected,
+            texts
+        );
+    }
+}
+
+/// Nested YAML keys must be reachable as plain_scalar nodes throughout the tree.
+#[test]
+fn yaml_find_nested_key() {
+    let results = query_source(YAML_FIXTURE, Language::Yaml, "desc:plain_scalar | @text");
+    let texts: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    for expected in &["sdk", "http", "uses-material-design"] {
+        assert!(
+            texts.contains(expected),
+            "expected nested key '{}' in plain_scalar results, got {:?}",
+            expected,
+            texts
+        );
+    }
+}
+
+/// YAML list items under flutter.assets must surface as plain_scalar nodes.
+#[test]
+fn yaml_find_list_items() {
+    let results = query_source(YAML_FIXTURE, Language::Yaml, "desc:plain_scalar | @text");
+    let texts: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        texts.contains(&"assets/images/"),
+        "expected 'assets/images/' in plain_scalar results, got {:?}",
+        texts
+    );
+    assert!(
+        texts.contains(&"assets/fonts/"),
+        "expected 'assets/fonts/' in plain_scalar results, got {:?}",
+        texts
+    );
+}
+
+/// Language::from_extension("yml") must return Some(Language::Yaml).
+#[test]
+fn yaml_from_extension_yml_returns_yaml() {
+    assert_eq!(Language::from_extension("yml"), Some(Language::Yaml));
+}
+
+/// Language::from_extension("yaml") must return Some(Language::Yaml).
+#[test]
+fn yaml_from_extension_yaml_returns_yaml() {
+    assert_eq!(Language::from_extension("yaml"), Some(Language::Yaml));
+}
+
+/// TreeSitterBackend::supported_languages() must contain the string "yaml".
+#[test]
+fn yaml_in_supported_languages() {
+    use aq_core::backend::Backend;
+    use aq_treesitter::TreeSitterBackend;
+    let backend = TreeSitterBackend;
+    let langs = backend.supported_languages();
+    assert!(
+        langs.contains(&"yaml"),
+        "expected \"yaml\" in supported_languages, got {:?}",
+        langs
+    );
+}
