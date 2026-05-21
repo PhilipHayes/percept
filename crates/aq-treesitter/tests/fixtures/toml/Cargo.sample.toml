@@ -1,0 +1,18 @@
+# Synthetic Cargo.toml-shaped fixture for aq-treesitter TOML grammar tests.
+# Name chosen to be unmistakable as a test fixture — not a real crate.
+
+[package]
+name = "aq-toml-fixture"
+version = "0.1.0"
+
+[dependencies]
+serde = "1.0"
+tree-sitter = { workspace = true }
+
+[features]
+default = ["foo"]
+foo = []
+bar = []
+
+[dev-dependencies]
+tempfile = "3"

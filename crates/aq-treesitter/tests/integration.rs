@@ -826,8 +826,7 @@ fn dart3_no_error_nodes() {
     .unwrap();
     let m = tree.metrics();
     assert_eq!(
-        m.error_nodes,
-        0,
+        m.error_nodes, 0,
         "Dart 3.x source should have zero ERROR nodes (got {}); upgrade to tree-sitter-dart 0.1.0+",
         m.error_nodes
     );
@@ -1116,4 +1115,114 @@ fn metrics_empty_source() {
     assert!(m.total_nodes <= 1);
     assert_eq!(m.confidence, 1.0);
     assert_eq!(m.source_bytes, 0);
+}
+
+// ---------------------------------------------------------------------------
+// TOML (S9.A.-1.1 RED — Language::Toml does not exist yet; these tests
+// fail at compile time, which is the correct RED state for TDD.
+// S9.A.-1.2 GREEN will wire the 5-touchpoint implementation.)
+// ---------------------------------------------------------------------------
+
+const TOML_FIXTURE: &str = include_str!("fixtures/toml/Cargo.sample.toml");
+
+/// Parse the synthetic TOML fixture and assert zero tree-sitter ERROR nodes.
+#[test]
+fn toml_parses_without_error_nodes() {
+    let tree = ParsedTree::parse(
+        TOML_FIXTURE.to_string(),
+        Language::Toml,
+        Some("Cargo.sample.toml".into()),
+    )
+    .unwrap();
+    let m = tree.metrics();
+    assert_eq!(
+        m.error_nodes, 0,
+        "TOML fixture should parse with zero ERROR nodes"
+    );
+}
+
+/// The four top-level TOML table section headers must appear as bare_key nodes.
+#[test]
+fn toml_find_top_level_keys() {
+    let results = query_source(TOML_FIXTURE, Language::Toml, "desc:bare_key | @text");
+    let keys: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        keys.contains(&"package"),
+        "expected section 'package', got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"dependencies"),
+        "expected section 'dependencies', got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"features"),
+        "expected section 'features', got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"dev-dependencies"),
+        "expected section 'dev-dependencies', got {:?}",
+        keys
+    );
+}
+
+/// The [features] table must surface its three keys: default, foo, bar.
+#[test]
+fn toml_find_specific_feature_key() {
+    let results = query_source(TOML_FIXTURE, Language::Toml, "desc:bare_key | @text");
+    let keys: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        keys.contains(&"default"),
+        "expected 'default' in keys, got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"foo"),
+        "expected 'foo' in keys, got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"bar"),
+        "expected 'bar' in keys, got {:?}",
+        keys
+    );
+}
+
+/// The [dependencies] table must expose 'serde' and 'tree-sitter' as bare_key nodes.
+#[test]
+fn toml_find_dep_by_name() {
+    let results = query_source(TOML_FIXTURE, Language::Toml, "desc:bare_key | @text");
+    let keys: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(
+        keys.contains(&"serde"),
+        "expected 'serde' in keys, got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"tree-sitter"),
+        "expected 'tree-sitter' in keys, got {:?}",
+        keys
+    );
+}
+
+/// Language::from_extension("toml") must return Some(Language::Toml).
+#[test]
+fn toml_from_extension_returns_toml() {
+    assert_eq!(Language::from_extension("toml"), Some(Language::Toml));
+}
+
+/// TreeSitterBackend::supported_languages() must contain the string "toml".
+#[test]
+fn toml_in_supported_languages() {
+    use aq_core::backend::Backend;
+    use aq_treesitter::TreeSitterBackend;
+    let backend = TreeSitterBackend;
+    let langs = backend.supported_languages();
+    assert!(
+        langs.contains(&"toml"),
+        "expected \"toml\" in supported_languages, got {:?}",
+        langs
+    );
 }
