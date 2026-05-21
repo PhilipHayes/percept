@@ -37,6 +37,7 @@ impl Backend for TreeSitterBackend {
             "swift",
             "toml",
             "tsx",
+            "yaml",
             "typescript",
         ]
     }

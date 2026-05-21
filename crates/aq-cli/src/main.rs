@@ -604,6 +604,8 @@ fn lang_from_path(path: &std::path::Path) -> Option<String> {
         "cpp" | "cc" | "cxx" | "hpp" | "hxx" | "hh" => Some("cpp".into()),
         "swift" => Some("swift".into()),
         "toml" => Some("toml".into()),
+        "yml" => Some("yaml".into()),
+        "yaml" => Some("yaml".into()),
         "json" => Some("json".into()),
         "txt" | "text" => Some("english".into()),
         "md" | "markdown" => Some("english".into()),
