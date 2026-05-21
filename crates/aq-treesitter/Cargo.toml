@@ -20,12 +20,13 @@ tree-sitter-c = { workspace = true }
 tree-sitter-cpp = { workspace = true }
 tree-sitter-dart = { workspace = true }
 tree-sitter-swift = { workspace = true }
+tree-sitter-toml-ng = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 
 [features]
-default = ["rust", "javascript", "typescript", "python", "json", "go", "java", "c", "cpp", "dart", "swift"]
+default = ["rust", "javascript", "typescript", "python", "json", "go", "java", "c", "cpp", "dart", "swift", "toml"]
 rust = []
 javascript = []
 typescript = []
@@ -37,3 +38,4 @@ c = []
 cpp = []
 dart = []
 swift = []
+toml = []

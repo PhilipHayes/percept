@@ -15,6 +15,7 @@ pub enum Language {
     Cpp,
     Dart,
     Swift,
+    Toml,
 }
 
 impl Language {
@@ -33,6 +34,7 @@ impl Language {
             "cc" | "cpp" | "cxx" | "hpp" | "hxx" | "hh" => Some(Self::Cpp),
             "dart" => Some(Self::Dart),
             "swift" => Some(Self::Swift),
+            "toml" => Some(Self::Toml),
             _ => None,
         }
     }
@@ -52,6 +54,7 @@ impl Language {
             "cpp" | "c++" | "cxx" => Some(Self::Cpp),
             "dart" => Some(Self::Dart),
             "swift" => Some(Self::Swift),
+            "toml" => Some(Self::Toml),
             _ => None,
         }
     }
@@ -78,6 +81,7 @@ impl Language {
             Self::Cpp => tree_sitter_cpp::LANGUAGE.into(),
             Self::Dart => tree_sitter_dart::LANGUAGE.into(),
             Self::Swift => tree_sitter_swift::LANGUAGE.into(),
+            Self::Toml => tree_sitter_toml_ng::LANGUAGE.into(),
         }
     }
 
@@ -96,6 +100,7 @@ impl Language {
             Self::Cpp => "C++",
             Self::Dart => "Dart",
             Self::Swift => "Swift",
+            Self::Toml => "toml",
         }
     }
 }
