@@ -168,10 +168,10 @@ fn main() -> anyhow::Result<()> {
                 cli.all_nodes,
                 cli.confidence,
             )?;
-            let output = if root.node_type == "document" {
+            let output = if lang == "english" {
                 format_nlp_skeleton(&root, &file_path, &cli.format)
             } else {
-                format_skeleton(&root, &file_path, &cli.format, metrics.as_ref())
+                format_skeleton(&root, &file_path, &lang, &cli.format, metrics.as_ref())
             };
             budget_tracker.emit(&output);
         }
@@ -1419,6 +1419,7 @@ fn format_nlp_skeleton(root: &aq_core::OwnedNode, file_path: &str, format: &str)
 fn format_skeleton(
     root: &aq_core::OwnedNode,
     file_path: &str,
+    lang: &str,
     format: &str,
     metrics: Option<&aq_treesitter::parse::ParseMetrics>,
 ) -> String {
@@ -1471,6 +1472,7 @@ fn format_skeleton(
 
     let mut skeleton = serde_json::json!({
         "file": file_path,
+        "language": lang,
         "imports": imports,
         "declarations": declarations,
     });
