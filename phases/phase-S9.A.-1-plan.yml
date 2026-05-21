@@ -275,26 +275,56 @@ anomalies:
 # ──────────────────────────────────────────────────────────────────────
 spike_notes:
   toml_pick: |
-    (S9.A.-1.0 TODO — fill in chosen crate name + exact version + URL +
-    `cargo doc` / source confirmation that it exports `LANGUAGE: LanguageFn`
-    const. Example shape:
-      crate: tree-sitter-toml-ng = "0.x.y"
-      url:   https://crates.io/crates/tree-sitter-toml-ng
-      const: confirmed via `cargo doc -p tree-sitter-toml-ng --no-deps` —
-             exports `pub static LANGUAGE: LanguageFn`. tree-sitter 0.25 compat
-             verified by adding to workspace and `cargo build -p aq-treesitter`
-             with a trivial reference.
-    )
+    Filled S9.A.-1.0 (2026-05-21).
+
+    Chosen crate:     tree-sitter-toml-ng = "0.7.0"
+    crates.io URL:    https://crates.io/crates/tree-sitter-toml-ng
+    repo:             https://github.com/tree-sitter-grammars/tree-sitter-toml
+    maintainer:       tree-sitter-grammars org (Amaan Qureshi + original ikatyang)
+
+    LANGUAGE const confirmed:
+      bindings/rust/lib.rs exports:
+        pub const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_toml) };
+      Identical pattern to tree-sitter-dart (existing percept grammar).
+      Usage:  use tree_sitter_toml_ng::LANGUAGE; LANGUAGE.into()
+      No abstraction needed. R-S9.A.-1-3 NOT triggered.
+
+    tree-sitter workspace compat:
+      tree-sitter-toml-ng Cargo.toml: [dependencies] = tree-sitter-language = "0.1"
+      (NOT a direct tree-sitter dep — same pattern as tree-sitter-dart)
+      percept Cargo.lock already has tree-sitter-language = "0.1.7" (resolved
+      via tree-sitter-dart). tree-sitter-toml-ng requires "0.1" → resolved to
+      same "0.1.7" entry. Zero version conflict with workspace tree-sitter = "0.25".
+
+    Candidates evaluated:
+      - tree-sitter-toml = "0.20.0"      (ikatyang original; stale, no 0.25 compat)
+      - tree-sitter-toml-ng = "0.7.0"    ← CHOSEN (actively maintained fork)
+      - tree-sitter-toml-updated = "0.20.0" (stale fork)
+      - devgen-tree-sitter-toml = "0.21.0"  (unknown provenance)
+
+    Build compat method: inspected cached Cargo.toml + lib.rs from
+    ~/.cargo/registry; tree-sitter-language dep version matches the already-
+    resolved entry in percept's Cargo.lock. No scratch branch needed.
+
+    Node types of interest (from node-types.json inspection):
+      document, table, pair, bare_key, quoted_key, dotted_key, string,
+      array, inline_table, integer, float, boolean.
+      Table section header = first bare_key child of table node.
+      Pair key = first bare_key/quoted_key/dotted_key child of pair node.
+      No named fields on table or pair (fields: {}) — queries use
+      desc:bare_key and children traversal rather than .field_name access.
   yaml_pick: |
     (S9.A.-1.0 TODO — same shape as toml_pick. Additionally document one
     fallback fork name + crates.io URL in case the primary pick regresses
     during S9.A.-1.3 RED.)
   api_compat_confirmed: |
-    (S9.A.-1.0 TODO — confirm both chosen crates can be referenced via
-       use tree_sitter_<lang>::LANGUAGE;
-       LANGUAGE.into()
-    matching the existing 12-grammar pattern. If either requires a different
-    incantation, document and trigger R-S9.A.-1-3 escalation.)
+    TOML (S9.A.-1.0 confirmed 2026-05-21):
+      use tree_sitter_toml_ng::LANGUAGE;
+      LANGUAGE.into()
+      Confirmed — identical incantation to tree-sitter-dart::LANGUAGE.
+      R-S9.A.-1-3 NOT triggered.
+
+    YAML (S9.A.-1.0 TODO — fill during YAML spike before S9.A.-1.3 RED).
   skeleton_observations: |
     (S9.A.-1.0 TODO — after S9.A.-1.2 GREEN, run
        cargo run --bin aq -- --skeleton crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml
