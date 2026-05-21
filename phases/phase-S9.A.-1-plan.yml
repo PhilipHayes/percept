@@ -1,0 +1,501 @@
+sprint: S9.A.-1
+phase: "S9.A.-1 (percept-side prerequisite to canopy Phase 9.A)"
+title: "Add tree-sitter-toml + tree-sitter-yaml grammars to aq-treesitter"
+status: planned
+authored: 2026-05-21
+upstream_plan: "../canopy/phases/phase-9-S9.A-plan.yml (canopy S9.A)"
+adr_refs:
+  - "ADR-028 §Prerequisites (Path A amendment, 2026-05-21) — names this sprint explicitly"
+  - "ADR-028 D4/D5 Path A — aq_path predicate routes by file extension via aq-treesitter; .toml and .yaml currently return None"
+  - "ADR-028 D1 — in-process evaluation invariant; grammars must be reachable from aq-core without shell-out"
+  - "ADR-028 D7.A — crates.io publish deferred; canopy stays path-dep"
+
+# ──────────────────────────────────────────────────────────────────────
+# Scope summary
+# ──────────────────────────────────────────────────────────────────────
+scope:
+  in_scope:
+    - "Add tree-sitter-toml grammar to aq-treesitter (5-touchpoint pattern)"
+    - "Add tree-sitter-yaml grammar to aq-treesitter (5-touchpoint pattern, dual-extension .yml/.yaml)"
+    - "Integration tests against real fixtures (Cargo.toml + pubspec.yaml)"
+    - "Workspace + crate Cargo.toml dependency + feature wiring"
+    - "backend.rs supported_languages() alphabetical insertion"
+  out_of_scope:
+    - "cfg-gating the existing inert feature flags across all 12+ grammars (see FU-S9.A.-1-1)"
+    - "Canopy-side aq_path predicate wiring (lives in canopy S9.A.1+)"
+    - "First crates.io publish of aq-core + aq-treesitter (see FU-S9.A.-1-2; ADR-028 D7.A)"
+    - "TOML/YAML being added to canopy's substrate classifier (canopy-side concern)"
+    - "aq --skeleton per-grammar query files unless the generic walker fails (see Q-S9.A.-1-1)"
+    - "Cargo.lock routing — .lock is a different extension, not in v1 (see Q-S9.A.-1-2)"
+
+# ──────────────────────────────────────────────────────────────────────
+# Existing convention reference (verified against current main 2026-05-21)
+# ──────────────────────────────────────────────────────────────────────
+existing_grammars:
+  count: 12
+  list:
+    - rust
+    - javascript
+    - typescript
+    - python
+    - json
+    - go
+    - java
+    - c
+    - cpp
+    - dart
+    - swift
+  api_invariant: |
+    All existing grammars use the tree-sitter 0.25 `LANGUAGE` const API:
+      use tree_sitter_<lang>::LANGUAGE;
+      LANGUAGE.into()
+    No grammar uses the legacy `language()` fn. R-S9.A.-1-3 escalation
+    trigger: any candidate crate that does not expose `LANGUAGE` const
+    requires a scope-expansion decision before silent abstraction.
+  five_touchpoint_pattern:
+    - "workspace Cargo.toml [workspace.dependencies] entry"
+    - "crates/aq-treesitter/Cargo.toml [dependencies] entry + [features] entry + addition to default feature list"
+    - "langs.rs: Language enum variant"
+    - "langs.rs: from_extension match arm"
+    - "langs.rs: from_name match arm + ts_language match arm + name match arm"
+  backend_touchpoint:
+    file: "crates/aq-treesitter/src/backend.rs"
+    detail: "supported_languages() literal-string slice; insertion stays alphabetical"
+  inert_feature_pattern: |
+    Existing features (rust, javascript, ...) are declared in Cargo.toml and
+    listed in `default`, but langs.rs does NOT gate variants with
+    `#[cfg(feature = "X")]`. Adding cfg gates is a cross-cutting refactor
+    across all 14 grammars — explicitly deferred to FU-S9.A.-1-1.
+    S9.A.-1 matches the existing inert pattern for consistency.
+
+loc_budget: 380     # production ~120, tests + fixtures ~260
+total_red_tests: 13 # 6 TOML + 7 YAML
+
+# ──────────────────────────────────────────────────────────────────────
+# Decisions (resolved before RED)
+# ──────────────────────────────────────────────────────────────────────
+decisions:
+  - id: D-S9.A.-1-1
+    question: "Which grammars are in scope, and in what order?"
+    answer: >
+      Two grammars: TOML first (smaller surface, single .toml extension),
+      YAML second (dual-extension .yml/.yaml, larger fixture surface, more
+      community-fork variance). Order keeps risk loaded into the second half
+      of the sprint, where the spike has already validated the API path.
+    rationale: >
+      ADR-028 §Prerequisites names exactly TOML + YAML. The canopy
+      use cases are Cargo.toml + pubspec.yaml. No other formats are
+      blocking S9.A.
+
+  - id: D-S9.A.-1-2
+    question: "Do new grammars get real #[cfg(feature = X)] gating?"
+    answer: >
+      No. Match the existing inert-feature-flag pattern: declare `toml` and
+      `yaml` features in crates/aq-treesitter/Cargo.toml and add them to the
+      `default` feature list, but do NOT add `#[cfg(feature = "toml")]` /
+      `#[cfg(feature = "yaml")]` attributes to langs.rs match arms.
+    rationale: >
+      All 12 existing grammars are inert-flagged. Adding real cfg gates for
+      only the 2 new grammars creates asymmetry that confuses readers and
+      makes a default-features=false build behave inconsistently. The full
+      cfg cross-cut is FU-S9.A.-1-1; do it for all 14 grammars at once or
+      not at all.
+
+  - id: D-S9.A.-1-3
+    question: "What fixtures do the integration tests use?"
+    answer: >
+      Real-world config files where practical:
+        - TOML: synthetic minimal Cargo.toml-shaped fixture under
+          crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml. A
+          checked-in fixture is preferred over reading crates/aq-treesitter/
+          Cargo.toml at test time because that file's contents change as
+          this sprint itself modifies it — tests would become flaky.
+        - YAML: synthetic minimal pubspec.yaml-shaped fixture under
+          crates/aq-treesitter/tests/fixtures/yaml/pubspec.sample.yaml.
+          Mirrors a canonical Flutter pubspec structure (name, version,
+          dependencies.flutter.sdk, dev_dependencies).
+    rationale: >
+      Synthetic but real-world-shaped fixtures keep tests deterministic
+      while reflecting what canopy aq_path will actually be asked to parse.
+      Avoids the self-referential flakiness of "test reads the file the
+      test edits".
+
+  - id: D-S9.A.-1-4
+    question: "Where in backend.rs supported_languages() do new entries land?"
+    answer: >
+      Alphabetical order across the entire list. Insertion points:
+        - "toml" after "swift"
+        - "yaml" after "toml" (i.e. final position assuming current list ends
+          at "typescript" — actual position will be alphabetical against the
+          existing list, which contains "typescript" > "toml"). Verify the
+          actual sort during GREEN; do not assume.
+    rationale: >
+      Backend.rs convention is alphabetical (verified by inspection 2026-05-21).
+      Preserving alphabetical ordering keeps diffs minimal and avoids editor
+      churn for downstream consumers.
+
+  - id: D-S9.A.-1-5
+    question: "How are .yml and .yaml routed?"
+    answer: >
+      Both extensions map to Language::Yaml in from_extension. Mirrors the
+      existing precedent for JavaScript (js/mjs/cjs/jsx all -> Language::Javascript)
+      and TypeScript (ts/tsx -> Language::Typescript). Single grammar,
+      multiple extensions; no separate enum variant.
+    rationale: >
+      .yml and .yaml are interchangeable per the YAML spec. Splitting them
+      across two enum variants would force downstream code to handle both
+      identically — pure noise.
+
+  - id: D-S9.A.-1-6
+    question: "Does this sprint modify aq-core's public API?"
+    answer: >
+      No. aq-treesitter exposes new variants on Language enum; callers
+      already use Language::from_path / Language::from_extension and
+      ParsedTree::parse, both of which transparently accept new variants.
+      aq-core's eval is grammar-agnostic and unchanged.
+    rationale: >
+      Keeps the sprint genuinely additive — no semver-relevant churn on the
+      consuming side. Canopy's S9.A.4 GREEN consumes the new grammars
+      through the existing API.
+
+  - id: D-S9.A.-1-7
+    question: "Does this sprint publish anything to crates.io?"
+    answer: >
+      No. Canopy continues to consume percept via path-dep. The first
+      crates.io publish is ADR-028 D7.A's separate sprint (tracked here as
+      FU-S9.A.-1-2). No version bumps to aq-core or aq-treesitter beyond
+      what's minimally required to land the dependency additions.
+    rationale: >
+      Publishing aq-treesitter to crates.io before path-dep consumption is
+      proven stable risks publishing churn. Defer.
+
+# ──────────────────────────────────────────────────────────────────────
+# Open questions (NOT resolved in this plan)
+# ──────────────────────────────────────────────────────────────────────
+open_questions:
+  - id: Q-S9.A.-1-1
+    question: >
+      Does `aq --skeleton` need a per-grammar skeleton query file for TOML /
+      YAML, or does the generic walker emit a usable skeleton?
+    blocking: no
+    resolve_during: S9.A.-1.2 GREEN (TOML smoke test) — first time we exercise
+      the binary against a new grammar end-to-end.
+    default: >
+      Assume the generic walker is sufficient. If `cargo run --bin aq --
+      --skeleton Cargo.sample.toml` produces an empty or panic output, scope
+      expands by one sprintlet (S9.A.-1.2a) to add a minimal skeleton query
+      file under whatever conventional path other grammars use. Document
+      finding in spike_notes.skeleton_observations.
+    impact_if_default_wrong: >
+      Acceptance block's `aq --skeleton ... | jq -e '.language == "toml"'`
+      check fails. Sprint blocked until skeleton query added. Cost: ~10-20
+      LOC per grammar query file.
+
+  - id: Q-S9.A.-1-2
+    question: >
+      Should `.toml` extension also route to Language::Toml when the file
+      is named `Cargo.lock` (which uses `.lock` not `.toml`)?
+    blocking: no
+    resolve_during: deferred — canopy's first use case is Cargo.toml +
+      pubspec.yaml. Cargo.lock is not in scope for ADR-028 v1.
+    default: >
+      No. `.lock` is a distinct extension. If canopy later wants Cargo.lock
+      parsed, add a separate routing entry then.
+
+# ──────────────────────────────────────────────────────────────────────
+# Risks
+# ──────────────────────────────────────────────────────────────────────
+risks:
+  - id: R-S9.A.-1-1
+    title: "tree-sitter-toml fork drift / version-compat with tree-sitter 0.25"
+    severity: medium
+    mitigation: >
+      Spike S9.A.-1.0 picks a specific crate and version, verifies it
+      exposes `LANGUAGE` const (matching the existing aq-treesitter
+      invariant), and pins that version in workspace Cargo.toml. Document
+      the chosen crate + version + verification method in
+      spike_notes.toml_pick. Candidate set (to evaluate; not pre-committed):
+      `tree-sitter-toml-ng`, `tree-sitter-toml` (original ikatyang fork).
+
+  - id: R-S9.A.-1-2
+    title: "tree-sitter-yaml fork drift — community-maintained, looser TS-version compat"
+    severity: medium-high
+    mitigation: >
+      Same approach as R-S9.A.-1-1 with higher attention. Document at
+      least one fallback fork in spike_notes.yaml_pick so a regression on
+      the chosen crate has a known alternative. Candidate set: `tree-sitter-
+      yaml`, `tree-sitter-yaml-ng`, ikatyang fork. Verify by building
+      aq-treesitter end-to-end during the spike, not by reading READMEs.
+
+  - id: R-S9.A.-1-3
+    title: "Chosen crate exposes legacy `language()` fn rather than `LANGUAGE` const"
+    severity: low-medium
+    mitigation: >
+      ESCALATE to Phil; do NOT silently add an abstraction layer to make it
+      work. If escalation results in approval to wrap, S9.A.-1.2a substory
+      is added between TOML GREEN and YAML RED. Inert-feature-flag pattern
+      preservation may also require a one-grammar exception, documented in
+      decisions if invoked.
+
+  - id: R-S9.A.-1-4
+    title: "YAML grammar fails on .github/workflows/*.yml (multi-doc, custom anchors)"
+    severity: low
+    mitigation: >
+      Per D-S9.A.-1-3, use a pubspec.yaml-shaped synthetic fixture rather
+      than GHA workflow files. Multi-doc/anchor support is not a v1 promise
+      to canopy; canopy's S9.A.4 use cases are dependency-manifest YAML
+      files where the structure is simple key-map.
+
+# ──────────────────────────────────────────────────────────────────────
+# Anomalies
+# ──────────────────────────────────────────────────────────────────────
+anomalies:
+  - id: A-S9.A.-1-1
+    title: >
+      Grammar may expose non-trivial query-syntax gotcha (e.g. TOML tables
+      vs. inline tables, YAML flow vs. block mappings)
+    handling: >
+      If discovered during S9.A.-1.0 or S9.A.-1.1, document inline in
+      spike_notes.toml_node_shape_note / yaml_node_shape_note. This is a
+      postscript note that informs canopy S9.A's contract.yml authoring
+      guide; it is NOT a sprint blocker. The aq-treesitter ParsedTree just
+      needs to parse without error nodes — query-shape semantics are
+      canopy's concern.
+
+  - id: A-S9.A.-1-2
+    title: "Spike may reveal that the chosen crate requires a Cargo build-script feature toggle"
+    handling: >
+      Some tree-sitter grammar crates ship with build-script-controlled C
+      compilation paths that conflict with our default features. Document
+      any such requirement in spike_notes; do NOT carry an undocumented
+      build.rs side-effect into the plan's GREEN substories.
+
+# ──────────────────────────────────────────────────────────────────────
+# Spike notes (filled during S9.A.-1.0 execution)
+# ──────────────────────────────────────────────────────────────────────
+spike_notes:
+  toml_pick: |
+    (S9.A.-1.0 TODO — fill in chosen crate name + exact version + URL +
+    `cargo doc` / source confirmation that it exports `LANGUAGE: LanguageFn`
+    const. Example shape:
+      crate: tree-sitter-toml-ng = "0.x.y"
+      url:   https://crates.io/crates/tree-sitter-toml-ng
+      const: confirmed via `cargo doc -p tree-sitter-toml-ng --no-deps` —
+             exports `pub static LANGUAGE: LanguageFn`. tree-sitter 0.25 compat
+             verified by adding to workspace and `cargo build -p aq-treesitter`
+             with a trivial reference.
+    )
+  yaml_pick: |
+    (S9.A.-1.0 TODO — same shape as toml_pick. Additionally document one
+    fallback fork name + crates.io URL in case the primary pick regresses
+    during S9.A.-1.3 RED.)
+  api_compat_confirmed: |
+    (S9.A.-1.0 TODO — confirm both chosen crates can be referenced via
+       use tree_sitter_<lang>::LANGUAGE;
+       LANGUAGE.into()
+    matching the existing 12-grammar pattern. If either requires a different
+    incantation, document and trigger R-S9.A.-1-3 escalation.)
+  skeleton_observations: |
+    (S9.A.-1.0 TODO — after S9.A.-1.2 GREEN, run
+       cargo run --bin aq -- --skeleton crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml
+    and document what it emits. Same for YAML after S9.A.-1.4. Resolves
+    Q-S9.A.-1-1.)
+  toml_node_shape_note: |
+    (S9.A.-1.1 TODO — after parsing the TOML fixture, document the AST node
+    type names returned for tables, key-value pairs, arrays, and inline
+    tables. Seeds canopy S9.A.7's aq query authoring guide.)
+  yaml_node_shape_note: |
+    (S9.A.-1.3 TODO — same shape as toml_node_shape_note, focused on
+    YAML block_mapping_pair, flow_mapping_pair, block_sequence_item.
+    Specifically document how `flutter: \n  sdk: flutter` parses — is
+    the value a nested mapping or a string sentinel? Canopy S9.A authoring
+    needs to know.)
+
+# ──────────────────────────────────────────────────────────────────────
+# Substories
+# ──────────────────────────────────────────────────────────────────────
+substories:
+
+  - id: S9.A.-1.0
+    title: "Grammar-pick spike — TOML + YAML crate selection + API verification"
+    type: spike
+    module: "(no production code — fills spike_notes only)"
+    rationale: >
+      Resolves R-S9.A.-1-1, R-S9.A.-1-2, R-S9.A.-1-3 before any RED test
+      pins a crate-version choice into a Cargo.toml diff. The spike's
+      output is the pinned crate identifiers that S9.A.-1.2 and S9.A.-1.4
+      reference. Skipping or compressing the spike risks committing a
+      crate version that fails to build on a colleague's machine after the
+      RED is already pushed.
+    design_notes:
+      - "Survey candidate crates on crates.io for both tree-sitter-toml and tree-sitter-yaml. Compare: last published date, stated tree-sitter version compat, exported `LANGUAGE` const presence, repo activity."
+      - "For each finalist, add as a workspace dep in a scratch branch and confirm `cargo build -p aq-treesitter --no-default-features` succeeds with a trivial `let _ = tree_sitter_<lang>::LANGUAGE.into();` reference."
+      - "If a finalist requires the legacy `language()` fn, escalate per R-S9.A.-1-3; do NOT add a wrapper without sign-off."
+      - "Fill spike_notes.toml_pick, spike_notes.yaml_pick, spike_notes.api_compat_confirmed."
+      - "Estimate: 30-60 minutes; output is notes only, no code change committed."
+    red_tests: []
+    green_impl: []
+    loc_budget: 0
+    commit_pair:
+      spike: "percept: S9.A.-1.0 spike — pin tree-sitter-toml + tree-sitter-yaml crate versions"
+
+  - id: S9.A.-1.1
+    title: "RED — TOML grammar integration tests + fixture"
+    type: red
+    module: "crates/aq-treesitter/tests/integration.rs, crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml"
+    rationale: >
+      Tests pin the public-API contract for the new TOML grammar before any
+      Cargo.toml or langs.rs change exists. Mirror the Dart/Swift integration
+      shape already present in tests/integration.rs (verified 2026-05-21).
+    design_notes:
+      - "Create crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml — synthetic minimal Cargo.toml-shape: a [package] table with name + version; a [dependencies] table with `tree-sitter = \"0.25\"`; a [features] table with `default = [\"semantic\"]` and `semantic = []`."
+      - "Add a `#[test] fn toml_*` block in tests/integration.rs (do not move existing tests; append). Use `include_str!` for the fixture, `Language::from_extension(\"toml\")` for the language lookup, `ParsedTree::parse(src, lang)` for parsing."
+      - "Each test is independent — no shared mutable state. Match existing tests' style (no helper indirection unless trivially obvious)."
+      - "All six tests MUST fail on `cargo test -p aq-treesitter` before the GREEN commit — verify with `cargo test -p aq-treesitter --quiet 2>&1 | grep 'FAILED' | wc -l` >= 6 OR a compile failure on `Language::Toml` reference."
+    red_tests:
+      - name: toml_parses_without_error_nodes
+        intent: "ParsedTree::parse(fixture, Language::Toml) -> Ok; resulting tree has no ERROR nodes when walked via to_owned_node()."
+      - name: toml_find_top_level_keys
+        intent: "Walking the parsed tree surfaces table node names that include `package`, `dependencies`, and `features` (or whatever the grammar's actual node types are — spike updates expected names if needed)."
+      - name: toml_find_specific_key
+        intent: "Querying for the `semantic` key inside the [features] table returns a non-empty result set."
+      - name: toml_find_dep_by_name
+        intent: "Querying for the `tree-sitter` key inside the [dependencies] table returns a non-empty result set."
+      - name: toml_from_extension_returns_toml
+        intent: "Language::from_extension(\"toml\") == Some(Language::Toml)."
+      - name: toml_in_supported_languages
+        intent: "backend::supported_languages() slice contains the literal string \"toml\"."
+    green_impl: []
+    loc_budget: 120
+    commit_pair:
+      red: "percept: S9.A.-1.1 RED — TOML grammar integration tests + fixture (6 RED)"
+
+  - id: S9.A.-1.2
+    title: "GREEN — TOML grammar wired through 5 touchpoints"
+    type: green
+    module:
+      - "Cargo.toml (workspace)"
+      - "crates/aq-treesitter/Cargo.toml"
+      - "crates/aq-treesitter/src/langs.rs"
+      - "crates/aq-treesitter/src/backend.rs"
+    rationale: >
+      Minimum implementation to pass S9.A.-1.1. No new tests added during
+      GREEN; no scope creep into cfg-gating.
+    design_notes:
+      - "Workspace Cargo.toml: add `tree-sitter-toml = \"<pin from spike_notes.toml_pick>\"` to [workspace.dependencies]."
+      - "crates/aq-treesitter/Cargo.toml: add `tree-sitter-toml = { workspace = true, optional = true }` to [dependencies]; add `toml = [\"dep:tree-sitter-toml\"]` to [features]; append `\"toml\"` to the `default = [...]` array. (Match the optional/feature shape used by existing grammars — verify via inspection during GREEN; if existing grammars are unconditional rather than dep:-gated, drop the optional + dep: forms and match precedent exactly. D-S9.A.-1-2 forbids divergence.)"
+      - "langs.rs: add `Toml` variant to `Language` enum; add `\"toml\" => Some(Language::Toml)` arm to `from_extension`; add `\"toml\" => Some(Language::Toml)` arm to `from_name`; add `Language::Toml => tree_sitter_toml::LANGUAGE.into()` arm to `ts_language`; add `Language::Toml => \"toml\"` arm to `name`."
+      - "backend.rs: insert `\"toml\"` into the alphabetical literal-string slice in `supported_languages()` (insertion point: after `\"swift\"`)."
+      - "Run `cargo fmt --all` and `cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli -- -D warnings` before committing — workspace exclusions per /memories/percept-conventions.md."
+    red_tests: []
+    loc_budget: 30
+    commit_pair:
+      green: "percept: S9.A.-1.2 GREEN — TOML grammar wired through 5 touchpoints"
+
+  - id: S9.A.-1.3
+    title: "RED — YAML grammar integration tests + fixture"
+    type: red
+    module: "crates/aq-treesitter/tests/integration.rs, crates/aq-treesitter/tests/fixtures/yaml/pubspec.sample.yaml"
+    rationale: >
+      Same shape as S9.A.-1.1 but for YAML, plus an extra test for the
+      .yml vs .yaml dual-extension routing (D-S9.A.-1-5). Pubspec-shaped
+      fixture matches canopy S9.A's primary YAML use case.
+    design_notes:
+      - "Create crates/aq-treesitter/tests/fixtures/yaml/pubspec.sample.yaml — synthetic pubspec.yaml shape: `name: sample_app`, `version: 0.1.0`, `dependencies:` with `flutter:` nested mapping containing `sdk: flutter`, `dev_dependencies:` with `flutter_test:` containing `sdk: flutter`, and a top-level `dependency_overrides:` left empty for the negative-existence test."
+      - "Tests use `Language::from_extension(\"yaml\")` for one test, `Language::from_extension(\"yml\")` for another — both must resolve to Language::Yaml."
+      - "Parser tests walk the OwnedNode tree and assert on block_mapping_pair / block_sequence_item node types (or whatever the chosen grammar actually emits — spike updates expected names if needed)."
+    red_tests:
+      - name: yaml_parses_without_error_nodes
+        intent: "ParsedTree::parse(fixture, Language::Yaml) -> Ok; no ERROR nodes in walked tree."
+      - name: yaml_find_top_level_keys
+        intent: "Walking the parsed tree surfaces top-level key nodes whose text includes `name`, `version`, `dependencies`, `dev_dependencies`."
+      - name: yaml_find_nested_key
+        intent: "Querying for `flutter` under `dependencies` returns a non-empty result set (nested-mapping lookup)."
+      - name: yaml_find_list_items
+        intent: "If the fixture contains a list (add one minimal list to a `dev_dependencies` analog if needed, e.g. `topics: [example, sample]`), the list's items are walkable as block_sequence_item or flow_node nodes."
+      - name: yaml_from_extension_yml_returns_yaml
+        intent: "Language::from_extension(\"yml\") == Some(Language::Yaml)."
+      - name: yaml_from_extension_yaml_returns_yaml
+        intent: "Language::from_extension(\"yaml\") == Some(Language::Yaml)."
+      - name: yaml_in_supported_languages
+        intent: "backend::supported_languages() slice contains the literal string \"yaml\"."
+    green_impl: []
+    loc_budget: 140
+    commit_pair:
+      red: "percept: S9.A.-1.3 RED — YAML grammar integration tests + fixture (7 RED)"
+
+  - id: S9.A.-1.4
+    title: "GREEN — YAML grammar wired through 5 touchpoints (dual-extension)"
+    type: green
+    module:
+      - "Cargo.toml (workspace)"
+      - "crates/aq-treesitter/Cargo.toml"
+      - "crates/aq-treesitter/src/langs.rs"
+      - "crates/aq-treesitter/src/backend.rs"
+    rationale: >
+      Minimum implementation to pass S9.A.-1.3. Mirrors S9.A.-1.2 with the
+      dual-extension twist: from_extension matches BOTH \"yml\" and \"yaml\"
+      (precedent: javascript matches js/mjs/cjs/jsx).
+    design_notes:
+      - "Workspace Cargo.toml: add `tree-sitter-yaml = \"<pin from spike_notes.yaml_pick>\"` to [workspace.dependencies]."
+      - "crates/aq-treesitter/Cargo.toml: add dep entry matching the pattern chosen in S9.A.-1.2 (optional+dep: gated, or unconditional — keep symmetric with TOML); add `yaml = [\"dep:tree-sitter-yaml\"]` (or equivalent) to [features]; append `\"yaml\"` to `default = [...]`."
+      - "langs.rs: add `Yaml` variant to `Language`; from_extension match arm `\"yml\" | \"yaml\" => Some(Language::Yaml)` (single arm, two patterns); from_name `\"yaml\" => Some(Language::Yaml)`; ts_language `Language::Yaml => tree_sitter_yaml::LANGUAGE.into()`; name `Language::Yaml => \"yaml\"`."
+      - "backend.rs: insert `\"yaml\"` alphabetically (insertion point: after `\"typescript\"` if typescript precedes yaml alphabetically — verify and place accordingly)."
+      - "Run `cargo fmt --all` and the workspace clippy (with mq-embed/mq-store/mq-cli excluded) before committing."
+    red_tests: []
+    loc_budget: 30
+    commit_pair:
+      green: "percept: S9.A.-1.4 GREEN — YAML grammar wired (dual-extension yml/yaml)"
+
+# ──────────────────────────────────────────────────────────────────────
+# Follow-ups (created when sprint closes; not part of S9.A.-1 scope)
+# ──────────────────────────────────────────────────────────────────────
+follow_ups:
+  - id: FU-S9.A.-1-1
+    title: "Add real #[cfg(feature = \"X\")] gates to all 14 grammar arms in langs.rs"
+    rationale: >
+      The inert-feature-flag pattern was extended (not fixed) by this sprint
+      per D-S9.A.-1-2. Real cfg gates would let canopy build with
+      `default-features = false, features = [\"toml\", \"yaml\"]` and skip
+      the rust/js/ts/dart compile cost — a meaningful win for canopy's
+      footprint. Refactor across all 14 grammars in a single sprint.
+    blocking_for: "canopy footprint optimization; not blocking ADR-028 Phase 9.B+"
+
+  - id: FU-S9.A.-1-2
+    title: "First crates.io publish for aq-core + aq-treesitter (ADR-028 D7.A precursor)"
+    rationale: >
+      Canopy consumes percept via path-dep today. Per ADR-028 D7.A, the
+      eventual posture is percept publishes to crates.io and canopy depends
+      on published versions. Pre-flight: bump versions, verify metadata
+      (license, repository, description), publish aq-core first, then
+      aq-treesitter, then bump canopy's Cargo.toml to use crates.io versions.
+    blocking_for: "ADR-028 D7.A activation"
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint-close acceptance (run all in order; non-zero exit blocks close)
+# ──────────────────────────────────────────────────────────────────────
+sprint_close_acceptance:
+  description: |
+    Conductor extracts each `$` line and runs it. All must exit 0 for
+    S9.A.-1 to ship. If `aq --skeleton` rejects the new extensions,
+    Q-S9.A.-1-1 escalates to a sprintlet S9.A.-1.2a / S9.A.-1.4a before
+    the sprint closes.
+  commands: |
+    $ cd /Users/develop/local-stacks/percept
+    $ cargo fmt --all -- --check
+    $ cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli -- -D warnings
+    $ cargo test -p aq-treesitter --quiet
+    $ cargo test --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --quiet
+    $ cargo run --quiet --bin aq -- --skeleton crates/aq-treesitter/tests/fixtures/toml/Cargo.sample.toml | jq -e '.language == "toml"'
+    $ echo 'name: test' > /tmp/s9a-1-smoke.yaml && cargo run --quiet --bin aq -- --skeleton /tmp/s9a-1-smoke.yaml | jq -e '.language == "yaml"'
+    $ echo 'name: test' > /tmp/s9a-1-smoke.yml && cargo run --quiet --bin aq -- --skeleton /tmp/s9a-1-smoke.yml | jq -e '.language == "yaml"'
+  verdict_logic: |
+    All commands must exit 0. If the three `aq --skeleton` smokes fail
+    with "unsupported extension" or empty `.language`, GREEN substories
+    are incomplete (the grammar is reachable from the library but not
+    from the binary). Investigate Q-S9.A.-1-1 resolution.
+  notes: |
+    Workspace-exclude flags (mq-embed, mq-store, mq-cli) are mandatory
+    per /memories/percept-conventions.md — those crates have known build
+    or lint failures unrelated to this sprint. Including them turns the
+    acceptance block red on unrelated issues.
