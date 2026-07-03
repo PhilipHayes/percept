@@ -1,0 +1,21 @@
+[package]
+name = "wq-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "wq-mcp — MCP stdio server over the wq work-graph store (ADR-038)"
+
+[[bin]]
+name = "wq-mcp"
+path = "src/main.rs"
+
+[dependencies]
+wq-core = { path = "../wq-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
