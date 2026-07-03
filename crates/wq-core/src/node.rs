@@ -36,13 +36,20 @@ pub struct UpdateNode {
 }
 
 impl WqDb {
-    /// Creates a node and (once wq-2 GREEN lands) its embedding row, atomically.
+    /// Creates a node and its embedding row atomically (one transaction) —
+    /// a node reachable after create_node always has an embedding and is
+    /// therefore always visible to `search` (D-wq-2-2: embedding is not
+    /// optional or deferred).
     ///
     /// `engine` is caller-owned: EmbedEngine holds a loaded ONNX model and is
     /// expensive to construct, so wq-core never instantiates one internally
     /// (see phase-wq-2-plan.yml, wq-2.2 design notes).
     pub fn create_node(&self, engine: &mut EmbedEngine, new: NewNode) -> Result<Node> {
-        let _ = &engine; // RED stub: embedding write path lands in wq-2.2 GREEN
+        let embedding = crate::embed::embed_to_bytes(
+            engine,
+            &crate::embed::node_embed_text(&new.title, new.body.as_deref()),
+        )?;
+
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
         let metadata_json = new
@@ -51,7 +58,8 @@ impl WqDb {
             .map(serde_json::to_string)
             .transpose()?;
 
-        self.conn.execute(
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
             "INSERT INTO nodes (id, type, title, body, status, harness_origin, created_at, updated_at, metadata_json)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)",
             rusqlite::params![
@@ -65,6 +73,11 @@ impl WqDb {
                 metadata_json,
             ],
         )?;
+        tx.execute(
+            "INSERT INTO node_embeddings (node_id, embedding) VALUES (?1, ?2)",
+            rusqlite::params![id, embedding],
+        )?;
+        tx.commit()?;
 
         self.get_node(&id)
     }
@@ -136,7 +149,7 @@ impl WqDb {
     }
 }
 
-fn row_to_node(row: &rusqlite::Row) -> std::result::Result<Node, rusqlite::Error> {
+pub(crate) fn row_to_node(row: &rusqlite::Row) -> std::result::Result<Node, rusqlite::Error> {
     let metadata_json: Option<String> = row.get(8)?;
     let metadata = metadata_json
         .map(|s| serde_json::from_str(&s))

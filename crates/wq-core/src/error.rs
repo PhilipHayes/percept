@@ -12,6 +12,8 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("embedding failed: {0}")]
+    Embed(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

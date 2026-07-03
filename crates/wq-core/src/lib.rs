@@ -1,5 +1,6 @@
 pub mod db;
 pub mod edge;
+mod embed;
 pub mod error;
 pub mod node;
 pub mod path;

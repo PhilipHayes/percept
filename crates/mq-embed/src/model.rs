@@ -32,9 +32,10 @@ pub struct MatchResult {
 }
 
 /// Supported embedding models.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ModelKind {
     /// BGE-small-en-v1.5 — 33MB, 384 dims, ~5ms/embed (default)
+    #[default]
     BgeSmall,
     /// Nomic-embed-code — 137MB, 768 dims, code-specialized (NOT YET AVAILABLE via fastembed)
     NomicCode,
@@ -53,12 +54,6 @@ impl ModelKind {
             ModelKind::BgeSmall => "bge-small-en-v1.5",
             ModelKind::NomicCode => "nomic-embed-code",
         }
-    }
-}
-
-impl Default for ModelKind {
-    fn default() -> Self {
-        ModelKind::BgeSmall
     }
 }
 

@@ -1,8 +1,29 @@
 use std::path::Path;
+use std::sync::Once;
 
 use crate::error::Result;
 
 const SCHEMA_SQL: &str = include_str!("schema.sql");
+
+/// Registers sqlite-vec's vec0 module for every subsequently-opened
+/// connection in this process. Must run before schema init (schema.sql
+/// contains a CREATE VIRTUAL TABLE ... USING vec0 statement). Idempotent
+/// via Once; the call shape is the one confirmed in the vec0-poc spike
+/// (reviews/manual/wq-spikes/vec0-poc/FINDINGS.md).
+fn register_vec0() {
+    static REGISTER: Once = Once::new();
+    REGISTER.call_once(|| unsafe {
+        // Inferred transmute target: sqlite3_auto_extension's callback type
+        // (unsafe extern "C" fn(*mut sqlite3, *mut *mut c_char,
+        // *const sqlite3_api_routines) -> c_int). Spelling it out would
+        // couple this to rusqlite's ffi type aliases for zero safety gain —
+        // the cast itself is the pattern sqlite-vec's own docs/tests use.
+        #[allow(clippy::missing_transmute_annotations)]
+        rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
+            sqlite_vec::sqlite3_vec_init as *const (),
+        )));
+    });
+}
 
 pub struct WqDb {
     pub(crate) conn: rusqlite::Connection,
@@ -10,6 +31,7 @@ pub struct WqDb {
 
 impl WqDb {
     pub fn open(path: &Path) -> Result<Self> {
+        register_vec0();
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
                 std::fs::create_dir_all(parent)?;
@@ -20,6 +42,7 @@ impl WqDb {
     }
 
     pub fn open_in_memory() -> Result<Self> {
+        register_vec0();
         let conn = rusqlite::Connection::open_in_memory()?;
         Self::init(conn)
     }

@@ -40,7 +40,7 @@ impl EmbedEngine {
     /// Embed a batch of text strings.
     pub fn embed_batch(&mut self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
         self.model
-            .embed(texts.to_vec(), None)
+            .embed(texts, None)
             .context("Batch embedding inference failed")
     }
 

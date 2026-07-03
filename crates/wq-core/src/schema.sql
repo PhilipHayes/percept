@@ -24,3 +24,13 @@ CREATE TABLE IF NOT EXISTS edges (
 CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_id, kind);
 CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_id, kind);
 CREATE INDEX IF NOT EXISTS idx_nodes_type_status ON nodes(type, status);
+
+-- Semantic search (wq-2). Requires the sqlite-vec extension, registered
+-- process-wide in db.rs before any connection opens. Dimension 384 is
+-- coupled to mq-embed's BgeSmall default — create_node asserts
+-- engine.dims() == 384 at write time and fails loudly on mismatch
+-- (an existing FLOAT[384] table cannot absorb differently-sized vectors).
+CREATE VIRTUAL TABLE IF NOT EXISTS node_embeddings USING vec0(
+  node_id TEXT PRIMARY KEY,
+  embedding FLOAT[384]
+);
