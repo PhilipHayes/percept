@@ -42,6 +42,12 @@ impl ServerState {
 }
 
 /// MCP tools/list payload: the 7 wq tools with JSON-schema inputs.
+///
+/// Every tool accepts `project_root` (optional): overrides the server's
+/// launch-time cwd for that one call. MCP servers are typically launched
+/// once per app-startup, not per active project, so this is the escape
+/// hatch a multi-root-workspace caller needs — omit it and the server's
+/// own cwd is used, matching single-project setups with no extra ceremony.
 pub fn tool_definitions() -> Value {
     json!({
         "tools": [
@@ -56,7 +62,8 @@ pub fn tool_definitions() -> Value {
                         "body": {"type": "string"},
                         "status": {"type": "string", "description": "e.g. open | in_progress | blocked | done"},
                         "metadata": {"type": "object", "description": "free-form JSON stored with the node"},
-                        "global": {"type": "boolean", "description": "write to the global DB instead of the project DB"}
+                        "global": {"type": "boolean", "description": "write to the global DB instead of the project DB"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
                     },
                     "required": ["title"]
                 }
@@ -72,7 +79,8 @@ pub fn tool_definitions() -> Value {
                         "body": {"type": "string"},
                         "status": {"type": "string"},
                         "metadata": {"type": "object"},
-                        "global": {"type": "boolean"}
+                        "global": {"type": "boolean"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
                     },
                     "required": ["id"]
                 }
@@ -82,7 +90,10 @@ pub fn tool_definitions() -> Value {
                 "description": "Raw SQL escape hatch against the project DB. Full read/write access — prefer the typed tools for mutations.",
                 "inputSchema": {
                     "type": "object",
-                    "properties": {"sql": {"type": "string"}},
+                    "properties": {
+                        "sql": {"type": "string"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
+                    },
                     "required": ["sql"]
                 }
             },
@@ -93,7 +104,8 @@ pub fn tool_definitions() -> Value {
                     "type": "object",
                     "properties": {
                         "text": {"type": "string"},
-                        "k": {"type": "integer", "description": "max results (default 10)"}
+                        "k": {"type": "integer", "description": "max results (default 10)"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
                     },
                     "required": ["text"]
                 }
@@ -108,7 +120,8 @@ pub fn tool_definitions() -> Value {
                         "to_id": {"type": "string"},
                         "kind": {"type": "string"},
                         "weight": {"type": "number"},
-                        "global": {"type": "boolean"}
+                        "global": {"type": "boolean"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
                     },
                     "required": ["from_id", "to_id", "kind"]
                 }
@@ -121,7 +134,8 @@ pub fn tool_definitions() -> Value {
                     "properties": {
                         "id": {"type": "string"},
                         "kind": {"type": "string"},
-                        "depth": {"type": "integer", "description": "max hops (default 3)"}
+                        "depth": {"type": "integer", "description": "max hops (default 3)"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
                     },
                     "required": ["id", "kind"]
                 }
@@ -131,7 +145,10 @@ pub fn tool_definitions() -> Value {
                 "description": "Roll up nodes across this DB's registry tree (or the global registry with global=true). Returns {nodes, warnings}.",
                 "inputSchema": {
                     "type": "object",
-                    "properties": {"global": {"type": "boolean"}}
+                    "properties": {
+                        "global": {"type": "boolean"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
+                    }
                 }
             },
             {
@@ -142,7 +159,8 @@ pub fn tool_definitions() -> Value {
                     "properties": {
                         "project_name": {"type": "string"},
                         "db_path": {"type": "string"},
-                        "global": {"type": "boolean", "description": "register under the global DB instead of the project DB"}
+                        "global": {"type": "boolean", "description": "register under the global DB instead of the project DB"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
                     },
                     "required": ["project_name", "db_path"]
                 }
@@ -151,8 +169,11 @@ pub fn tool_definitions() -> Value {
     })
 }
 
-fn open_db(state: &ServerState, global: bool) -> Result<wq_core::WqDb, String> {
-    let path = wq_core::resolve_write_target(&state.project_root, global);
+fn open_db(state: &ServerState, args: &Value, global: bool) -> Result<wq_core::WqDb, String> {
+    let root = arg_str(args, "project_root")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| state.project_root.clone());
+    let path = wq_core::resolve_write_target(&root, global);
     wq_core::WqDb::open(&path).map_err(|e| format!("failed to open {}: {e}", path.display()))
 }
 
@@ -198,7 +219,7 @@ pub fn handle_tool_call(
                 harness_origin: Some(state.harness_origin.clone()),
                 metadata: args.get("metadata").filter(|m| !m.is_null()).cloned(),
             };
-            let db = open_db(state, arg_bool(args, "global"))?;
+            let db = open_db(state, args, arg_bool(args, "global"))?;
             let node = db
                 .create_node(state.engine()?, new)
                 .map_err(|e| e.to_string())?;
@@ -206,7 +227,7 @@ pub fn handle_tool_call(
         }
         "wq_ticket_update" => {
             let id = require_str(args, "id", tool)?;
-            let db = open_db(state, arg_bool(args, "global"))?;
+            let db = open_db(state, args, arg_bool(args, "global"))?;
             let node = db
                 .update_node(
                     &id,
@@ -222,14 +243,14 @@ pub fn handle_tool_call(
         }
         "wq_query" => {
             let sql = require_str(args, "sql", tool)?;
-            let db = open_db(state, false)?;
+            let db = open_db(state, args, false)?;
             let rows = db.query_json(&sql).map_err(|e| e.to_string())?;
             Ok(Value::Array(rows))
         }
         "wq_search" => {
             let text = require_str(args, "text", tool)?;
             let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
-            let db = open_db(state, false)?;
+            let db = open_db(state, args, false)?;
             let results = db
                 .search(state.engine()?, &text, k)
                 .map_err(|e| e.to_string())?;
@@ -240,7 +261,7 @@ pub fn handle_tool_call(
             Ok(Value::Array(rows))
         }
         "wq_edge_create" => {
-            let db = open_db(state, arg_bool(args, "global"))?;
+            let db = open_db(state, args, arg_bool(args, "global"))?;
             let edge = db
                 .create_edge(wq_core::NewEdge {
                     from_id: require_str(args, "from_id", tool)?,
@@ -255,7 +276,7 @@ pub fn handle_tool_call(
             let id = require_str(args, "id", tool)?;
             let kind = require_str(args, "kind", tool)?;
             let depth = args.get("depth").and_then(|v| v.as_u64()).unwrap_or(3) as u32;
-            let db = open_db(state, false)?;
+            let db = open_db(state, args, false)?;
             let hops = db.traverse(&id, &kind, depth).map_err(|e| e.to_string())?;
             let rows: Vec<Value> = hops
                 .into_iter()
@@ -264,14 +285,14 @@ pub fn handle_tool_call(
             Ok(Value::Array(rows))
         }
         "wq_rollup" => {
-            let db = open_db(state, arg_bool(args, "global"))?;
+            let db = open_db(state, args, arg_bool(args, "global"))?;
             let result = db.rollup().map_err(|e| e.to_string())?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "wq_register" => {
             let project_name = require_str(args, "project_name", tool)?;
             let db_path = require_str(args, "db_path", tool)?;
-            let db = open_db(state, arg_bool(args, "global"))?;
+            let db = open_db(state, args, arg_bool(args, "global"))?;
             db.register_child(&project_name, std::path::Path::new(&db_path))
                 .map_err(|e| e.to_string())?;
             let entry = db
