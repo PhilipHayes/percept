@@ -31,10 +31,10 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build workspace (excluding mq + wq — require ONNX runtime)
-        run: cargo build --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli
+        run: cargo build --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli --exclude wq-mcp
 
       - name: Test workspace (excluding mq + wq)
-        run: cargo test --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli
+        run: cargo test --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli --exclude wq-mcp
 
       - name: Lint cq (shellcheck)
         run: |
@@ -59,4 +59,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli -- -D warnings
+      - run: cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli --exclude wq-mcp -- -D warnings
