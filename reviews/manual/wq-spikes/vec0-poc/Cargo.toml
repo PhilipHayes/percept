@@ -1,0 +1,14 @@
+[package]
+name = "wq_spike_vec0"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Deliberately its own standalone workspace — NOT a member of percept's
+# real Cargo workspace. This is a throwaway spike crate for ADR-038
+# (wq) phase wq-2/wq-3 research; see FINDINGS.md in this directory.
+[workspace]
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+sqlite-vec = "0.1.9"

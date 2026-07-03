@@ -1,0 +1,348 @@
+sprint: wq-1
+phase: "wq-1 (percept new-crate-family, phase 1 of 5)"
+title: "wq-core foundations — SQLite schema, node/edge CRUD, graph traversal"
+status: planned
+authored: 2026-07-03
+upstream_plan: "n/a — greenfield crate family, no upstream percept plan"
+adr_refs:
+  - "ADR-038 — wq: Work Graph Query (Accepted 2026-07-03)"
+  - "ADR-038 §Schema (draft) — nodes/edges tables + indexes"
+  - "ADR-038 §Design Principle — wq owns its substrate (exception to percept's observer-only discipline, precedented by mq-store)"
+  - "ADR-038 Q3 — 10,000s-of-nodes scale confirmed; indexes are required, not optional, from day one"
+
+# ──────────────────────────────────────────────────────────────────────
+# Scope summary
+# ──────────────────────────────────────────────────────────────────────
+scope:
+  in_scope:
+    - "New workspace member crates/wq-core (library only — no binary, no CLI, no MCP in this phase)"
+    - "rusqlite dependency pick + pin (spike)"
+    - "Schema init: nodes, edges tables + idx_edges_from / idx_edges_to / idx_nodes_type_status indexes"
+    - "Project-DB path resolution: default to .agents/wq.db, create parent dirs if absent, single-file open/create"
+    - "Node CRUD: create_node, get_node, update_node, list_nodes (filter by type/status)"
+    - "Edge CRUD: create_edge, list_edges (by from_id/kind, by to_id/kind)"
+    - "Graph traversal: traverse(start_id, kind, max_depth) via WITH RECURSIVE"
+    - "Typed error enum (wq-core::Error) — no sentinel values, no fabricated UUIDs for not-found"
+  out_of_scope:
+    - "node_embeddings vec0 virtual table / sqlite-vec extension loading (phase wq-2)"
+    - "registry table, federation, rollup, ATTACH DATABASE (phase wq-3)"
+    - "wq-cli binary / any CLI surface (phase wq-4)"
+    - "wq-mcp server (phase wq-5)"
+    - "mq-embed dependency (does not land until wq-2 — wq-core stays in the DEFAULT workspace build/lint through this phase)"
+    - "mq-store migration to vec0 (ADR-038 §Relationship to mq-store, Q4 — unscheduled follow-on, never scheduled in a wq sprint)"
+
+# ──────────────────────────────────────────────────────────────────────
+# Existing convention reference
+# ──────────────────────────────────────────────────────────────────────
+existing_precedent:
+  crate_naming: >
+    aq family uses aq-core (library) + aq-cli (binary) + aq-nlp/aq-treesitter
+    (support libs). mq family uses mq-embed + mq-store (libraries) + mq-cli
+    (binary) — no "mq-core". wq follows the aq shape per ADR-038's own
+    Architecture section: wq-core (library) + wq-cli (binary) + wq-mcp
+    (binary, MCP server). This phase only adds wq-core.
+  stateful_precedent: >
+    mq-store (crates/mq-store/src/collection.rs) is the only existing percept
+    crate that owns mutable local state (JSON-file embedding collections).
+    wq-core is the second. Unlike mq-store, wq-core's state is relational
+    (SQLite) rather than flat-file JSON — no direct code to reuse, but the
+    "percept crate may own local state" precedent is established.
+  error_handling_precedent: >
+    mq-embed/gq use anyhow::Result at the boundary. wq-core is a stateful,
+    multi-caller library (wq-cli AND wq-mcp both depend on it) — per user's
+    architectural-principles.md ("typed errors > fabricated/sentinel
+    values"), wq-core should expose a thiserror-based typed Error enum
+    (e.g. NodeNotFound(String), EdgeNotFound(String), Sqlite(rusqlite::Error))
+    rather than anyhow, so wq-cli and wq-mcp can pattern-match on failure
+    kind (e.g. to return a structured JSON error vs. a stack-trace-shaped one).
+    workspace Cargo.toml already carries thiserror = "2" — reuse it.
+
+loc_budget: 420   # production ~180, tests ~240
+total_red_tests: 15  # 6 schema/CRUD-node + 5 edge + 4 traversal
+
+# ──────────────────────────────────────────────────────────────────────
+# Decisions (resolved before RED)
+# ──────────────────────────────────────────────────────────────────────
+decisions:
+  - id: D-wq-1-1
+    question: "Migration strategy — hand-rolled CREATE TABLE IF NOT EXISTS, or a migration crate (refinery / rusqlite_migration)?"
+    answer: >
+      Hand-rolled: a single `const SCHEMA_SQL: &str` (or one .sql file loaded
+      via include_str!) executed inside a transaction on connection-open,
+      using CREATE TABLE IF NOT EXISTS for every statement. No migration
+      crate dependency.
+    rationale: >
+      Schema is new (v1, no prior on-disk format to migrate from) and small
+      (2 tables + 3 indexes this phase). A migration framework is scope
+      answering a question ("how do we evolve schema across versions") that
+      doesn't exist yet. Revisit if/when a real breaking schema change is
+      needed post-v1 — do not pre-build the framework speculatively.
+
+  - id: D-wq-1-2
+    question: "Where does the schema SQL text live?"
+    answer: >
+      crates/wq-core/src/schema.sql, loaded via include_str!("schema.sql")
+      in src/db.rs. Not inlined as a Rust string literal.
+    rationale: >
+      Keeps the DDL reviewable as SQL (syntax highlighting, diffing) rather
+      than buried in a Rust string. Precedent: no existing percept crate
+      embeds SQL this way, but it's the common pattern for rusqlite-based
+      tools generally and keeps schema.sql grep-able independent of Rust.
+
+  - id: D-wq-1-3
+    question: "IDs: application-generated UUIDs, or SQLite ROWID/AUTOINCREMENT?"
+    answer: >
+      Application-generated UUIDv4 strings (TEXT PRIMARY KEY), matching
+      ADR-038's schema draft exactly ('id TEXT PRIMARY KEY -- uuid'). Add
+      `uuid = { version = \"1\", features = [\"v4\"] }` to workspace deps.
+    rationale: >
+      ADR already specifies this. UUIDs also make federation (phase wq-3)
+      collision-free across independently-created per-project DBs without
+      needing to renumber on rollup — an integer ROWID scheme would collide
+      the instant two project DBs are ATTACHed together.
+
+  - id: D-wq-1-4
+    question: "Does create_node take a full timestamp pair, or does wq-core own created_at/updated_at generation?"
+    answer: >
+      wq-core owns timestamp generation internally (chrono::Utc::now(),
+      RFC3339 string, matching the workspace's existing chrono dep with the
+      serde feature already enabled). Callers never pass timestamps in.
+    rationale: >
+      Single source of truth (user's architectural-principles.md, priority
+      #1) — if callers could pass created_at, two call sites could disagree
+      about "when was this created" for the same logical action. update_node
+      always overwrites updated_at with now(); created_at is immutable after
+      insert (no setter exposed).
+
+  - id: D-wq-1-5
+    question: "Is db path resolution (walk-up to find .agents/wq.db) in scope for wq-1, or deferred to wq-3 federation?"
+    answer: >
+      A minimal `resolve_project_db_path(start_dir: &Path) -> PathBuf` lands
+      in wq-1: walk up from start_dir looking for an existing .agents/wq.db;
+      if none found by the filesystem root, return start_dir's own
+      .agents/wq.db as the path a caller should create. This is NOT
+      federation (no registry, no ATTACH, no --global) — it is single-DB
+      resolution only, needed by any caller (including wq-1's own tests)
+      before wq-3 exists.
+    rationale: >
+      wq-cli (wq-4) needs this on day one and shouldn't block on federation.
+      Keeping it in wq-core (not wq-cli) also means wq-mcp gets it for free
+      later without duplicating the walk-up logic — single source of truth
+      for "which DB does this cwd belong to".
+
+# ──────────────────────────────────────────────────────────────────────
+# Open questions (NOT resolved in this plan)
+# ──────────────────────────────────────────────────────────────────────
+open_questions:
+  - id: Q-wq-1-1
+    question: "What rusqlite feature flags does wq-core need (bundled vs. system libsqlite3, load_extension)?"
+    blocking: yes
+    resolve_during: wq-1.0 spike
+    default: >
+      Assume `rusqlite = { version = \"0.3x\", features = [\"bundled\"] }` for
+      reproducible builds across contributor machines (matches sqlite-vec's
+      own documented rusqlite integration pattern, which wq-2 will need).
+      `load_extension` feature is NOT enabled in wq-1 (no extension loading
+      yet — that's wq-2's concern) to keep this phase's dependency surface
+      minimal and independently reviewable.
+    impact_if_default_wrong: >
+      If bundled libsqlite3 version is too old for sqlite-vec's requirements
+      (discovered in wq-2's spike), wq-1's pinned rusqlite version may need
+      a bump — low blast radius since wq-1's schema has no version-specific
+      SQL features (no JSON1 functions, no window functions used yet).
+
+  - id: Q-wq-1-2
+    question: >
+      Should traverse() return a flat Vec<Node> in BFS/DFS order, or a
+      structured tree (parent-child nesting)?
+    blocking: no
+    resolve_during: wq-1.3 RED (test shape forces the decision)
+    default: >
+      Flat Vec<(Node, depth: u32)> in traversal order (WITH RECURSIVE's
+      natural output shape — a depth column is trivial to add to the CTE
+      and lets callers reconstruct structure without wq-core imposing a
+      tree type). wq-cli's `wq traverse` JSON output (phase wq-4) can
+      re-nest client-side if needed.
+    impact_if_default_wrong: >
+      Low — wq-cli's JSON serialization shape can change without touching
+      wq-core's traversal SQL if a nested-tree return type is wanted later.
+
+# ──────────────────────────────────────────────────────────────────────
+# Risks
+# ──────────────────────────────────────────────────────────────────────
+risks:
+  - id: R-wq-1-1
+    title: "rusqlite version drift vs. sqlite-vec's expected libsqlite3 version (wq-2 concern surfacing early)"
+    severity: low
+    mitigation: >
+      wq-1's spike documents the rusqlite version pinned, so wq-2's spike
+      can check compatibility against it instead of re-discovering rusqlite
+      from scratch. Do not let wq-2 silently bump rusqlite without
+      re-running wq-1's existing tests.
+
+  - id: R-wq-1-2
+    title: "WITH RECURSIVE cycle risk — edges can form cycles (e.g. relates_to A->B->A)"
+    severity: medium
+    mitigation: >
+      RED tests in wq-1.3 MUST include a cyclic-edge fixture (A blocks B,
+      B blocks A) and assert traverse() terminates (bounded by max_depth,
+      not by cycle detection alone) rather than looping forever. SQLite's
+      WITH RECURSIVE does not auto-detect cycles — the CTE must carry a
+      depth counter and a `WHERE depth < :max_depth` guard, not just rely
+      on visited-set dedup, since a naive visited-path UNION can still
+      blow up on dense graphs before the cycle closes.
+
+# ──────────────────────────────────────────────────────────────────────
+# Substories
+# ──────────────────────────────────────────────────────────────────────
+substories:
+  - id: wq-1.0
+    title: "Spike — rusqlite version pick + connection/schema-init pattern"
+    type: spike
+    module: "(no production code — fills spike_notes only)"
+    rationale: >
+      Pins the rusqlite version and bundled-vs-system feature choice before
+      any RED test depends on a specific Connection API shape.
+    design_notes:
+      - "Add rusqlite as a workspace.dependencies entry; scratch-build a trivial `Connection::open_in_memory()` + `execute_batch(SCHEMA_SQL)` smoke test."
+      - "Confirm `include_str!` for schema.sql works from crates/wq-core/src/."
+      - "Decide and document: bundled feature (recommended, see Q-wq-1-1 default) vs. system sqlite3."
+      - "Fill spike_notes.rusqlite_pick."
+    red_tests: []
+    green_impl: []
+    loc_budget: 0
+    commit_pair:
+      spike: "percept: wq-1.0 spike — pin rusqlite version + schema-init pattern"
+
+  - id: wq-1.1
+    title: "RED — schema init + node CRUD tests"
+    type: red
+    module: "crates/wq-core/tests/node_crud.rs"
+    rationale: >
+      Pins the node CRUD contract (create/get/update/list, type/status
+      filtering, not-found error shape) before db.rs exists.
+    design_notes:
+      - "Each test opens a fresh in-memory Connection (Connection::open_in_memory + init_schema) — no shared fixture DB, no test ordering dependency."
+      - "Cover: create_node returns a Node with a generated UUID id + timestamps; get_node round-trips all fields including metadata_json; get_node on unknown id returns Error::NodeNotFound (typed, not a fabricated UUID — see architectural-principles.md); update_node changes updated_at but not created_at; list_nodes filters by type AND status combined."
+      - "metadata_json round-trip test: store a small serde_json::Value, confirm it comes back byte-identical after get_node (guards against silent stringify/reparse lossiness)."
+    red_tests:
+      - name: create_node_generates_id_and_timestamps
+        intent: "create_node(NewNode{...}) returns Node with non-empty UUID id, created_at == updated_at on first insert."
+      - name: get_node_round_trips_all_fields
+        intent: "get_node(id) after create_node returns identical type/title/body/status/harness_origin/metadata_json."
+      - name: get_node_unknown_id_returns_typed_not_found
+        intent: "get_node(\"nonexistent\") returns Err(Error::NodeNotFound(_)), not a panic or a fabricated default Node."
+      - name: update_node_changes_updated_at_not_created_at
+        intent: "update_node(id, ...) leaves created_at untouched, bumps updated_at to a later timestamp."
+      - name: list_nodes_filters_by_type_and_status
+        intent: "Given nodes of mixed type/status, list_nodes(Some(\"ticket\"), Some(\"open\")) returns only the matching subset."
+      - name: metadata_json_round_trips_without_lossiness
+        intent: "A nested serde_json::Value stored via create_node's metadata field is byte-identical on read via get_node."
+    green_impl: []
+    loc_budget: 130
+    commit_pair:
+      red: "percept: wq-1.1 RED — wq-core node CRUD tests (6 RED)"
+
+  - id: wq-1.2
+    title: "GREEN — schema.sql + db.rs + node CRUD implementation"
+    type: green
+    module:
+      - "crates/wq-core/Cargo.toml"
+      - "crates/wq-core/src/lib.rs"
+      - "crates/wq-core/src/schema.sql"
+      - "crates/wq-core/src/db.rs"
+      - "crates/wq-core/src/error.rs"
+      - "crates/wq-core/src/node.rs"
+    rationale: "Minimum implementation to pass wq-1.1. No edge/traversal code yet."
+    design_notes:
+      - "schema.sql: nodes + edges CREATE TABLE + all 3 indexes from ADR-038's schema draft, verbatim (edges table created now even though edge CRUD lands in wq-1.4 — creating both tables in one init call avoids a second ALTER-shaped migration next substory)."
+      - "error.rs: thiserror enum wq_core::Error { NodeNotFound(String), EdgeNotFound(String), Sqlite(#[from] rusqlite::Error), Json(#[from] serde_json::Error) }."
+      - "db.rs: WqDb::open(path: &Path) -> Result<Self>, WqDb::open_in_memory() -> Result<Self> (test-only, behind #[cfg(any(test, feature = \"test-util\"))] or just always compiled — decide during GREEN whichever is less ceremony), init_schema() runs schema.sql inside a transaction."
+      - "node.rs: NewNode struct (type/title/body/status/harness_origin/metadata: Option<serde_json::Value>), Node struct (adds id/created_at/updated_at), create_node/get_node/update_node/list_nodes methods on WqDb."
+      - "Run cargo fmt --all + cargo clippy -p wq-core -- -D warnings before committing (wq-core is NOT yet exclusion-listed — no mq-embed dependency this phase)."
+    red_tests: []
+    loc_budget: 160
+    commit_pair:
+      green: "percept: wq-1.2 GREEN — schema init + node CRUD"
+
+  - id: wq-1.3
+    title: "RED — edge CRUD + graph traversal tests (including cycle-termination)"
+    type: red
+    module: "crates/wq-core/tests/edges_and_traversal.rs"
+    rationale: >
+      Pins edge CRUD and the traverse() contract, including the cycle
+      case flagged in R-wq-1-2, before recursive-CTE code exists.
+    design_notes:
+      - "Build a small fixture graph per test: 4-5 nodes, a handful of typed edges (blocks/depends_on/relates_to), including at least one cyclic pair for the cycle test."
+      - "create_edge validates from_id/to_id both exist (FK-style check at the app layer, not just relying on SQLite's REFERENCES which doesn't enforce by default without PRAGMA foreign_keys=ON — decide during GREEN whether to enable that pragma instead of app-layer checks; RED tests should pass either way, so don't hard-code which mechanism produces the rejection)."
+      - "traverse() tests: depth-1 returns direct neighbors only; depth-N returns transitively-reachable nodes filtered by edge kind; cyclic fixture terminates within a bounded time/depth rather than hanging or stack-overflowing."
+    red_tests:
+      - name: create_edge_round_trips
+        intent: "create_edge(from, to, kind, weight) then list_edges filtered by from_id+kind returns it."
+      - name: create_edge_rejects_unknown_node_id
+        intent: "create_edge with a from_id or to_id that doesn't exist in nodes returns a typed error, not a silently-orphaned edge row."
+      - name: traverse_depth_one_returns_direct_neighbors_only
+        intent: "traverse(start, kind=\"blocks\", depth=1) returns exactly the nodes directly connected by a `blocks` edge, not further transitive ones."
+      - name: traverse_depth_n_returns_transitive_neighbors_filtered_by_kind
+        intent: "traverse(start, kind=\"depends_on\", depth=3) returns nodes reachable within 3 hops via depends_on edges only, excluding nodes only reachable via a different edge kind."
+      - name: traverse_terminates_on_cyclic_graph
+        intent: "Given A blocks B, B blocks A, traverse(A, \"blocks\", depth=5) returns a finite result set and completes (bounded assertion: test itself times out / asserts on a wall-clock budget if the implementation regresses to infinite recursion)."
+    green_impl: []
+    loc_budget: 110
+    commit_pair:
+      red: "percept: wq-1.3 RED — edge CRUD + traversal tests (5 RED)"
+
+  - id: wq-1.4
+    title: "GREEN — edge CRUD + WITH RECURSIVE traversal + db path resolution"
+    type: green
+    module:
+      - "crates/wq-core/src/edge.rs"
+      - "crates/wq-core/src/traverse.rs"
+      - "crates/wq-core/src/path.rs"
+    rationale: "Minimum implementation to pass wq-1.3, plus D-wq-1-5's path resolution helper (no dedicated RED — pure filesystem-walk logic covered by a small inline unit test, not a full integration-test file)."
+    design_notes:
+      - "edge.rs: create_edge (validates both node ids exist via a SELECT EXISTS before insert — app-layer check, per design_notes in wq-1.3), list_edges(from_id or to_id, kind)."
+      - "traverse.rs: single parameterized WITH RECURSIVE CTE keyed by direction (outgoing via from_id, matching ADR-038's example `wq traverse <id> --kind --depth`), with a `depth < :max_depth` guard in the recursive term (not just a visited-set, per R-wq-1-2)."
+      - "path.rs: resolve_project_db_path(start_dir) per D-wq-1-5, with a #[test] unit test using tempfile::TempDir to build a nested directory fixture (no integration-test file needed for this one — it's pure and small)."
+      - "Run cargo fmt --all + cargo clippy -p wq-core -- -D warnings."
+    red_tests: []
+    loc_budget: 90
+    commit_pair:
+      green: "percept: wq-1.4 GREEN — edge CRUD, recursive traversal, db path resolution"
+
+# ──────────────────────────────────────────────────────────────────────
+# Follow-ups
+# ──────────────────────────────────────────────────────────────────────
+follow_ups: []
+
+# ──────────────────────────────────────────────────────────────────────
+# Spike notes (filled during wq-1.0 execution)
+# ──────────────────────────────────────────────────────────────────────
+spike_notes:
+  rusqlite_pick: |
+    (wq-1.0 TODO — document chosen rusqlite version, bundled vs. system
+    feature decision, and confirm include_str!("schema.sql") +
+    execute_batch() works from an in-memory connection.)
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint-close acceptance
+# ──────────────────────────────────────────────────────────────────────
+sprint_close_acceptance:
+  description: |
+    wq-core has no CLI/binary yet — acceptance is library-level only.
+    wq-core is NOT exclusion-listed in this phase (no mq-embed dependency
+    yet), so it participates in the normal workspace build/test/lint.
+  commands: |
+    $ cd /Users/develop/local-stacks/percept
+    $ cargo fmt --all -- --check
+    $ cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli -- -D warnings
+    $ cargo test -p wq-core --quiet
+    $ cargo build --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli
+  verdict_logic: |
+    All commands must exit 0. wq-core deliberately participates in the
+    default exclude list's *complement* here (it is built and tested, not
+    excluded) — this changes in wq-2 once mq-embed lands as a dependency.
+  notes: |
+    Do not add wq-core to the --exclude flags in this phase. Adding it here
+    would be premature — the whole point of D-wq-1-5 and this phase's scope
+    boundary is that wq-core has zero ONNX/mq-embed surface until wq-2.

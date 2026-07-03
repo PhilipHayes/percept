@@ -1,0 +1,293 @@
+sprint: wq-3
+phase: "wq-3 (percept new-crate-family, phase 3 of 5)"
+title: "wq-core federation — registry table, multi-DB rollup via ATTACH + UNION ALL"
+status: planned
+authored: 2026-07-03
+upstream_plan: "phase-wq-2-plan.yml (vec0 embeddings + search — must be GREEN first)"
+adr_refs:
+  - "ADR-038 — wq: Work Graph Query (Accepted 2026-07-03)"
+  - "ADR-038 §Federation model — per-project + global, without duplication"
+  - "ADR-038 §Schema (draft) — registry table (project_name, db_path, parent_registry_id, last_seen)"
+  - "ADR-038 Q2 — default DB path convention .agents/wq.db per repo, confirmed"
+  - "ADR-038 Q3 — single graph per DB stands at confirmed scale; federation is about querying ACROSS DBs, not sharding one"
+
+# ──────────────────────────────────────────────────────────────────────
+# Scope summary
+# ──────────────────────────────────────────────────────────────────────
+scope:
+  in_scope:
+    - "registry table creation (only meaningful in DBs acting as rollup parents — schema.sql still creates it unconditionally per D-wq-3-1)"
+    - "register_child(parent_db, project_name, child_db_path) — add a pointer row, never copy rows"
+    - "rollup(parent_db) -> rolled-up query results across all registered children via ATTACH DATABASE + UNION ALL, live at query time"
+    - "Arbitrarily-deep registry nesting: a registry row may point to another registry DB instead of a leaf project DB"
+    - "Global DB path convention: ~/.agents/wq/global.db (per ADR-038 §Federation model)"
+    - "Write-target resolution: writes default to the project-scoped (cwd-resolved) DB; explicit opt-in targets a parent registry DB"
+  out_of_scope:
+    - "wq-cli / wq-mcp surfaces for any of this (phases wq-4 / wq-5 wire the --global flag and wq rollup command onto this phase's library functions)"
+    - "Automatic child-registration (e.g. auto-discovering sibling project DBs on disk) — registration is always an explicit, deliberate action in this phase (no filesystem-scanning auto-registry-builder)"
+    - "Conflict resolution for genuinely global-scoped nodes living directly in the global DB (ADR-038 allows this; this phase implements it as 'just a node in that DB', no special-casing beyond what wq-1's node CRUD already provides)"
+
+# ──────────────────────────────────────────────────────────────────────
+# Existing convention reference
+# ──────────────────────────────────────────────────────────────────────
+existing_precedent:
+  walk_up_pattern: >
+    ADR-038 explicitly analogizes the registry tree to "the walk-up pattern
+    already used for Copilot/Claude memory in this vault" (gestalt's
+    /memories/ hierarchy walking up from cwd). wq-1.4's
+    resolve_project_db_path (phase wq-1, D-wq-1-5) already implements the
+    single-DB half of this; this phase adds the multi-DB rollup half. No
+    code reuse across the two (different problems — "which DB is mine"
+    vs. "which DBs are registered under a parent"), but the analogy is
+    the design's throughline.
+  no_prior_attach_usage: >
+    No existing percept crate uses SQLite's ATTACH DATABASE. This is new
+    ground for the workspace — the wq-3.0 spike exists specifically because
+    ATTACH's interaction with the vec0 virtual table (wq-2's node_embeddings)
+    across attached databases is untested territory (does a vec0 MATCH
+    query work against an attached schema's virtual table, or does vec0
+    require same-connection registration per attached file?).
+
+loc_budget: 240  # production ~130, tests ~110
+total_red_tests: 8
+
+# ──────────────────────────────────────────────────────────────────────
+# Decisions (resolved before RED)
+# ──────────────────────────────────────────────────────────────────────
+decisions:
+  - id: D-wq-3-1
+    question: "Is the registry table created in every DB, or only in DBs that act as rollup parents?"
+    answer: >
+      Created unconditionally in schema.sql (every WqDb has an empty,
+      unused registry table if it's never a parent) — matching wq-1/wq-2's
+      "one schema.sql, CREATE TABLE IF NOT EXISTS everything" pattern
+      rather than conditionally creating tables based on role.
+    rationale: >
+      Single source of truth for schema shape (architectural-principles.md
+      priority #1) — a DB's role (leaf vs. parent) is determined by whether
+      its registry table has rows, not by which tables physically exist.
+      Avoids a second schema variant to maintain and test.
+
+  - id: D-wq-3-2
+    question: "How does rollup() attach children — by literal db_path string from the registry row, or resolved/validated somehow?"
+    answer: >
+      Literal db_path from the registry row, with an existence check
+      (fs::metadata) before attempting ATTACH — if a registered child's
+      db_path no longer exists on disk, rollup() skips it and surfaces a
+      warning in its return value (a Vec<RollupWarning> alongside the
+      results) rather than failing the entire rollup query.
+    rationale: >
+      A stale registry pointer (project moved/deleted) is an expected
+      real-world condition, not exceptional — failing the whole rollup
+      because one of N children vanished would make the feature fragile
+      exactly when it's most useful (querying across many projects, some
+      of which inevitably get archived/moved over time).
+
+  - id: D-wq-3-3
+    question: "Does write-target resolution (project-scoped default vs. --global) live in wq-core, or is it purely a wq-cli concern?"
+    answer: >
+      The resolution FUNCTION lives in wq-core (resolve_write_target(cwd,
+      explicit_global: bool) -> PathBuf), reusing wq-1's
+      resolve_project_db_path for the non-global case and a new
+      resolve_global_db_path() (fixed ~/.agents/wq/global.db, creating
+      parent dirs) for the global case. The --global FLAG itself is a
+      wq-cli concern (phase wq-4) — wq-core just exposes the two path
+      functions plus the boolean dispatch.
+    rationale: >
+      Same single-source-of-truth reasoning as wq-1's D-wq-1-5 — wq-mcp
+      (phase wq-5) needs identical resolution logic without duplicating
+      it, so it belongs below the CLI layer.
+
+# ──────────────────────────────────────────────────────────────────────
+# Open questions (NOT resolved in this plan)
+# ──────────────────────────────────────────────────────────────────────
+open_questions:
+  - id: Q-wq-3-1
+    question: >
+      Does a vec0 MATCH/KNN query work transparently against an ATTACHed
+      database's virtual table, or does vec0's extension registration need
+      to happen per-attached-file (i.e. does rollup()'s semantic search
+      across children even work, or is rollup() SQL-only / structural-query
+      only in v1)?
+    blocking: yes
+    resolve_during: wq-3.0 spike
+    status: "RESOLVED 2026-07-03 — see reviews/manual/wq-spikes/vec0-poc/FINDINGS.md"
+    default: >
+      RESOLVED, not just defaulted: a single connection with `ATTACH
+      DATABASE '<child path>' AS child` followed by a qualified query
+      (`SELECT node_id FROM child.node_embeddings WHERE embedding MATCH ?1
+      AND k = 1 ORDER BY distance`) works with no special handling —
+      vec0's extension registration is connection-wide (via
+      sqlite3_auto_extension, confirmed in wq-2's spike), so it applies
+      uniformly to attached schemas too. rollup()'s semantic-search path
+      CAN be one SQL statement per child (or a UNION ALL across several
+      qualified `k = N` subqueries) — the "per-connection search + Rust-
+      side merge" fallback is no longer a hard requirement. It remains a
+      valid *optimization* choice if profiling later shows SQL-side
+      merging across many attached children is slow, but it is not
+      required for correctness.
+    impact_if_default_wrong: >
+      N/A — resolved via direct spike, not left as an assumption.
+
+  - id: Q-wq-3-2
+    question: "What's the max sane registry depth, and does rollup() guard against a cyclic registry (parent_registry_id pointing back to a descendant)?"
+    blocking: no
+    resolve_during: wq-3.1 RED (test shape forces the decision, mirrors R-wq-1-2's cyclic-edge handling in wq-1)
+    default: >
+      rollup() tracks visited db_paths in a HashSet during its recursive
+      ATTACH walk and stops (with a warning, not a panic) if it would
+      revisit an already-attached path — same defensive posture as wq-1's
+      traversal cycle guard, applied to the registry tree instead of the
+      edge graph.
+    impact_if_default_wrong: >
+      Without a visited-set guard, a misconfigured registry (accidentally
+      pointing a child's parent_registry_id back at itself or an ancestor)
+      would hang or infinitely recurse — same failure mode wq-1.3 already
+      tested for at the edge-traversal level; this is the federation-level
+      analog and should get equivalent test coverage.
+
+# ──────────────────────────────────────────────────────────────────────
+# Risks
+# ──────────────────────────────────────────────────────────────────────
+risks:
+  - id: R-wq-3-1
+    title: "ATTACH DATABASE + vec0 virtual table interaction is unverified (Q-wq-3-1)"
+    severity: medium
+    status: "RESOLVED 2026-07-03 — see reviews/manual/wq-spikes/vec0-poc/FINDINGS.md"
+    mitigation: >
+      Spiked directly ahead of wq-3.0 (standalone scratch crate, not part
+      of this workspace): PASS, no caveats. rollup()'s semantic search can
+      be a single qualified SQL query per child — no Rust-side merge
+      required as a hard blocker. Remember the wq-2 finding applies here
+      too: every KNN query needs an explicit `k = N` predicate, including
+      ones against attached schemas.
+  - id: R-wq-3-2
+    title: "SQLite has a hard-coded ATTACH limit (SQLITE_MAX_ATTACHED, default 10)"
+    severity: low-medium
+    mitigation: >
+      At ADR-038's confirmed scale (10,000s of nodes in "at least one
+      existing project"), the number of REGISTERED PROJECTS (not nodes
+      per project) is what matters for this limit. Document the default
+      limit (10 simultaneously attached DBs) in spike_notes; if Phil's
+      actual project count approaches it, rollup() would need batching
+      (attach N, query, detach, attach next N) rather than one giant
+      ATTACH-everything call. Not expected to bite at current known usage
+      (a handful of active projects), but document the ceiling so it's
+      not a silent surprise later.
+
+# ──────────────────────────────────────────────────────────────────────
+# Substories
+# ──────────────────────────────────────────────────────────────────────
+substories:
+  - id: wq-3.0
+    title: "Spike — ATTACH DATABASE + vec0 interaction, SQLITE_MAX_ATTACHED confirmation"
+    type: spike
+    module: "(no production code — fills spike_notes only)"
+    rationale: >
+      Resolves Q-wq-3-1 and documents R-wq-3-2's real ceiling before any
+      RED test assumes rollup()'s semantic-search behavior.
+    design_notes:
+      - "RESOLVED (2026-07-03, standalone spike pre-empted this design_note): structural rollup AND vec0 MATCH both work against an ATTACHed schema via qualified names (`child.nodes`, `child.node_embeddings`). See reviews/manual/wq-spikes/vec0-poc/FINDINGS.md experiment 2. Remember the wq-2 `k = N` requirement applies to attached-schema queries too."
+      - "STILL OPEN — not covered by the standalone spike: confirm SQLITE_MAX_ATTACHED's actual compiled-in value for the pinned rusqlite/bundled-sqlite version (query `PRAGMA compile_options` or attempt attaching 11 DBs and confirm the 11th fails with the expected SQLite error). Do this before wq-3.1 RED if registry depth/breadth tests need a concrete ceiling number."
+      - "Fill spike_notes.attach_vec0_result (can copy from FINDINGS.md), spike_notes.max_attached_confirmed (still needs a real run)."
+    red_tests: []
+    green_impl: []
+    loc_budget: 0
+    commit_pair:
+      spike: "percept: wq-3.0 spike — confirm ATTACH+vec0 interaction and SQLITE_MAX_ATTACHED (ATTACH+vec0 portion pre-empted 2026-07-03; MAX_ATTACHED still open)"
+
+  - id: wq-3.1
+    title: "RED — registry CRUD + rollup tests (structural + cyclic-registry guard)"
+    type: red
+    module: "crates/wq-core/tests/federation.rs"
+    rationale: >
+      Pins register_child/rollup's contract, including the stale-pointer
+      warning behavior (D-wq-3-2) and cyclic-registry guard (Q-wq-3-2),
+      before any ATTACH-driving code exists.
+    design_notes:
+      - "Build fixture: 1 parent WqDb (temp file, not in-memory — ATTACH needs a real file path for the child) + 2-3 child WqDbs (temp files), each with a couple of nodes."
+      - "register_child inserts a registry row pointing at a real child db_path; rollup() against the parent returns nodes from all registered children plus the parent's own, via structural UNION ALL."
+      - "Stale-pointer test: register a child, then delete its file from disk, then rollup() — assert it returns a non-empty RollupWarning list mentioning the missing path, and does NOT error out or omit the other (still-valid) children's results."
+      - "Cyclic-registry test: construct 3 WqDbs where child C's registry points back at parent A (mirrors wq-1.3's cyclic-edge test at the federation level) — assert rollup() terminates instead of hanging, per Q-wq-3-2's default."
+      - "If wq-3.0's spike found vec0 doesn't span ATTACHed schemas, include a test asserting the documented fallback behavior for 'rollup with semantic search' instead of asserting a single-SQL-UNION path — do not write this test until the spike's finding is known."
+    red_tests:
+      - name: register_child_adds_pointer_row_not_copy
+        intent: "After register_child, the parent's registry table has exactly one new row pointing at the child's db_path; the child's nodes table is untouched (no duplication)."
+      - name: rollup_returns_nodes_from_all_registered_children
+        intent: "rollup(parent) returns nodes from parent + all registered children, live (no prior sync step)."
+      - name: rollup_supports_nested_registry_two_levels_deep
+        intent: "A grandparent registry pointing at a parent registry (which itself has children) surfaces all leaf nodes when rolled up from the grandparent."
+      - name: rollup_skips_stale_child_with_warning_not_error
+        intent: "A registered child whose db_path no longer exists on disk produces a warning in the result, not a hard error; other valid children's results are still returned."
+      - name: rollup_terminates_on_cyclic_registry
+        intent: "A registry cycle (child's parent_registry_id ultimately points back at an ancestor already being attached) terminates rollup() instead of hanging, per the visited-set guard."
+      - name: resolve_write_target_defaults_to_project_scoped
+        intent: "resolve_write_target(cwd, explicit_global=false) returns the same path resolve_project_db_path(cwd) would (wq-1's function), NOT the global db path."
+      - name: resolve_write_target_honors_explicit_global
+        intent: "resolve_write_target(cwd, explicit_global=true) returns resolve_global_db_path(), regardless of cwd."
+    green_impl: []
+    loc_budget: 130
+    commit_pair:
+      red: "percept: wq-3.1 RED — registry CRUD + rollup tests (7 RED)"
+
+  - id: wq-3.2
+    title: "GREEN — registry table, register_child, rollup(), write-target resolution"
+    type: green
+    module:
+      - "crates/wq-core/src/schema.sql"
+      - "crates/wq-core/src/registry.rs"
+      - "crates/wq-core/src/rollup.rs"
+      - "crates/wq-core/src/path.rs"
+    rationale: "Minimum implementation to pass wq-3.1."
+    design_notes:
+      - "schema.sql: add the registry table verbatim from ADR-038's schema draft (project_name, db_path, parent_registry_id, last_seen)."
+      - "registry.rs: register_child(parent: &WqDb, project_name, child_db_path) inserts a row; list_registered_children(parent) reads them back."
+      - "rollup.rs: for each registry row, check fs::metadata existence first (skip + collect RollupWarning if missing, per D-wq-3-2); ATTACH the valid ones under a generated alias (e.g. child_0, child_1); recurse if a row's target is itself a registry parent (visited-set guarded per Q-wq-3-2); run the UNION ALL query; DETACH afterward (don't leak attached handles past the call)."
+      - "path.rs: add resolve_global_db_path() (fixed ~/.agents/wq/global.db via the `dirs` crate, already a workspace dependency) and resolve_write_target(cwd, explicit_global) per D-wq-3-3."
+      - "If wq-3.0's spike found vec0 doesn't span ATTACHed schemas: implement rollup()'s semantic-search variant as documented in the spike (likely: attach-free per-child search() calls, results merged and re-sorted in Rust) — do not force a single-SQL path that the spike disproved."
+      - "Run cargo clippy -p wq-core -- -D warnings + cargo test -p wq-core."
+    red_tests: []
+    loc_budget: 150
+    commit_pair:
+      green: "percept: wq-3.2 GREEN — registry, rollup via ATTACH+UNION ALL, write-target resolution"
+
+# ──────────────────────────────────────────────────────────────────────
+# Follow-ups
+# ──────────────────────────────────────────────────────────────────────
+follow_ups: []
+
+# ──────────────────────────────────────────────────────────────────────
+# Spike notes (filled during wq-3.0 execution)
+# ──────────────────────────────────────────────────────────────────────
+spike_notes:
+  attach_vec0_result: |
+    (wq-3.0 TODO — document whether a vec0 MATCH query succeeds against an
+    ATTACHed database's virtual table, or whether search-across-rollup
+    needs a per-connection fallback merged in Rust. This directly decides
+    rollup()'s implementation shape in wq-3.2.)
+  max_attached_confirmed: |
+    (wq-3.0 TODO — document the pinned rusqlite/bundled-sqlite build's
+    actual SQLITE_MAX_ATTACHED value and whether it's the SQLite default
+    of 10 or has been compiled differently.)
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint-close acceptance
+# ──────────────────────────────────────────────────────────────────────
+sprint_close_acceptance:
+  description: |
+    wq-core remains excluded from the default workspace build/test/lint
+    (unchanged from wq-2) — verify via its own -p invocation.
+  commands: |
+    $ cd /Users/develop/local-stacks/percept
+    $ cargo fmt --all -- --check
+    $ cargo clippy -p wq-core -- -D warnings
+    $ cargo test -p wq-core --quiet
+    $ cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core -- -D warnings
+  verdict_logic: |
+    All commands must exit 0. No further exclusion-list changes are
+    expected this phase (wq-core was already added in wq-2).
+  notes: |
+    If wq-3.0's spike reveals SQLITE_MAX_ATTACHED is a real near-term
+    ceiling for Phil's actual project count, flag it back to Phil rather
+    than silently building batched-attach logic speculatively — confirm
+    it's worth the complexity before adding it.

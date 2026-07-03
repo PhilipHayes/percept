@@ -1,0 +1,268 @@
+sprint: wq-4
+phase: "wq-4 (percept new-crate-family, phase 4 of 5)"
+title: "wq-cli — CLI surface over wq-core (ticket/query/search/edge/traverse/rollup)"
+status: planned
+authored: 2026-07-03
+upstream_plan: "phase-wq-3-plan.yml (registry + rollup — must be GREEN first)"
+adr_refs:
+  - "ADR-038 — wq: Work Graph Query (Accepted 2026-07-03)"
+  - "ADR-038 §Architecture — wq-cli/ binary: create/update/query/traverse/search, scriptable JSON output (percept convention)"
+  - "ADR-038 §CLI/MCP surface (draft) — exact command list this phase implements"
+  - "ADR-038 Q2 — default DB path convention .agents/wq.db per repo"
+
+# ──────────────────────────────────────────────────────────────────────
+# Scope summary
+# ──────────────────────────────────────────────────────────────────────
+scope:
+  in_scope:
+    - "New workspace member crates/wq-cli (binary: wq)"
+    - "Subcommands, matching ADR-038's draft CLI surface verbatim: wq ticket create, wq ticket update, wq query <sql>, wq search <text> --k N, wq edge create, wq traverse <id> --kind --depth, wq rollup --global"
+    - "JSON output on stdout for every subcommand (percept convention — scriptable, pipeable)"
+    - "--global flag wiring onto wq-core's resolve_write_target (phase wq-3, D-wq-3-3) for ticket create/update and edge create; wq rollup always targets the resolved parent (project-scoped rollup rolls up FROM that project's own registry, if any — see D-wq-4-2)"
+    - "wq query <sql> escape hatch: raw SQL string, results as JSON array of row-objects"
+    - "Exit code convention: 0 success, non-zero on any wq-core Error, matching gq/aq-cli's existing anyhow-at-the-boundary pattern for the binary crate specifically (wq-core itself stays typed-error internally per wq-1's D-wq-1-... error handling precedent — the CLI boundary is where anyhow::Result is acceptable)"
+  out_of_scope:
+    - "wq-mcp (phase wq-5 — mirrors this CLI 1:1 as MCP tools, but is a separate binary/crate)"
+    - "Interactive/TUI mode — every subcommand is a single non-interactive invocation, matching gq/aq-cli's existing shape"
+    - "Shell completion scripts"
+    - "harness_origin auto-detection heuristics beyond a plain --harness <string> flag (see open_questions — how the CLI knows which harness invoked it is explicitly NOT solved by inference in this phase)"
+
+# ──────────────────────────────────────────────────────────────────────
+# Existing convention reference
+# ──────────────────────────────────────────────────────────────────────
+existing_precedent:
+  clap_style: >
+    gq (crates/gq/src/main.rs, verified 2026-07-03) uses a flat
+    #[derive(Parser)] struct with flag-style options (--log, --diff, --at),
+    no nested subcommands. wq's surface (ADR-038's draft: `wq ticket
+    create`, `wq ticket update`, `wq query`, ...) is inherently nested
+    (verb-noun and noun-verb mixed) and needs clap's #[derive(Subcommand)]
+    with an enum, e.g. Cli { command: Command }, Command::Ticket(TicketArgs)
+    where TicketArgs itself has a #[derive(Subcommand)] for
+    Create/Update. This is new ground stylistically for percept (no
+    existing crate nests subcommands this way) but is standard clap usage.
+  json_output_convention: >
+    percept convention per the ADR/user's framing is "scriptable JSON
+    output" — gq emits serde_json-serialized structures to stdout for
+    piping into jq/aq. wq-cli follows the same shape: every subcommand's
+    success path prints one JSON value (object or array) to stdout via
+    serde_json::to_writer(io::stdout(), &value) or ..._pretty depending on
+    a --pretty flag (default: compact, matching scriptability over
+    human-readability, consistent with jq being the expected downstream
+    consumer per the structured-data-parsing skill in this workspace).
+  binary_crate_shape: >
+    gq's Cargo.toml: [[bin]] name = "gq", path = "src/main.rs", plus
+    workspace-inherited version/edition/license/authors/repository fields.
+    wq-cli's Cargo.toml mirrors this exactly, description field updated to
+    describe wq-cli specifically.
+
+loc_budget: 340  # production ~200, tests ~140 (assert_cmd integration tests)
+total_red_tests: 10
+
+# ──────────────────────────────────────────────────────────────────────
+# Decisions (resolved before RED)
+# ──────────────────────────────────────────────────────────────────────
+decisions:
+  - id: D-wq-4-1
+    question: "Does wq-cli link wq-core directly (in-process), or shell out / use IPC?"
+    answer: >
+      Direct in-process dependency — wq-cli's Cargo.toml depends on
+      wq-core as a path dependency, same as every other percept CLI
+      crate depending on its -core sibling (e.g. lq-cli -> lq-core).
+    rationale: >
+      No precedent anywhere in percept for a CLI shelling out to its own
+      sibling crate; this would be a pointless deviation. wq-mcp (phase
+      wq-5) will make the identical choice for the identical reason.
+
+  - id: D-wq-4-2
+    question: "Does `wq rollup --global` operate on the CURRENT project's registry (if it happens to itself be a registry parent), or always on the global DB (~/.agents/wq/global.db)?"
+    answer: >
+      `wq rollup --global` always targets the GLOBAL db
+      (resolve_global_db_path from wq-3). `wq rollup` with no --global flag
+      operates on the CURRENT project's own DB as a rollup parent (useful
+      if a project DB has itself registered children — e.g. a monorepo
+      root registering per-package child DBs). Both are the same
+      underlying wq-core rollup() call, differing only in which DB path
+      is opened first.
+    rationale: >
+      ADR-038's federation model explicitly allows arbitrarily deep
+      nesting ("global → workspace-cluster → per-repo") — a project DB
+      acting as an intermediate rollup parent for its own sub-registry is
+      a real case the schema supports, so the CLI shouldn't collapse it
+      into "rollup always means global".
+
+  - id: D-wq-4-3
+    question: "How does `wq query <sql>` guard against writes (INSERT/UPDATE/DELETE/DROP) via the raw-SQL escape hatch?"
+    answer: >
+      It does NOT guard — `wq query` executes whatever SQL the caller
+      provides against the resolved DB connection, full read/write access,
+      matching ADR-038's own framing of it as 'raw escape hatch'. No
+      read-only connection mode, no statement allowlist/denylist in v1.
+    rationale: >
+      ADR-038 calls this out by name as an escape hatch, not a guarded
+      read path — over-engineering a SQL-statement classifier for a
+      single-user local tool contradicts the "don't add validation for
+      scenarios that can't happen" discipline (this runs locally, as the
+      same user who owns the DB file; there's no cross-trust-boundary
+      caller to defend against at the CLI layer). Flagged explicitly here
+      so it's a deliberate choice, not an oversight — revisit ONLY if
+      wq-mcp (phase wq-5) exposes this to a context where the caller and
+      DB owner might differ trust levels (see phase wq-5's open questions).
+
+# ──────────────────────────────────────────────────────────────────────
+# Open questions (NOT resolved in this plan)
+# ──────────────────────────────────────────────────────────────────────
+open_questions:
+  - id: Q-wq-4-1
+    question: >
+      How is harness_origin populated in practice — does wq-cli require an
+      explicit --harness <string> flag on every mutating command, read an
+      environment variable (e.g. WQ_HARNESS), or default to a hard-coded
+      "cli" string when invoked directly by a human at a terminal?
+    blocking: yes
+    resolve_during: wq-4.1 RED (test shape forces the decision)
+    default: >
+      A --harness <string> flag on ticket create/update and edge create,
+      defaulting to the literal string "cli" if omitted (a human typing
+      `wq ticket create` directly is a legitimate harness_origin value in
+      its own right, not an error case). wq-mcp (phase wq-5) is expected
+      to always pass an explicit value identifying which agent harness
+      invoked the MCP tool (e.g. "claude-code", "copilot-chat", "codex-cli")
+      — but the exact string vocabulary and where wq-mcp obtains it (is it
+      passed in the MCP tool call payload by the harness itself, or
+      inferred server-side from the connection?) is NOT resolved by this
+      phase and carries forward to phase wq-5's open questions.
+    impact_if_default_wrong: >
+      Low for wq-cli itself (just a flag default); the real open question
+      is what wq-mcp does, which this phase explicitly does not solve —
+      flagged forward rather than guessed at now.
+
+# ──────────────────────────────────────────────────────────────────────
+# Risks
+# ──────────────────────────────────────────────────────────────────────
+risks:
+  - id: R-wq-4-1
+    title: "wq query's unguarded raw-SQL escape hatch could DROP TABLE nodes/edges/registry with no confirmation prompt"
+    severity: low
+    mitigation: >
+      Per D-wq-4-3 this is accepted as-is for a single-user local tool.
+      Document in --help text and JSON error output that `wq query` has
+      full read/write access. No confirmation prompt added (would break
+      scriptability — a prompt on a piped/non-interactive stdin either
+      hangs or silently auto-confirms, both bad). If Phil wants a
+      safety rail later (e.g. requiring a --i-know-what-im-doing flag for
+      statements matching /^(DROP|DELETE|UPDATE)/i), that's a follow-up
+      decision, not something this phase should invent speculatively.
+  - id: R-wq-4-2
+    title: "Nested clap subcommands (wq ticket create vs. wq ticket update) are new stylistic ground for percept — no existing crate to copy verbatim"
+    severity: low
+    mitigation: >
+      Standard clap #[derive(Subcommand)] usage; well-documented upstream.
+      Low risk technically, flagged only because it's a stylistic first
+      for this workspace (see existing_precedent.clap_style) — the RED
+      tests in wq-4.1 pin the exact invocation shapes so GREEN has no
+      ambiguity about what `wq ticket create --type ticket --title "..."
+      --status open` must parse into.
+
+# ──────────────────────────────────────────────────────────────────────
+# Substories
+# ──────────────────────────────────────────────────────────────────────
+substories:
+  - id: wq-4.1
+    title: "RED — wq-cli integration tests (assert_cmd) for all 6 command groups"
+    type: red
+    module: "crates/wq-cli/tests/cli.rs"
+    rationale: >
+      Pins the exact CLI invocation shapes and JSON output structure
+      before main.rs exists, using assert_cmd + predicates (already
+      workspace dev-dependencies, used elsewhere in percept per gq's
+      Cargo.toml).
+    design_notes:
+      - "Each test runs in a tempfile::TempDir acting as a fake project root (so .agents/wq.db resolution doesn't collide with the real repo's own .agents/wq.db or other tests running in parallel)."
+      - "Use assert_cmd::Command::cargo_bin(\"wq\").current_dir(&temp_dir) for every invocation."
+      - "ticket create/update: assert stdout is valid JSON (serde_json::from_str parses it) containing the expected id/title/status fields."
+      - "query: seed a node via ticket create first, then `wq query \"SELECT title FROM nodes\"` and assert the seeded title appears in the JSON array output."
+      - "search: seed 2+ nodes, run `wq search <text> --k 1`, assert exactly one JSON result."
+      - "edge create + traverse: seed 2 nodes via ticket create, create an edge between them, then traverse and assert the JSON output includes the connected node."
+      - "rollup: seed a project DB with one node, register it as a child of a separate temp global-db location (override the global path via an env var or --global-db-path test-only flag — decide during GREEN whichever is less invasive; do NOT let this test touch Phil's real ~/.agents/wq/global.db)."
+      - "One negative test: `wq ticket update <unknown-id>` exits non-zero with a JSON error object on stdout or stderr (decide which stream during GREEN and pin it in this test)."
+    red_tests:
+      - name: ticket_create_prints_json_with_generated_id
+        intent: "wq ticket create --type ticket --title X --status open exits 0, stdout parses as JSON, contains a non-empty id field."
+      - name: ticket_update_changes_status_and_prints_updated_json
+        intent: "wq ticket update <id> --status in_progress exits 0, output JSON reflects the new status."
+      - name: ticket_update_unknown_id_exits_nonzero_with_json_error
+        intent: "wq ticket update <bogus-id> --status done exits non-zero and produces a structured JSON error, not a raw panic/backtrace."
+      - name: query_escape_hatch_returns_json_array_of_rows
+        intent: "wq query \"SELECT title FROM nodes\" after seeding a node returns a JSON array containing that title."
+      - name: search_respects_k_flag
+        intent: "wq search \"...\" --k 1 after seeding 2+ nodes returns exactly one JSON result object."
+      - name: edge_create_and_traverse_round_trip
+        intent: "wq edge create <a> <b> --kind blocks then wq traverse <a> --kind blocks --depth 1 includes node b in the JSON output."
+      - name: rollup_global_includes_registered_child_nodes
+        intent: "After registering a project DB as a child of a (test-scoped) global DB, wq rollup --global returns nodes from both."
+      - name: harness_flag_defaults_to_cli_when_omitted
+        intent: "wq ticket create without --harness produces a node whose harness_origin field is \"cli\" (per Q-wq-4-1's default)."
+    green_impl: []
+    loc_budget: 170
+    commit_pair:
+      red: "percept: wq-4.1 RED — wq-cli integration tests, 8 command scenarios (8 RED)"
+
+  - id: wq-4.2
+    title: "GREEN — wq-cli main.rs, subcommand dispatch, JSON output"
+    type: green
+    module:
+      - "crates/wq-cli/Cargo.toml"
+      - "crates/wq-cli/src/main.rs"
+      - "crates/wq-cli/src/commands.rs"
+      - "Cargo.toml (workspace — add crates/wq-cli member)"
+      - ".github/workflows/ci.yml (add --exclude wq-cli, since wq-cli transitively depends on wq-core which depends on mq-embed)"
+    rationale: "Minimum implementation to pass wq-4.1."
+    design_notes:
+      - "main.rs: #[derive(Parser)] Cli { #[command(subcommand)] command: Command }; Command enum with Ticket(TicketCommand), Query{sql: String}, Search{text: String, #[arg(long, default_value=\"10\")] k: usize}, Edge(EdgeCommand), Traverse{id: String, #[arg(long)] kind: String, #[arg(long)] depth: u32}, Rollup{#[arg(long)] global: bool}."
+      - "TicketCommand / EdgeCommand as nested #[derive(Subcommand)] enums (Create/Update for ticket, Create for edge) per D-wq-4-1/R-wq-4-2."
+      - "Every command handler: resolve DB path (wq-core's resolve_write_target for mutating commands, resolve_project_db_path or resolve_global_db_path for read commands per --global), open WqDb, call the wq-core function, serde_json::to_writer(stdout, &result), exit 0. On wq_core::Error, print a JSON error object ({\"error\": \"...\"}) and exit 1 (pins the stream/format decision left open in wq-4.1's negative test)."
+      - "--harness flag (global, applies to ticket create/update + edge create) defaulting to \"cli\" per Q-wq-4-1's default."
+      - "For the rollup test's global-db-path override: add a WQ_GLOBAL_DB_PATH env var read by resolve_global_db_path (wq-core, phase wq-3) as an override point — this is a small addition to wq-3's function, done here rather than retroactively editing phase wq-3's already-closed sprint, since it's purely additive and doesn't change wq-3's committed behavior when the env var is unset."
+      - "ci.yml: add --exclude wq-cli alongside --exclude wq-core in all three cargo invocations."
+      - "Run cargo fmt --all + cargo clippy -p wq-cli -- -D warnings + cargo test -p wq-cli."
+    red_tests: []
+    loc_budget: 200
+    commit_pair:
+      green: "percept: wq-4.2 GREEN — wq-cli binary, 6 command groups, JSON output"
+
+# ──────────────────────────────────────────────────────────────────────
+# Follow-ups
+# ──────────────────────────────────────────────────────────────────────
+follow_ups:
+  - id: FU-wq-4-1
+    title: "Confirmation/safety-rail flag for destructive `wq query` statements (DROP/DELETE/UPDATE without WHERE)"
+    rationale: >
+      R-wq-4-1 accepted as-is for v1 per D-wq-4-3. Revisit only if Phil
+      requests it after real usage — do not speculatively build a SQL
+      statement classifier now.
+    blocking_for: "nothing — deliberate v1 scope cut"
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint-close acceptance
+# ──────────────────────────────────────────────────────────────────────
+sprint_close_acceptance:
+  description: |
+    wq-cli joins wq-core in the exclusion list (transitively pulls in
+    mq-embed via wq-core).
+  commands: |
+    $ cd /Users/develop/local-stacks/percept
+    $ cargo fmt --all -- --check
+    $ cargo clippy -p wq-core -p wq-cli -- -D warnings
+    $ cargo test -p wq-core -p wq-cli --quiet
+    $ cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli -- -D warnings
+    $ cargo run --quiet -p wq-cli -- ticket create --type ticket --title "smoke test" --status open | jq -e '.id | length > 0'
+  verdict_logic: |
+    All commands must exit 0, including the end-to-end smoke test piping
+    real binary output through jq (mirrors the S9.A.-1 template's pattern
+    of a live `aq --skeleton | jq -e` smoke check, not just unit/integration
+    test suites).
+  notes: |
+    Run the smoke-test command from a scratch temp directory, not the
+    percept repo root itself, to avoid writing a stray .agents/wq.db into
+    the percept working tree during sprint-close verification.

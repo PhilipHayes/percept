@@ -1,0 +1,308 @@
+sprint: wq-5
+phase: "wq-5 (percept new-crate-family, phase 5 of 5)"
+title: "wq-mcp — MCP server mirroring wq-cli 1:1 as tools (cross-harness portability seam)"
+status: planned
+authored: 2026-07-03
+upstream_plan: "phase-wq-4-plan.yml (wq-cli — must be GREEN first; wq-mcp mirrors its command surface)"
+adr_refs:
+  - "ADR-038 — wq: Work Graph Query (Accepted 2026-07-03)"
+  - "ADR-038 §Architecture — wq-mcp/: MCP server exposing the same operations as tools — 'the actual cross-harness seam'"
+  - "ADR-038 §CLI/MCP surface (draft) — MCP tools mirror CLI 1:1: wq_ticket_create, wq_query, wq_search, wq_edge_create, wq_traverse, wq_rollup"
+  - "ADR-038 Consequences — cross-harness project continuity becomes an MCP-server property, not a per-harness memory-file convention"
+
+# ──────────────────────────────────────────────────────────────────────
+# Scope summary
+# ──────────────────────────────────────────────────────────────────────
+scope:
+  in_scope:
+    - "New workspace member crates/wq-mcp (binary: wq-mcp, stdio-transport MCP server)"
+    - "6 MCP tools mirroring wq-cli's command groups 1:1: wq_ticket_create, wq_ticket_update, wq_query, wq_search, wq_edge_create, wq_traverse, wq_rollup (7 tools if ticket create/update stay split — see D-wq-5-1)"
+    - "Tool input schemas mirroring wq-cli's flags (JSON Schema per-tool, matching whatever MCP crate/pattern is chosen in the wq-5.0 spike)"
+    - "harness_origin plumbing: how an MCP tool call communicates which agent harness invoked it (resolves Q-wq-4-1's carry-forward)"
+    - "Shared dispatch logic with wq-cli where practical (both call the same wq-core functions; avoid re-deriving business logic in wq-mcp that wq-cli's commands.rs already expresses, per DRY)"
+  out_of_scope:
+    - "Any new wq-core functionality — this phase is pure MCP-surface wiring over the already-shipped wq-core API (phases wq-1 through wq-3)"
+    - "Network/HTTP transport for the MCP server — stdio only, matching how MCP servers are typically launched by agent harnesses (spawned subprocess, not a listening network service) unless the wq-5.0 spike finds a workspace precedent that says otherwise"
+    - "Auto-discovery/registration of the wq-mcp server into any specific harness's MCP config (e.g. VS Code settings.json, Claude Desktop config) — this phase ships the server binary; wiring it into a harness's config is a per-harness setup step, documented but not automated"
+
+# ──────────────────────────────────────────────────────────────────────
+# Existing convention reference
+# ──────────────────────────────────────────────────────────────────────
+existing_precedent:
+  no_existing_mcp_server_in_percept: >
+    Verified 2026-07-03: none of percept's 16 existing crates (aq-*, gq,
+    oq, lq-*, mq-*, tq-*) implement an MCP server — percept crates today
+    are CLI binaries + libraries, consumed by canopy's own MCP server
+    (canopy exposes canopy_contract_status etc. as MCP tools, per
+    percept-conventions.md / canopy-conventions.md memory, but that MCP
+    server lives in the canopy-rs repo, not in percept). This IS new
+    ground for percept — the wq-5.0 spike must pick an MCP server crate/
+    SDK from scratch, with canopy's Rust MCP server (if inspectable) as
+    a reference for "what does an MCP tool definition look like in Rust
+    in this ecosystem", not a percept-internal precedent to copy from.
+  cli_mirroring_intent: >
+    ADR-038 states MCP tools mirror the CLI 1:1 — this phase should NOT
+    invent a different capability surface. Every tool name in this
+    phase's scope corresponds exactly to a wq-cli subcommand from phase
+    wq-4; if wq-cli gains a command later, wq-mcp should gain the
+    matching tool in a follow-up, not diverge.
+
+loc_budget: 300  # production ~180, tests ~120
+total_red_tests: 8
+
+# ──────────────────────────────────────────────────────────────────────
+# Decisions (resolved before RED)
+# ──────────────────────────────────────────────────────────────────────
+decisions:
+  - id: D-wq-5-1
+    question: "Is ticket create/update one MCP tool (wq_ticket, with an action param) or two (wq_ticket_create, wq_ticket_update)?"
+    answer: >
+      Two separate tools, matching ADR-038's own draft list which names
+      wq_ticket_create explicitly (and implies wq_ticket_update by 1:1
+      mirroring with wq-cli's `wq ticket update`). Do not collapse into
+      one tool with an action enum param.
+    rationale: >
+      MCP tool schemas are typically most useful to calling harnesses when
+      each tool has a single, unambiguous purpose and a flat parameter
+      schema — an action-dispatch param re-introduces the kind of
+      dual-intent-in-one-method pattern flagged as an anti-pattern in
+      architectural-principles.md's domain decomposition signals.
+
+  - id: D-wq-5-2
+    question: "Does wq-mcp share a dispatch module with wq-cli, or duplicate the wq-core call sites?"
+    answer: >
+      wq-mcp depends on wq-core directly (same as wq-cli) and does NOT
+      depend on wq-cli itself — no cross-binary-crate dependency. Each
+      tool handler in wq-mcp calls wq-core functions directly, mirroring
+      wq-cli's commands.rs logic in shape but not sharing code via a
+      compiled dependency edge between the two binaries.
+    rationale: >
+      wq-cli and wq-mcp are peer consumers of wq-core, not layered on top
+      of each other — matching the ADR's architecture diagram (wq-core /
+      wq-cli / wq-mcp as three siblings, not wq-mcp depending on wq-cli).
+      Duplication risk (both re-implement "resolve DB path, call wq-core,
+      serialize result") is accepted as small and acceptable given the
+      two crates' output shapes differ anyway (CLI: stdout text; MCP: tool
+      result objects per whatever SDK the spike picks).
+
+# ──────────────────────────────────────────────────────────────────────
+# Open questions (NOT resolved in this plan)
+# ──────────────────────────────────────────────────────────────────────
+open_questions:
+  - id: Q-wq-5-1
+    question: >
+      How does an MCP tool call learn which agent harness invoked it, to
+      populate harness_origin? Is this passed explicitly as a tool
+      parameter by the harness (e.g. every wq_ticket_create call includes
+      a harness field the calling harness fills in), or does wq-mcp infer
+      it some other way (e.g. an environment variable set by the harness
+      when it spawns the server subprocess, a value baked into the
+      server's launch config per-harness)?
+    blocking: yes
+    resolve_during: wq-5.0 spike — requires checking what identifying
+      information (if any) MCP's protocol or common harness launch
+      patterns actually expose to a spawned server process.
+    status: "RESOLVED 2026-07-03 by Phil — keep harness_origin, per-process env-var mechanism"
+    default: >
+      RESOLVED as option (b): read a `WQ_HARNESS_ORIGIN` environment
+      variable once at server-launch time, set in that harness's own MCP
+      server config entry (VS Code's mcp.json, Claude Desktop's config,
+      etc. all support per-server env vars for stdio-launched servers —
+      no protocol-level identity needed, this is a launch-config
+      convention Phil controls directly). One wq-mcp process instance
+      serves exactly one harness's identity for its whole lifetime.
+      Default to the literal string "unknown" if the env var is unset —
+      never fail startup over a missing harness identity. Treat the
+      resulting value as best-effort attribution metadata, NOT a
+      security-relevant or correctness-critical field; nothing in wq's
+      design depends on it being accurate.
+    impact_if_default_wrong: >
+      Low, by design — if the env var is misconfigured or forgotten for
+      a given harness's launch config, nodes created from that harness
+      simply read "unknown". No query/traversal/rollup behavior depends
+      on harness_origin being correct; it is diagnostic metadata only.
+
+  - id: Q-wq-5-2
+    question: "Which Rust MCP server SDK/crate does wq-mcp use?"
+    blocking: yes
+    resolve_during: wq-5.0 spike
+    status: "RESOLVED 2026-07-03 — no SDK crate; hand-roll, mirroring canopy"
+    default: >
+      RESOLVED: canopy's Cargo.toml has NO mcp/rmcp/jsonrpc dependency at
+      all (confirmed by direct grep 2026-07-03) — crates/canopy/src/
+      mcp_server.rs hand-rolls JSON-RPC 2.0 over stdin/stdout directly
+      (serde_json::Value request/response handling, manual dispatch on
+      method name). wq-mcp follows the same pattern rather than adopting
+      an unproven MCP SDK crate: zero new dependency risk, consistent
+      implementation style across Phil's tools, and canopy's
+      implementation is directly inspectable as a reference during
+      wq-5.1 GREEN.
+    impact_if_default_wrong: >
+      Low — this is a proven pattern already running in production for
+      canopy's 11 MCP tools, not a novel choice being made blind.
+
+# ──────────────────────────────────────────────────────────────────────
+# Risks
+# ──────────────────────────────────────────────────────────────────────
+risks:
+  - id: R-wq-5-1
+    title: "Rust MCP SDK immaturity/churn (Q-wq-5-2) — protocol and crate landscape may have shifted since ADR-038 was authored"
+    severity: medium-high
+    mitigation: >
+      wq-5.0 spike must check crates.io publish recency for any candidate
+      MCP SDK crate before pinning. If the ecosystem is still thin,
+      escalate to Phil — this may warrant checking whether canopy's own
+      MCP server implementation (different repo) has already solved this
+      and can be referenced or even shared as a workspace dependency
+      pattern, rather than percept re-solving "how do I speak MCP in
+      Rust" independently.
+  - id: R-wq-5-2
+    title: "harness_origin attribution mechanism unresolved (Q-wq-5-1) undermines the ADR's stated cross-harness-portability motivation if no viable answer exists"
+    severity: medium
+    mitigation: >
+      Treated as a first-class spike question, not an implementation
+      afterthought. If genuinely unsolvable at the protocol level,
+      escalate to Phil rather than shipping a field that will silently
+      always read the same placeholder value across all harnesses.
+
+# ──────────────────────────────────────────────────────────────────────
+# Substories
+# ──────────────────────────────────────────────────────────────────────
+substories:
+  - id: wq-5.0
+    title: "Spike — MCP SDK pick + harness_origin attribution mechanism"
+    type: spike
+    status: "DONE 2026-07-03 — both questions resolved without needing the full spike; see Q-wq-5-1/Q-wq-5-2 above"
+    module: "(no production code — fills spike_notes only)"
+    rationale: >
+      Resolves Q-wq-5-1 and Q-wq-5-2 before any RED test assumes a
+      specific tool-registration API or harness-identity mechanism.
+    design_notes:
+      - "RESOLVED: no MCP SDK crate exists in canopy's dependency tree (confirmed via grep of canopy/Cargo.toml) — hand-roll JSON-RPC 2.0 over stdio, mirroring src/mcp_server.rs's existing structure."
+      - "RESOLVED: harness_origin populated via WQ_HARNESS_ORIGIN env var, read once at server startup, default \"unknown\". Set per-harness in that harness's own MCP server launch config (env key on the server entry) — this is a config convention, not a protocol feature, and Phil owns writing each harness's config entry."
+      - "Fill spike_notes.mcp_sdk_pick = 'hand-rolled, no SDK crate', spike_notes.harness_origin_mechanism = 'WQ_HARNESS_ORIGIN env var, per-process, default unknown'."
+    red_tests: []
+    green_impl: []
+    loc_budget: 0
+    commit_pair:
+      spike: "percept: wq-5.0 spike — MCP SDK pick + harness_origin attribution mechanism (resolved via direct decision 2026-07-03, no code spike needed)"
+
+  - id: wq-5.1
+    title: "RED — wq-mcp tool-call tests for all 7 tools"
+    type: red
+    module: "crates/wq-mcp/tests/tools.rs"
+    rationale: >
+      Pins each tool's input schema and result shape before server.rs
+      exists, using whatever test-harness pattern the chosen SDK
+      recommends (spike output determines exact mechanics; this
+      substory's shape may need light revision once wq-5.0 lands — flagged
+      here rather than pretending certainty ahead of the spike).
+    design_notes:
+      - "Mirror wq-4.1's fixture pattern (tempfile::TempDir per test as a fake project root) so wq-core state doesn't leak across tests or touch Phil's real DBs."
+      - "Each of the 7 tools gets at least one success-path test; wq_ticket_update and wq_traverse also get a not-found/empty-result edge case, mirroring wq-4.1's negative test for symmetry with the CLI layer."
+      - "A dedicated test for harness_origin plumbing per whatever mechanism wq-5.0 pins (e.g. if it's a per-call parameter, assert the resulting node's harness_origin matches what was passed; if it's an env-var-at-launch mechanism, assert it via the test harness's process-spawn configuration)."
+    red_tests:
+      - name: wq_ticket_create_tool_returns_node_with_id
+        intent: "Tool call with type/title/status params returns a result containing a generated id."
+      - name: wq_ticket_update_tool_changes_status
+        intent: "Tool call updates an existing node's status field."
+      - name: wq_ticket_update_tool_unknown_id_returns_structured_error
+        intent: "Tool call on an unknown id returns an MCP-protocol-appropriate error result, not an unhandled exception/crash."
+      - name: wq_query_tool_returns_json_rows
+        intent: "Raw SQL tool call returns row objects matching a seeded fixture."
+      - name: wq_search_tool_respects_k_param
+        intent: "Semantic search tool call with k=1 on a multi-node fixture returns exactly one result."
+      - name: wq_edge_create_and_wq_traverse_round_trip
+        intent: "Edge-create tool call followed by a traverse tool call surfaces the connected node."
+      - name: wq_rollup_tool_returns_cross_db_results
+        intent: "Rollup tool call against a test-scoped registered child returns nodes from both DBs (mirrors wq-4.1's rollup CLI test at the MCP layer)."
+      - name: harness_origin_is_attributed_per_wq_5_0_mechanism
+        intent: "A created node's harness_origin field reflects the mechanism wq-5.0's spike pinned (parameter or env-var-derived) — exact assertion shape depends on spike outcome."
+    green_impl: []
+    loc_budget: 150
+    commit_pair:
+      red: "percept: wq-5.1 RED — wq-mcp tool tests, 7 tools + harness_origin attribution (8 RED)"
+
+  - id: wq-5.2
+    title: "GREEN — wq-mcp server, 7 tool handlers, harness_origin wiring"
+    type: green
+    module:
+      - "crates/wq-mcp/Cargo.toml"
+      - "crates/wq-mcp/src/main.rs"
+      - "crates/wq-mcp/src/tools.rs"
+      - "Cargo.toml (workspace — add crates/wq-mcp member)"
+      - ".github/workflows/ci.yml (add --exclude wq-mcp)"
+    rationale: "Minimum implementation to pass wq-5.1."
+    design_notes:
+      - "Server registration + stdio transport per whatever the wq-5.0-pinned SDK requires — exact shape deferred to spike output, do not hard-code an API here that hasn't been confirmed to exist."
+      - "tools.rs: one handler function per tool (wq_ticket_create, wq_ticket_update, wq_query, wq_search, wq_edge_create, wq_traverse, wq_rollup), each calling the corresponding wq-core function directly (per D-wq-5-2 — no dependency on wq-cli's commands.rs)."
+      - "harness_origin wiring per wq-5.0's pinned mechanism."
+      - "ci.yml: add --exclude wq-mcp alongside --exclude wq-core --exclude wq-cli in all three cargo invocations — this is the FINAL exclusion-list update for the wq family (all three crates now excluded from default build/test/lint, matching mq-{embed,store,cli}'s existing 3-crate exclusion exactly in shape)."
+      - "Run cargo fmt --all + cargo clippy -p wq-mcp -- -D warnings + cargo test -p wq-mcp."
+    red_tests: []
+    loc_budget: 180
+    commit_pair:
+      green: "percept: wq-5.2 GREEN — wq-mcp server, 7 tools, harness_origin wiring"
+
+# ──────────────────────────────────────────────────────────────────────
+# Follow-ups
+# ──────────────────────────────────────────────────────────────────────
+follow_ups:
+  - id: FU-wq-5-1
+    title: "Wire wq-mcp into at least one real agent harness's MCP config and dogfood cross-harness continuity end-to-end"
+    rationale: >
+      This phase ships the server binary; actually adding it to (for
+      example) this workspace's VS Code MCP config and confirming a
+      ticket created via Claude Code is visible via Copilot Chat's wq
+      tools is the real proof of ADR-038's central claim. Worth a
+      dedicated dogfood sprint after wq-5 ships, not bundled into it.
+    blocking_for: "validating ADR-038's core thesis in practice"
+  - id: FU-wq-5-2
+    title: "Revisit percept's CONTRIBUTING.md framing now that wq-core + mq-store both own local state (ADR-038 Consequences)"
+    rationale: >
+      ADR-038 explicitly flags this: 'worth revisiting percept's
+      CONTRIBUTING.md framing once this ships.' Documentation-only
+      follow-up, not a code sprint.
+    blocking_for: "nothing — documentation accuracy only"
+
+# ──────────────────────────────────────────────────────────────────────
+# Spike notes (filled during wq-5.0 execution)
+# ──────────────────────────────────────────────────────────────────────
+spike_notes:
+  mcp_sdk_pick: |
+    (wq-5.0 TODO — document chosen Rust MCP SDK crate/version, or the
+    finding that a hand-rolled JSON-RPC-over-stdio implementation is
+    necessary, with rationale either way.)
+  harness_origin_mechanism: |
+    (wq-5.0 TODO — document whether harness_origin is populated via a
+    per-tool-call parameter, a server-launch-time env var, or requires
+    escalation to Phil because neither is mechanically reliable.)
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint-close acceptance
+# ──────────────────────────────────────────────────────────────────────
+sprint_close_acceptance:
+  description: |
+    wq-mcp joins wq-core and wq-cli in the exclusion list — the wq family
+    is now fully excluded from default build/test/lint, matching
+    mq-{embed,store,cli}'s existing shape. This is the final phase of the
+    initial wq build (phases wq-1 through wq-5).
+  commands: |
+    $ cd /Users/develop/local-stacks/percept
+    $ cargo fmt --all -- --check
+    $ cargo clippy -p wq-core -p wq-cli -p wq-mcp -- -D warnings
+    $ cargo test -p wq-core -p wq-cli -p wq-mcp --quiet
+    $ cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli --exclude wq-mcp -- -D warnings
+    $ cargo build --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core --exclude wq-cli --exclude wq-mcp
+  verdict_logic: |
+    All commands must exit 0. At this point the default workspace build/
+    test/lint excludes exactly 6 crates (mq-embed, mq-store, mq-cli,
+    wq-core, wq-cli, wq-mcp) — confirm .github/workflows/ci.yml's three
+    cargo invocations all carry the full 6-crate exclude list consistently
+    (a partial list in even one of the three commands reproduces the same
+    "confusing unrelated CI failure" risk flagged in phase wq-2's notes).
+  notes: |
+    This sprint-close also closes out the wq-1..wq-5 initial build per
+    ADR-038. FU-wq-2-1 (mq-store -> vec0 migration) remains unscheduled
+    and is NOT a gate for calling this phase — or the wq family overall —
+    complete-clean.

@@ -1,0 +1,336 @@
+sprint: wq-2
+phase: "wq-2 (percept new-crate-family, phase 2 of 5)"
+title: "wq-core embeddings — sqlite-vec integration, node_embeddings vec0 table, semantic search"
+status: planned
+authored: 2026-07-03
+upstream_plan: "phase-wq-1-plan.yml (wq-core schema, node/edge CRUD, traversal — must be GREEN first)"
+adr_refs:
+  - "ADR-038 — wq: Work Graph Query (Accepted 2026-07-03)"
+  - "ADR-038 §Storage: SQLite + sqlite-vec — sqlite-vec (not sqlite-vss), vec0 virtual table, dims=384"
+  - "ADR-038 §Schema (draft) — node_embeddings vec0 table"
+  - "ADR-038 §Relationship to mq-store — vec0 proof-of-concept precedes any mq-store migration (unscheduled follow-on, NOT this phase)"
+  - "ADR-038 Consequences — sqlite-vec + mq-embed excluded from default build/lint 'the same way mq-{embed,store,cli} already are, once wired in'"
+
+# ──────────────────────────────────────────────────────────────────────
+# Scope summary
+# ──────────────────────────────────────────────────────────────────────
+scope:
+  in_scope:
+    - "sqlite-vec Rust crate pick + version pin (spike) — loadable extension registration via rusqlite"
+    - "mq-embed dependency added to wq-core (EmbedEngine::new/embed_one, matching crates/mq-embed/src/engine.rs's existing public API)"
+    - "node_embeddings vec0 virtual table creation (dims=384, matching mq-embed's BgeSmall default)"
+    - "Write-path wiring: create_node (or a new create_node_with_embedding path) generates an embedding from title+body at write time and stores it in node_embeddings"
+    - "search(query: &str, k: usize) -> Vec<(Node, f32 distance)> — embeds the query text, runs a vec0 KNN MATCH query, joins back to nodes"
+    - "Workspace + CI + clippy exclusion-list updates: add wq-core (and any wq-core test-only helper crate) to the --exclude flags in .github/workflows/ci.yml, mirroring mq-{embed,store,cli}"
+  out_of_scope:
+    - "registry table, federation, rollup (phase wq-3)"
+    - "wq-cli / wq-mcp (phases wq-4 / wq-5)"
+    - "mq-store's JSON-file storage migrating onto vec0 (ADR-038 §Relationship to mq-store, Q4 — explicitly deferred, unscheduled, touches canopy's semantic.rs; tracked as a follow-up entry below, never scheduled into a wq sprint)"
+    - "Re-embedding existing nodes on update_node (title/body edits do NOT regenerate the embedding in this phase — see open_questions)"
+
+# ──────────────────────────────────────────────────────────────────────
+# Existing convention reference
+# ──────────────────────────────────────────────────────────────────────
+existing_precedent:
+  mq_embed_api: >
+    crates/mq-embed/src/engine.rs (verified 2026-07-03): EmbedEngine::new(ModelKind::BgeSmall)
+    -> Result<Self>; embed_one(&mut self, text: &str) -> Result<Vec<f32>>;
+    embed_batch(&mut self, texts: &[&str]) -> Result<Vec<Vec<f32>>>; dims() -> usize.
+    wq-core calls embed_one at write time — no batch path needed yet (one
+    node created/updated at a time via CLI/MCP, not bulk-imported).
+  mq_store_precedent_NOT_reused: >
+    crates/mq-store/src/{collection.rs,similarity.rs} implement flat-JSON
+    storage + linear-scan cosine similarity. wq-core does NOT depend on or
+    import mq-store — it is a parallel, independent implementation using
+    vec0 instead. ADR-038 explicitly treats "migrate mq-store onto vec0"
+    as a separate, unscheduled follow-on (see follow_ups below), not
+    something this phase performs or blocks on.
+  default_build_exclusion_precedent: >
+    .github/workflows/ci.yml and this repo's clippy invocation currently
+    read: --exclude mq-embed --exclude mq-store --exclude mq-cli. This
+    phase is the point at which wq-core gains an mq-embed dependency
+    (transitively pulling in the ONNX/fastembed stack), so wq-core joins
+    that exclusion list starting in this phase — not before (see phase
+    wq-1's explicit note that it does NOT exclude wq-core).
+
+loc_budget: 260  # production ~140, tests ~120
+total_red_tests: 7
+
+# ──────────────────────────────────────────────────────────────────────
+# Decisions (resolved before RED)
+# ──────────────────────────────────────────────────────────────────────
+decisions:
+  - id: D-wq-2-1
+    question: "How is the sqlite-vec loadable extension registered with a rusqlite::Connection?"
+    answer: >
+      Use the `sqlite-vec` crate's Rust bindings (crates.io `sqlite-vec`,
+      published by asg017) which expose a `sqlite3_vec_init` C entry point
+      wrapped for rusqlite via `rusqlite::ffi::sqlite3_auto_extension` or
+      the crate's own documented `sqlite_vec::sqlite3_vec_init` registration
+      helper — EXACT API to be confirmed and pinned in wq-2.0's spike, not
+      assumed here. Do not hand-roll extension loading via
+      Connection::load_extension() + a compiled .dylib/.so path; prefer
+      the Rust-native registration path if the crate offers one, since it
+      avoids a runtime file-path dependency on the target platform's
+      extension file naming (.so/.dylib/.dll).
+    rationale: >
+      A Rust-native `sqlite3_auto_extension`-style registration (linked at
+      compile time) sidesteps needing to locate a platform-specific shared
+      library file at runtime — critical for wq-core being embedded in
+      wq-cli/wq-mcp binaries that get run from arbitrary working
+      directories across contributor machines. Exact confirmation is the
+      entire point of the wq-2.0 spike; this decision states the preferred
+      shape, not a verified fact.
+
+  - id: D-wq-2-2
+    question: "Does create_node always generate an embedding, or is it opt-in?"
+    answer: >
+      Always, synchronously, inline in create_node — no separate
+      create_node_with_embedding path, no async/background embedding queue.
+      embed_one(&format!(\"{title}\\n\\n{body}\")) (body may be empty string).
+    rationale: >
+      A node without an embedding is invisible to `wq search` — silently
+      creating un-searchable nodes is a footgun with no upside at this
+      project's scale (10,000s of nodes, per ADR-038 Q3 — embedding
+      generation cost is not a bottleneck at that scale). Keeping it
+      synchronous also avoids introducing async/threading into wq-core's
+      first release.
+
+  - id: D-wq-2-3
+    question: "Does update_node re-embed when title/body change?"
+    answer: >
+      NOT in this phase (see open_questions — Q-wq-2-1). update_node
+      updates the nodes row only; node_embeddings is left stale if
+      title/body changed. This is a known, documented gap, not a silent one.
+    rationale: >
+      Re-embedding on every update_node call (even ones that only touch
+      status) would make status-only updates (the common case — e.g.
+      `wq ticket update <id> --status done`) pay an ONNX inference cost
+      for no reason. Correctly detecting "did title or body change" and
+      re-embedding only then is a real feature — deferred to keep wq-2's
+      scope to "prove vec0 works end-to-end", not "build the fully correct
+      re-embedding lifecycle". Flagged to Phil as an open question, not
+      silently shipped as an accepted permanent gap.
+
+# ──────────────────────────────────────────────────────────────────────
+# Open questions (NOT resolved in this plan)
+# ──────────────────────────────────────────────────────────────────────
+open_questions:
+  - id: Q-wq-2-1
+    question: >
+      Should update_node re-embed when title/body change, and if so,
+      synchronously (pays inference cost on that call) or via some lazy/
+      background mechanism?
+    blocking: no
+    resolve_during: "follow-on sprint after wq-2 ships and real usage surfaces whether stale embeddings are actually a problem in practice"
+    default: "No re-embedding on update in v1 (D-wq-2-3)."
+    impact_if_default_wrong: >
+      `wq search` may return nodes ranked by their embedding as of creation
+      time, not their current title/body — a search-quality regression
+      that's invisible until someone notices a heavily-edited ticket isn't
+      surfacing for a query that matches its current (not original) text.
+      Low severity at current usage patterns (Phil is the only user); would
+      need revisiting before multi-user or automated-bulk-edit scenarios.
+
+  - id: Q-wq-2-2
+    question: "Does search() fall back to a non-fatal result (or an error) if the sqlite-vec extension fails to load on a given platform?"
+    blocking: yes
+    resolve_during: wq-2.0 spike
+    default: >
+      Fail loudly: WqDb::open() returns Err if vec0 registration fails,
+      rather than silently degrading to a DB with no semantic search. A
+      DB that can store nodes but can't search them is a confusing partial
+      state — better to fail at open() time with a clear error than at
+      first `wq search` call.
+    impact_if_default_wrong: >
+      If sqlite-vec has real platform-support gaps (e.g. no prebuilt
+      binary for some target triple), failing hard at open() would make
+      wq-core entirely unusable on that platform, not just search-degraded.
+      Spike must check documented platform support before this default is
+      locked in.
+
+# ──────────────────────────────────────────────────────────────────────
+# Risks
+# ──────────────────────────────────────────────────────────────────────
+risks:
+  - id: R-wq-2-1
+    title: "sqlite-vec Rust crate maturity / API stability — newer and smaller ecosystem than tree-sitter grammars"
+    severity: medium-high
+    status: "RESOLVED 2026-07-03 — see reviews/manual/wq-spikes/vec0-poc/FINDINGS.md"
+    mitigation: >
+      Spiked directly (standalone scratch crate, not part of this
+      workspace) rather than left to wq-2.0: sqlite-vec 0.1.9 accepts
+      ADR-038's draft schema verbatim (`vec0(node_id TEXT PRIMARY KEY,
+      embedding FLOAT[384])`) on macOS arm64 with `rustc 1.94.0`/stable —
+      no auxiliary rowid-mapping table needed, the "vec0 is rowid-only"
+      concern below does not apply to this version. One real gotcha
+      found: a KNN query through a JOIN needs an explicit `k = N`
+      predicate in the WHERE clause — `ORDER BY distance LIMIT N` alone
+      fails once a JOIN is involved. **Pin `rusqlite = "0.31"` explicitly
+      in wq-core's Cargo.toml** — `rusqlite@0.40` (latest as of spike date)
+      fails to build on this stable toolchain (pulls in
+      `libsqlite3-sys 0.38.1`, whose build script needs the unstable
+      `cfg_select` feature). Linux/CI (ubuntu-latest) prebuilt-binary
+      support was NOT verified by this spike — only macOS arm64. If CI
+      fails to build wq-core once it's added to the workspace, check that
+      first before assuming a code bug.
+  - id: R-wq-2-2
+    title: "dims=384 hard-coded coupling between wq-core and mq-embed's BgeSmall default"
+    severity: low
+    mitigation: >
+      If mq-embed's default model ever changes (e.g. to NomicCode, which
+      may have different dims), wq-core's vec0 table dimension is fixed at
+      creation time — an existing DB with FLOAT[384] cannot silently absorb
+      a differently-sized embedding. wq-core should read EmbedEngine::dims()
+      at write time and assert it equals 384 (fail loudly on mismatch)
+      rather than trusting the constant implicitly. Document this coupling
+      inline in schema.sql as a comment.
+  - id: R-wq-2-3
+    title: "CI runner (ubuntu-latest) may lack a system dependency sqlite-vec's prebuilt binary assumes"
+    severity: medium
+    mitigation: >
+      Since wq-core joins the --exclude list in this phase's CI update
+      (mirroring mq-embed/mq-store/mq-cli's existing ONNX-runtime
+      exclusion), wq-core's tests do NOT run in the default CI `test`
+      job at all after this phase — same treatment as mq-embed today.
+      A dedicated CI job for the excluded crates (if one exists or is
+      added later) would need to handle sqlite-vec's runtime requirements;
+      out of scope for this phase's plan, but the exclusion is the reason
+      R-wq-2-1's platform-support finding doesn't block CI green.
+
+# ──────────────────────────────────────────────────────────────────────
+# Substories
+# ──────────────────────────────────────────────────────────────────────
+substories:
+  - id: wq-2.0
+    title: "Spike — sqlite-vec crate pick + vec0 registration + platform support check"
+    type: spike
+    status: "DONE 2026-07-03 — see reviews/manual/wq-spikes/vec0-poc/FINDINGS.md (pre-empted this substory; standalone scratch crate, not part of this workspace)"
+    module: "(no production code — findings captured in FINDINGS.md, not spike_notes below)"
+    rationale: >
+      Resolves R-wq-2-1 and Q-wq-2-2 before any RED test depends on a
+      specific vec0 registration call shape or SQL syntax.
+    design_notes:
+      - "RESOLVED: sqlite-vec = \"0.1.9\" + rusqlite = \"0.31\" (features=[\"bundled\"]) is the confirmed-working pin. Registration: `rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(sqlite_vec::sqlite3_vec_init as *const ())))` inside an `unsafe` block, called once before opening any connection that needs vec0."
+      - "RESOLVED: ADR-038's draft schema SQL is accepted verbatim — no auxiliary rowid-mapping table needed. Use `vec0(node_id TEXT PRIMARY KEY, embedding FLOAT[384])` exactly as drafted."
+      - "RESOLVED (new finding, not anticipated in this plan): KNN queries through a JOIN need an explicit `k = N` predicate — `WHERE embedding MATCH ?1 AND k = ?2`, not `ORDER BY distance LIMIT N`. Bake this into every wq-2.1 RED test's expected query shape."
+      - "NOT verified by the spike: Linux/CI (ubuntu-latest) prebuilt-binary support. Only macOS arm64 was tested. Flag as a residual risk when wq-core is first added to CI."
+    red_tests: []
+    green_impl: []
+    loc_budget: 0
+    commit_pair:
+      spike: "percept: wq-2.0 spike — pin sqlite-vec crate + confirm vec0 schema shape (pre-empted by standalone reviews/manual/wq-spikes/vec0-poc spike, 2026-07-03)"
+
+  - id: wq-2.1
+    title: "RED — embedding write path + semantic search tests"
+    type: red
+    module: "crates/wq-core/tests/search.rs"
+    rationale: >
+      Pins the search() contract (embed at write time, KNN at query time,
+      join back to full Node) before any vec0-touching code exists.
+    design_notes:
+      - "Fixture: create 4-5 nodes with clearly semantically-distinct title/body text (e.g. one about 'authentication rework', one about 'chord wheel rotation bug', one about 'database migration'), then search for a query closely matching one of them and assert it ranks first."
+      - "Test that search() returns Vec<(Node, f32)> with the distance/score field present and ordered best-first."
+      - "Test k truncation: search(query, k=2) on a 5-node fixture returns exactly 2 results."
+      - "Test that search() results reference full Node records (not just ids) — join correctness, not just vec0 rowid plumbing."
+      - "If wq-2.0's spike found vec0 requires rowid-based keys (not native TEXT PRIMARY KEY), tests must exercise the node_id<->rowid mapping transparently — the public search() API signature does not change regardless of internal storage shape."
+    red_tests:
+      - name: create_node_generates_and_stores_embedding
+        intent: "After create_node, a corresponding row exists in node_embeddings for that node's id (verified via a direct query, not just via search())."
+      - name: search_ranks_closest_semantic_match_first
+        intent: "search(\"login and password rework\", k=5) on the fixture ranks the 'authentication rework' node first."
+      - name: search_respects_k_truncation
+        intent: "search(query, k=2) on a 5-node fixture returns exactly 2 results."
+      - name: search_returns_full_node_records
+        intent: "Each search() result's Node has all fields populated (title/body/status/etc.), not just an id."
+    green_impl: []
+    loc_budget: 100
+    commit_pair:
+      red: "percept: wq-2.1 RED — embedding write path + semantic search tests (4 RED)"
+
+  - id: wq-2.2
+    title: "GREEN — vec0 table wiring, write-path embedding, search() implementation"
+    type: green
+    module:
+      - "crates/wq-core/Cargo.toml"
+      - "crates/wq-core/src/schema.sql"
+      - "crates/wq-core/src/db.rs"
+      - "crates/wq-core/src/node.rs"
+      - "crates/wq-core/src/search.rs"
+      - "Cargo.toml (workspace — add sqlite-vec + mq-embed as workspace.dependencies / member path dep)"
+      - ".github/workflows/ci.yml (add --exclude wq-core to build/test/clippy invocations)"
+    rationale: "Minimum implementation to pass wq-2.1, plus the exclusion-list update this phase's scope requires."
+    design_notes:
+      - "Register the vec0 extension per wq-2.0's confirmed API inside WqDb::open() / open_in_memory(), before init_schema() runs (schema.sql's CREATE VIRTUAL TABLE ... USING vec0 statement needs the extension already loaded)."
+      - "node.rs: create_node now also calls mq_embed::EmbedEngine::embed_one on `{title}\\n\\n{body}` and inserts into node_embeddings in the same transaction as the nodes insert (atomicity: a node with no embedding row should never be reachable after a successful create_node call)."
+      - "search.rs: search(db, engine, query, k) embeds query via the same EmbedEngine, runs the vec0 MATCH/KNN query pattern confirmed in wq-2.0, joins node_embeddings back to nodes, returns Vec<(Node, f32)> sorted by distance ascending."
+      - "EmbedEngine is NOT owned by WqDb (it holds a loaded ONNX model — expensive to construct); callers construct one EmbedEngine and pass it by &mut reference into create_node/search. Document this ownership choice inline — avoids wq-core silently re-initializing the model on every call."
+      - "ci.yml: add --exclude wq-core to the 'Build workspace', 'Test workspace', and clippy job's cargo invocations, matching the existing mq-embed/mq-store/mq-cli entries exactly in style."
+      - "Run cargo fmt --all + cargo clippy -p wq-core -- -D warnings (run directly against the crate, NOT via the now-excluding workspace clippy invocation, since wq-core is excluded from that command starting this phase)."
+    red_tests: []
+    loc_budget: 160
+    commit_pair:
+      green: "percept: wq-2.2 GREEN — vec0 wiring, embedding write path, search()"
+
+# ──────────────────────────────────────────────────────────────────────
+# Follow-ups (created when sprint closes; not part of wq-2 scope)
+# ──────────────────────────────────────────────────────────────────────
+follow_ups:
+  - id: FU-wq-2-1
+    title: "Migrate mq-store's JSON-file vector storage onto vec0 (ADR-038 §Relationship to mq-store, Q4)"
+    rationale: >
+      ADR-038 explicitly defers this: "no preference; may happen immediately
+      after wq-core ships or be deferred indefinitely... pull forward
+      whenever convenient." Touches canopy's semantic.rs, which consumes
+      mq_store::collection::Collection and cosine_similarity directly —
+      a real refactor of a crate 3+ other things depend on, deliberately
+      NOT bundled into wq's initial build per the ADR's own framing.
+    blocking_for: "nothing — explicitly unscheduled; pull forward only when convenient per ADR-038 Q4"
+  - id: FU-wq-2-2
+    title: "Re-embedding on update_node when title/body change (Q-wq-2-1)"
+    rationale: >
+      Deferred per D-wq-2-3 to keep wq-2 scoped to proving vec0 end-to-end.
+      Revisit once real usage shows whether stale post-edit embeddings are
+      an actual search-quality problem.
+    blocking_for: "nothing — quality-of-life improvement, not correctness"
+
+# ──────────────────────────────────────────────────────────────────────
+# Spike notes (filled during wq-2.0 execution)
+# ──────────────────────────────────────────────────────────────────────
+spike_notes:
+  sqlite_vec_pick: |
+    (wq-2.0 TODO — document chosen sqlite-vec crate name, version, publisher,
+    platform prebuilt-binary support for aarch64-apple-darwin and
+    x86_64-unknown-linux-gnu, and the exact Rust registration call used.)
+  vec0_schema_confirmed: |
+    (wq-2.0 TODO — confirm whether vec0 supports TEXT PRIMARY KEY natively
+    at the pinned version, or whether an auxiliary rowid<->node_id mapping
+    table is required. Document the final schema.sql shape here before
+    wq-2.1 RED is written.)
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint-close acceptance
+# ──────────────────────────────────────────────────────────────────────
+sprint_close_acceptance:
+  description: |
+    wq-core is now excluded from the default workspace build/test/lint
+    (mirrors mq-embed/mq-store/mq-cli) — it must be exercised via its own
+    explicit -p invocation instead.
+  commands: |
+    $ cd /Users/develop/local-stacks/percept
+    $ cargo fmt --all -- --check
+    $ cargo clippy --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core -- -D warnings
+    $ cargo clippy -p wq-core -- -D warnings
+    $ cargo test -p wq-core --quiet
+    $ cargo build --workspace --exclude mq-embed --exclude mq-store --exclude mq-cli --exclude wq-core
+  verdict_logic: |
+    All commands must exit 0. The workspace-wide commands must now carry
+    --exclude wq-core (newly added this phase); wq-core's own health is
+    verified by the two crate-scoped -p commands instead.
+  notes: |
+    This is the first phase where wq-core's exclusion-list membership
+    changes CI. Confirm .github/workflows/ci.yml's three cargo invocations
+    (build, test, clippy) all gained --exclude wq-core in the same commit
+    as wq-2.2's GREEN — a partial update (e.g. build excludes it but
+    clippy doesn't) would produce a confusing CI failure unrelated to this
+    phase's actual code.
