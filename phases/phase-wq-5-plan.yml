@@ -236,6 +236,7 @@ substories:
     design_notes:
       - "Server registration + stdio transport per whatever the wq-5.0-pinned SDK requires — exact shape deferred to spike output, do not hard-code an API here that hasn't been confirmed to exist."
       - "tools.rs: one handler function per tool (wq_ticket_create, wq_ticket_update, wq_query, wq_search, wq_edge_create, wq_traverse, wq_rollup), each calling the corresponding wq-core function directly (per D-wq-5-2 — no dependency on wq-cli's commands.rs)."
+      - "DRIFT NOTE (added post-wq-2, 2026-07-03): create_node/search take &mut wq_core::EmbedEngine (caller-owned). Unlike wq-cli's per-invocation construction, wq-mcp holds ONE lazily-initialized engine for the server process's whole lifetime (OnceCell/Option in server state, constructed on the first embed-requiring tool call) — amortizing the ~1s ONNX model load across all calls is precisely the advantage a long-lived server has over a one-shot CLI. Tool calls that never embed (query/traverse/rollup/edge_create/ticket_update) must not trigger engine construction."
       - "harness_origin wiring per wq-5.0's pinned mechanism."
       - "ci.yml: add --exclude wq-mcp alongside --exclude wq-core --exclude wq-cli in all three cargo invocations — this is the FINAL exclusion-list update for the wq family (all three crates now excluded from default build/test/lint, matching mq-{embed,store,cli}'s existing 3-crate exclusion exactly in shape)."
       - "Run cargo fmt --all + cargo clippy -p wq-mcp -- -D warnings + cargo test -p wq-mcp."
