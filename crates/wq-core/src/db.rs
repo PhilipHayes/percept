@@ -27,6 +27,9 @@ fn register_vec0() {
 
 pub struct WqDb {
     pub(crate) conn: rusqlite::Connection,
+    /// The file this DB was opened from; None for in-memory DBs. Used by
+    /// rollup()'s cycle guard to seed the visited set with "self".
+    pub(crate) path: Option<std::path::PathBuf>,
 }
 
 impl WqDb {
@@ -38,23 +41,23 @@ impl WqDb {
             }
         }
         let conn = rusqlite::Connection::open(path)?;
-        Self::init(conn)
+        Self::init(conn, Some(path.to_path_buf()))
     }
 
     pub fn open_in_memory() -> Result<Self> {
         register_vec0();
         let conn = rusqlite::Connection::open_in_memory()?;
-        Self::init(conn)
+        Self::init(conn, None)
     }
 
-    fn init(mut conn: rusqlite::Connection) -> Result<Self> {
+    fn init(mut conn: rusqlite::Connection, path: Option<std::path::PathBuf>) -> Result<Self> {
         // Enable FK enforcement: simplest mechanism to reject orphan edges
         // (wq-1.3's edge CRUD will rely on this rather than app-layer checks).
         conn.pragma_update(None, "foreign_keys", "ON")?;
         let tx = conn.transaction()?;
         tx.execute_batch(SCHEMA_SQL)?;
         tx.commit()?;
-        Ok(Self { conn })
+        Ok(Self { conn, path })
     }
 
     /// Read-level access to the underlying connection.

@@ -34,3 +34,14 @@ CREATE VIRTUAL TABLE IF NOT EXISTS node_embeddings USING vec0(
   node_id TEXT PRIMARY KEY,
   embedding FLOAT[384]
 );
+
+-- Federation registry (wq-3). Created unconditionally in every DB
+-- (D-wq-3-1): a DB's role (leaf vs. rollup parent) is determined by
+-- whether this table has rows, not by which tables exist. Rows are
+-- POINTERS to child DBs — child data is never copied.
+CREATE TABLE IF NOT EXISTS registry (
+  project_name TEXT PRIMARY KEY,
+  db_path TEXT NOT NULL,
+  parent_registry_id TEXT,           -- NULL at the true root
+  last_seen TEXT
+);

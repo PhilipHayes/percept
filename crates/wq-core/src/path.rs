@@ -23,7 +23,14 @@ pub fn resolve_project_db_path(start_dir: &Path) -> PathBuf {
 /// Overridable via the `WQ_GLOBAL_DB_PATH` env var — the seam wq-cli's
 /// tests use to avoid touching the real global DB (phase wq-4 plan).
 pub fn resolve_global_db_path() -> PathBuf {
-    todo!("wq-3.2 GREEN")
+    if let Ok(overridden) = std::env::var("WQ_GLOBAL_DB_PATH") {
+        return PathBuf::from(overridden);
+    }
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".agents")
+        .join("wq")
+        .join("global.db")
 }
 
 /// Where a write should land: the cwd-resolved project DB by default,
@@ -31,8 +38,11 @@ pub fn resolve_global_db_path() -> PathBuf {
 /// FLAG lives in wq-cli; this function is the single source of the
 /// dispatch logic so wq-mcp inherits it unchanged.
 pub fn resolve_write_target(cwd: &Path, explicit_global: bool) -> PathBuf {
-    let _ = (cwd, explicit_global);
-    todo!("wq-3.2 GREEN")
+    if explicit_global {
+        resolve_global_db_path()
+    } else {
+        resolve_project_db_path(cwd)
+    }
 }
 
 #[cfg(test)]
