@@ -1,7 +1,7 @@
 sprint: wq-1
 phase: "wq-1 (percept new-crate-family, phase 1 of 5)"
 title: "wq-core foundations — SQLite schema, node/edge CRUD, graph traversal"
-status: planned
+status: complete  # closed 2026-07-03 — all 4 substories shipped (6020a08 spike, 705540b RED, ed9b9d2 GREEN, 84aece5 RED, 80c0986 GREEN); sprint-close acceptance 4/4 commands green, 13/13 tests
 authored: 2026-07-03
 upstream_plan: "n/a — greenfield crate family, no upstream percept plan"
 adr_refs:
