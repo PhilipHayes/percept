@@ -1,7 +1,7 @@
 sprint: wq-2
 phase: "wq-2 (percept new-crate-family, phase 2 of 5)"
 title: "wq-core embeddings — sqlite-vec integration, node_embeddings vec0 table, semantic search"
-status: planned
+status: complete  # closed 2026-07-03 — spike pre-empted by vec0-poc; 3b3118b RED (4 tests), ab58758 GREEN; acceptance all green (17 tests total, semantic ranking passes)
 authored: 2026-07-03
 upstream_plan: "phase-wq-1-plan.yml (wq-core schema, node/edge CRUD, traversal — must be GREEN first)"
 adr_refs:
@@ -299,14 +299,21 @@ follow_ups:
 # ──────────────────────────────────────────────────────────────────────
 spike_notes:
   sqlite_vec_pick: |
-    (wq-2.0 TODO — document chosen sqlite-vec crate name, version, publisher,
-    platform prebuilt-binary support for aarch64-apple-darwin and
-    x86_64-unknown-linux-gnu, and the exact Rust registration call used.)
+    sqlite-vec = "0.1.9" (crates.io, publisher asg017), workspace-pinned.
+    Registration: rusqlite::ffi::sqlite3_auto_extension +
+    transmute(sqlite_vec::sqlite3_vec_init as *const ()), Once-guarded in
+    wq-core/src/db.rs. macOS arm64 verified (dev box); Linux CI unverified
+    but moot — wq-core is exclusion-listed from CI as of this phase.
+    Note: rustc needs the transmute target INFERRED (clippy
+    missing_transmute_annotations allowed at the call site) — an explicit
+    `unsafe extern "C" fn()` turbofish fails E0308 because the real
+    callback type is sqlite3's 3-arg extension-init signature.
   vec0_schema_confirmed: |
-    (wq-2.0 TODO — confirm whether vec0 supports TEXT PRIMARY KEY natively
-    at the pinned version, or whether an auxiliary rowid<->node_id mapping
-    table is required. Document the final schema.sql shape here before
-    wq-2.1 RED is written.)
+    TEXT PRIMARY KEY supported natively at 0.1.9 — ADR-038's draft schema
+    shipped verbatim in schema.sql (node_embeddings vec0, FLOAT[384]).
+    No auxiliary rowid-mapping table. KNN requires explicit `k = ?`
+    predicate in WHERE when JOINing (LIMIT alone fails) — implemented in
+    search.rs accordingly.
 
 # ──────────────────────────────────────────────────────────────────────
 # Sprint-close acceptance
