@@ -1,7 +1,7 @@
 sprint: wq-3
 phase: "wq-3 (percept new-crate-family, phase 3 of 5)"
 title: "wq-core federation — registry table, multi-DB rollup via ATTACH + UNION ALL"
-status: planned
+status: complete  # closed 2026-07-03 — 0f118a4 spike (MAX_ATTACHED=10), b609063 RED (7), 13dbd90 GREEN. NOTE: rollup shipped as per-child-connection loop, NOT ATTACH+UNION (title kept for history; see spike_notes.max_attached_confirmed + GREEN commit message for the rationale)
 authored: 2026-07-03
 upstream_plan: "phase-wq-2-plan.yml (vec0 embeddings + search — must be GREEN first)"
 adr_refs:
