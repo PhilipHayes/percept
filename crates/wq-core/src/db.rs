@@ -12,7 +12,7 @@ impl WqDb {
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                let _ = std::fs::create_dir_all(parent);
+                std::fs::create_dir_all(parent)?;
             }
         }
         let conn = rusqlite::Connection::open(path)?;
