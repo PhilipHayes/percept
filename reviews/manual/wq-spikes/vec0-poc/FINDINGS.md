@@ -53,6 +53,18 @@ ORDER BY distance;
 
 — resolves correctly against the attached schema's vec0 virtual table. **This resolves the wq-3 architectural fork**: rollup's semantic-search path can be one SQL statement (`ATTACH` each registered child, `UNION ALL` across `child1.node_embeddings`/`child2.node_embeddings`/... each with its own `k = N`, or attach one at a time and merge in Rust if N children is large) — it does **not** require a Rust-side per-connection merge as a hard requirement. Whether to merge via SQL `UNION ALL` vs. Rust-side top-k merging across attached children is now a performance/ergonomics choice, not a "does this work at all" blocker.
 
+## Experiment 3 — SQLITE_MAX_ATTACHED (added 2026-07-03, wq-3 spike remainder)
+
+**Result: 10** (the stock SQLite default) for rusqlite 0.31's bundled build.
+Attach #11 fails with `too many attached databases - max 10`.
+
+**Design consequence for wq-3's rollup()**: do NOT attach all registered
+children simultaneously — a federation of >10 projects would hard-fail.
+Attach one child at a time (ATTACH → query → DETACH loop), merging results
+in Rust. Identical semantics (live at query time, no copies), no ceiling,
+and the per-child loop is also where the cyclic-registry visited-set guard
+naturally lives.
+
 ## Net effect on the phase plans
 
 - wq-2: drop the aux-mapping-table contingency; drop rowid-only concern. Pin `rusqlite = "0.31"` explicitly in `wq-core`'s `Cargo.toml` (don't let it float to 0.40+). Bake the `k = N` requirement into every KNN query, not just a top-level one.

@@ -164,9 +164,38 @@ fn experiment_2_attach_plus_match() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+fn experiment_3_max_attached() {
+    println!("\n=== Experiment 3: SQLITE_MAX_ATTACHED for the bundled sqlite (rusqlite 0.31) ===");
+
+    let dir = std::env::temp_dir().join(format!("wq-spike-attach-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let conn = Connection::open(dir.join("parent.db")).unwrap();
+    let mut attached = 0u32;
+    for i in 0..64 {
+        let child = dir.join(format!("c{i}.db"));
+        // Touch the file as a valid sqlite db.
+        Connection::open(&child).unwrap();
+        match conn.execute(
+            &format!("ATTACH DATABASE '{}' AS a{i}", child.display()),
+            [],
+        ) {
+            Ok(_) => attached += 1,
+            Err(e) => {
+                println!("Attach #{} failed: {e}", i + 1);
+                break;
+            }
+        }
+    }
+    println!("Max simultaneously attached DBs (beyond main): {attached}");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 fn main() {
     register_vec0();
     experiment_1_text_primary_key();
     experiment_1b_knn_through_join();
     experiment_2_attach_plus_match();
+    experiment_3_max_attached();
 }

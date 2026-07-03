@@ -261,14 +261,18 @@ follow_ups: []
 # ──────────────────────────────────────────────────────────────────────
 spike_notes:
   attach_vec0_result: |
-    (wq-3.0 TODO — document whether a vec0 MATCH query succeeds against an
-    ATTACHed database's virtual table, or whether search-across-rollup
-    needs a per-connection fallback merged in Rust. This directly decides
-    rollup()'s implementation shape in wq-3.2.)
+    RESOLVED 2026-07-03 (pre-empted by the standalone vec0-poc spike):
+    vec0 MATCH works against an ATTACHed schema's virtual table with a
+    qualified name + explicit `k = ?` predicate. No per-connection
+    fallback needed. See reviews/manual/wq-spikes/vec0-poc/FINDINGS.md.
   max_attached_confirmed: |
-    (wq-3.0 TODO — document the pinned rusqlite/bundled-sqlite build's
-    actual SQLITE_MAX_ATTACHED value and whether it's the SQLite default
-    of 10 or has been compiled differently.)
+    RESOLVED 2026-07-03 (vec0-poc experiment 3): SQLITE_MAX_ATTACHED = 10
+    (stock default) for rusqlite 0.31's bundled sqlite. Attach #11 fails
+    with 'too many attached databases - max 10'. CONSEQUENCE: rollup()
+    attaches ONE child at a time (ATTACH → query → DETACH loop, results
+    merged in Rust) instead of the plan's original attach-all-then-
+    UNION-ALL shape — >10 registered projects is a plausible federation
+    size and must not hard-fail. Semantics unchanged (live, no copies).
 
 # ──────────────────────────────────────────────────────────────────────
 # Sprint-close acceptance
