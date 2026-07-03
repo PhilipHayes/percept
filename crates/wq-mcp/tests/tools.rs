@@ -190,6 +190,46 @@ fn harness_origin_is_attributed_per_wq_5_0_mechanism() {
     );
 }
 
+/// wq-mcp servers are typically launched once per app-startup by the host
+/// harness, not per active project — so `state.project_root` (fixed at
+/// construction) can go stale the moment the caller switches projects.
+/// An explicit `project_root` arg on each call is the escape hatch,
+/// mirroring `--global`'s per-call override rather than requiring a
+/// stateful "switch project" tool (canopy's canopy_open pattern).
+#[test]
+fn explicit_project_root_arg_overrides_server_state_per_call() {
+    let server_launch_dir = TempDir::new().unwrap();
+    let actual_project_dir = TempDir::new().unwrap();
+    let mut state =
+        ServerState::with_harness(server_launch_dir.path().to_path_buf(), "test-harness");
+
+    let node = handle_tool_call(
+        &mut state,
+        "wq_ticket_create",
+        &json!({
+            "title": "Routed via explicit project_root",
+            "status": "open",
+            "project_root": actual_project_dir.path().to_str().unwrap()
+        }),
+    )
+    .expect("create succeeds");
+    assert!(!node["id"].as_str().unwrap_or("").is_empty());
+
+    // The node must land in actual_project_dir's DB, NOT the server's
+    // launch-time project_root.
+    let db_in_actual = actual_project_dir.path().join(".agents").join("wq.db");
+    assert!(
+        db_in_actual.exists(),
+        "DB must be created under the override path"
+    );
+
+    let db_in_launch_dir = server_launch_dir.path().join(".agents").join("wq.db");
+    assert!(
+        !db_in_launch_dir.exists(),
+        "the server's launch-time project_root must NOT be touched when overridden"
+    );
+}
+
 #[test]
 fn wq_register_tool_adds_pointer_and_rollup_sees_it() {
     let project = TempDir::new().unwrap();
