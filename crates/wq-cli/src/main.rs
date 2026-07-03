@@ -7,7 +7,7 @@
 //! anyhow is acceptable at this binary boundary (wq-4 plan, scope note);
 //! wq-core itself stays typed-error.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -54,6 +54,13 @@ enum Command {
     },
     /// Roll up nodes across this DB's registry (or the global registry)
     Rollup {
+        #[arg(long)]
+        global: bool,
+    },
+    /// Register a child DB as a federation pointer (Amendment 2026-07-03, closes FU-wq-4-2)
+    Register {
+        project_name: String,
+        db_path: String,
         #[arg(long)]
         global: bool,
     },
@@ -204,6 +211,20 @@ fn run(cli: Cli) -> Result<Value> {
         Command::Rollup { global } => {
             let db = open_db(global)?;
             Ok(serde_json::to_value(db.rollup()?)?)
+        }
+        Command::Register {
+            project_name,
+            db_path,
+            global,
+        } => {
+            let db = open_db(global)?;
+            db.register_child(&project_name, Path::new(&db_path))?;
+            let entry = db
+                .list_registered_children()?
+                .into_iter()
+                .find(|e| e.project_name == project_name)
+                .expect("just-registered entry must be present");
+            Ok(serde_json::to_value(entry)?)
         }
     }
 }

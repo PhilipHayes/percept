@@ -133,6 +133,19 @@ pub fn tool_definitions() -> Value {
                     "type": "object",
                     "properties": {"global": {"type": "boolean"}}
                 }
+            },
+            {
+                "name": "wq_register",
+                "description": "Register a child DB as a federation pointer under this DB's (or the global DB's) registry. Stores a pointer only — never copies rows.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project_name": {"type": "string"},
+                        "db_path": {"type": "string"},
+                        "global": {"type": "boolean", "description": "register under the global DB instead of the project DB"}
+                    },
+                    "required": ["project_name", "db_path"]
+                }
             }
         ]
     })
@@ -254,6 +267,20 @@ pub fn handle_tool_call(
             let db = open_db(state, arg_bool(args, "global"))?;
             let result = db.rollup().map_err(|e| e.to_string())?;
             serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "wq_register" => {
+            let project_name = require_str(args, "project_name", tool)?;
+            let db_path = require_str(args, "db_path", tool)?;
+            let db = open_db(state, arg_bool(args, "global"))?;
+            db.register_child(&project_name, std::path::Path::new(&db_path))
+                .map_err(|e| e.to_string())?;
+            let entry = db
+                .list_registered_children()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .find(|e| e.project_name == project_name)
+                .ok_or_else(|| "just-registered entry must be present".to_string())?;
+            serde_json::to_value(entry).map_err(|e| e.to_string())
         }
         other => Err(format!("unknown tool: {other}")),
     }
