@@ -1,0 +1,18 @@
+[package]
+name = "wq-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Durable work-graph storage for wq (ADR-038)"
+
+[dependencies]
+rusqlite = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+uuid = { workspace = true }

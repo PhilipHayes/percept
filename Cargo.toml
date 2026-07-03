@@ -22,6 +22,8 @@ members = [
     "crates/tq-parse",
     "crates/tq-core",
     "crates/tq-cli",
+    # wq — Work Graph Query
+    "crates/wq-core",
 ]
 
 [workspace.package]
