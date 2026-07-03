@@ -27,7 +27,7 @@ pub struct RollupWarning {
     pub reason: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct RollupResult {
     /// Nodes from this DB and every (transitively) registered child.
     pub nodes: Vec<Node>,

@@ -69,4 +69,34 @@ impl WqDb {
     pub fn connection(&self) -> &rusqlite::Connection {
         &self.conn
     }
+
+    /// Executes arbitrary SQL, returning rows as JSON objects keyed by
+    /// column name — the shared backend for the `wq query` escape hatch
+    /// (CLI, phase wq-4) and the `wq_query` MCP tool (phase wq-5).
+    /// Blobs are summarized, not dumped (embeddings are 1.5KB each).
+    pub fn query_json(&self, sql: &str) -> Result<Vec<serde_json::Value>> {
+        use serde_json::{json, Value};
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
+        let mut rows = stmt.query([])?;
+        let mut out = Vec::new();
+        while let Some(row) = rows.next()? {
+            let mut obj = serde_json::Map::new();
+            for (i, name) in column_names.iter().enumerate() {
+                let value = match row.get_ref(i)? {
+                    rusqlite::types::ValueRef::Null => Value::Null,
+                    rusqlite::types::ValueRef::Integer(n) => json!(n),
+                    rusqlite::types::ValueRef::Real(f) => json!(f),
+                    rusqlite::types::ValueRef::Text(t) => json!(String::from_utf8_lossy(t)),
+                    rusqlite::types::ValueRef::Blob(b) => {
+                        json!(format!("<blob {} bytes>", b.len()))
+                    }
+                };
+                obj.insert(name.clone(), value);
+            }
+            out.push(Value::Object(obj));
+        }
+        Ok(out)
+    }
 }
