@@ -54,6 +54,13 @@ impl WqDb {
         // Enable FK enforcement: simplest mechanism to reject orphan edges
         // (wq-1.3's edge CRUD will rely on this rather than app-layer checks).
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        // WAL + busy_timeout (post-review hardening, FAULT-003): without
+        // these, concurrent writers to the same DB (the whole point of the
+        // federation/cross-harness design) hit a raw "database is locked"
+        // error instead of retrying, and readers block on writers. WAL is
+        // a no-op-safe pragma for in-memory DBs (SQLite ignores it there).
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "busy_timeout", 5000)?;
         let tx = conn.transaction()?;
         tx.execute_batch(SCHEMA_SQL)?;
         tx.commit()?;
@@ -74,8 +81,20 @@ impl WqDb {
     /// column name — the shared backend for the `wq query` escape hatch
     /// (CLI, phase wq-4) and the `wq_query` MCP tool (phase wq-5).
     /// Blobs are summarized, not dumped (embeddings are 1.5KB each).
+    ///
+    /// Rejects multi-statement SQL (post-review hardening, FAULT-004):
+    /// `sqlite3_prepare_v2` silently compiles and runs only the FIRST
+    /// statement of a semicolon-separated string, discarding the rest
+    /// with no error — dangerous for a tool explicitly documented as
+    /// "full read/write access." A caller doing a compound write-then-
+    /// verify in one call would otherwise get only the first half
+    /// executed, silently.
     pub fn query_json(&self, sql: &str) -> Result<Vec<serde_json::Value>> {
         use serde_json::{json, Value};
+
+        if let Some(extra) = find_trailing_statement(sql) {
+            return Err(crate::error::Error::MultiStatementSql(extra));
+        }
 
         let mut stmt = self.conn.prepare(sql)?;
         let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
@@ -99,4 +118,28 @@ impl WqDb {
         }
         Ok(out)
     }
+}
+
+/// Quote-aware scan for a `;` followed by non-whitespace content — the
+/// signature of a second SQL statement `sqlite3_prepare_v2` would silently
+/// ignore. Returns the trailing content (trimmed) if found. A trailing
+/// `;` with nothing after it (the common "I always end my SQL with a
+/// semicolon" style) is NOT flagged.
+fn find_trailing_statement(sql: &str) -> Option<String> {
+    let mut in_single = false;
+    let mut in_double = false;
+    for (byte_idx, c) in sql.char_indices() {
+        match c {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            ';' if !in_single && !in_double => {
+                let rest = sql[byte_idx + c.len_utf8()..].trim();
+                if !rest.is_empty() {
+                    return Some(rest.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }

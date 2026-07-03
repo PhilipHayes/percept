@@ -14,6 +14,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("embedding failed: {0}")]
     Embed(String),
+    #[error("query contains more than one SQL statement (extra content after ';': {0:?}) — wq_query supports a single statement only")]
+    MultiStatementSql(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
