@@ -33,4 +33,14 @@ impl WqDb {
         tx.commit()?;
         Ok(Self { conn })
     }
+
+    /// Read-level access to the underlying connection.
+    ///
+    /// Exists for ADR-038's raw-SQL escape hatch (`wq query "SELECT ..."`,
+    /// phase wq-4) and for tests that assert on storage-level invariants.
+    /// Mutations should go through the typed CRUD methods, which own
+    /// invariants (timestamps, embedding rows) raw SQL would bypass.
+    pub fn connection(&self) -> &rusqlite::Connection {
+        &self.conn
+    }
 }

@@ -3,7 +3,13 @@ pub mod edge;
 pub mod error;
 pub mod node;
 pub mod path;
+pub mod search;
 pub mod traverse;
+
+// Re-exported so wq-cli / wq-mcp / tests construct the engine through one
+// dependency (wq-core) instead of depending on mq-embed directly.
+pub use mq_embed::engine::EmbedEngine;
+pub use mq_embed::model::ModelKind;
 
 pub use db::WqDb;
 pub use edge::{Edge, NewEdge};

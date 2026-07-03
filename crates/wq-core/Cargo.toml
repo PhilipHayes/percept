@@ -7,6 +7,8 @@ description = "Durable work-graph storage for wq (ADR-038)"
 
 [dependencies]
 rusqlite = { workspace = true }
+sqlite-vec = { workspace = true }
+mq-embed = { path = "../mq-embed" }
 uuid = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }

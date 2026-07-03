@@ -1,3 +1,4 @@
+use mq_embed::engine::EmbedEngine;
 use serde::{Deserialize, Serialize};
 
 use crate::db::WqDb;
@@ -35,7 +36,13 @@ pub struct UpdateNode {
 }
 
 impl WqDb {
-    pub fn create_node(&self, new: NewNode) -> Result<Node> {
+    /// Creates a node and (once wq-2 GREEN lands) its embedding row, atomically.
+    ///
+    /// `engine` is caller-owned: EmbedEngine holds a loaded ONNX model and is
+    /// expensive to construct, so wq-core never instantiates one internally
+    /// (see phase-wq-2-plan.yml, wq-2.2 design notes).
+    pub fn create_node(&self, engine: &mut EmbedEngine, new: NewNode) -> Result<Node> {
+        let _ = &engine; // RED stub: embedding write path lands in wq-2.2 GREEN
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
         let metadata_json = new

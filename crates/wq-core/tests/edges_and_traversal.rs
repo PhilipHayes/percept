@@ -4,21 +4,27 @@ use std::time::Duration;
 
 use wq_core::{NewEdge, NewNode, WqDb};
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+mod common;
+
+// ── helpers ────────────────────────────────────────────────────────────────────────────
 
 fn fresh_db() -> WqDb {
     WqDb::open_in_memory().unwrap()
 }
 
 fn make_node(db: &WqDb, title: &str) -> String {
-    db.create_node(NewNode {
-        node_type: "ticket".to_string(),
-        title: title.to_string(),
-        body: None,
-        status: None,
-        harness_origin: None,
-        metadata: None,
-    })
+    let mut engine = common::engine().lock().unwrap();
+    db.create_node(
+        &mut engine,
+        NewNode {
+            node_type: "ticket".to_string(),
+            title: title.to_string(),
+            body: None,
+            status: None,
+            harness_origin: None,
+            metadata: None,
+        },
+    )
     .unwrap()
     .id
 }
