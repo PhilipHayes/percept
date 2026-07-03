@@ -246,6 +246,7 @@ follow_ups:
     blocking_for: "nothing — deliberate v1 scope cut"
   - id: FU-wq-4-2
     title: "`wq register <name> <path>` CLI command — surface gap discovered during wq-4.1"
+    status: "RESOLVED 2026-07-03 — ADR-038 amended, implemented in 357e540 (wq-6.2 GREEN, CLI + MCP both)"
     rationale: >
       ADR-038's draft CLI surface has no registration command, but
       register_child (wq-3) has no user-facing entry point without one —
