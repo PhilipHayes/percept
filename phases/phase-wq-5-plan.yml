@@ -1,7 +1,7 @@
 sprint: wq-5
 phase: "wq-5 (percept new-crate-family, phase 5 of 5)"
 title: "wq-mcp — MCP server mirroring wq-cli 1:1 as tools (cross-harness portability seam)"
-status: planned
+status: complete  # closed 2026-07-03 — 656bc1a RED (8), 948d35c GREEN; all gates + live JSON-RPC protocol smoke test green. wq family COMPLETE: ADR-038 fully built (wq-core/wq-cli/wq-mcp, 40 tests).
 authored: 2026-07-03
 upstream_plan: "phase-wq-4-plan.yml (wq-cli — must be GREEN first; wq-mcp mirrors its command surface)"
 adr_refs:
