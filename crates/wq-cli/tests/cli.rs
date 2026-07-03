@@ -1,10 +1,12 @@
-//! wq-4.1 RED — wq-cli integration tests (8 scenarios, assert_cmd).
+//! wq-4.1 RED — wq-cli integration tests (assert_cmd).
 //!
 //! Every invocation runs inside a fresh TempDir (its own .agents/wq.db) and
 //! passes FASTEMBED_CACHE_DIR through — fastembed's default cache is
 //! cwd-relative, and cwd here is a TempDir (see the wq-4 plan drift note).
-//! Registration for the rollup test uses wq-core directly: ADR-038's CLI
-//! surface has no `wq register` command (flagged as FU-wq-4-2).
+//!
+//! wq-6.1 RED (added 2026-07-03, closes FU-wq-4-2): `wq register` test.
+//! Prior rollup test still registers via wq-core directly, deliberately
+//! unchanged — it exercises rollup(), not the registration UX.
 
 use std::path::Path;
 
@@ -219,5 +221,50 @@ fn harness_flag_defaults_to_cli_when_omitted() {
         json.as_array().unwrap()[0]["harness_origin"],
         "cli",
         "omitted --harness must default to \"cli\" (Q-wq-4-1)"
+    );
+}
+
+#[test]
+fn register_command_adds_pointer_and_rollup_sees_it() {
+    let project = TempDir::new().unwrap();
+    let global_dir = TempDir::new().unwrap();
+    let global_db = global_dir.path().join("global.db");
+
+    seed_ticket(project.path(), "Registered via the CLI");
+
+    let child_db = project.path().join(".agents").join("wq.db");
+    let output = wq(project.path())
+        .args([
+            "register",
+            "testproj",
+            child_db.to_str().unwrap(),
+            "--global",
+        ])
+        .env("WQ_GLOBAL_DB_PATH", &global_db)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let entry = parse_stdout(&output);
+    assert_eq!(entry["project_name"], "testproj");
+    assert_eq!(entry["db_path"], child_db.to_str().unwrap());
+
+    // The registration is real, not just an echo: rollup --global sees it.
+    let output = wq(project.path())
+        .args(["rollup", "--global"])
+        .env("WQ_GLOBAL_DB_PATH", &global_db)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let rolled = parse_stdout(&output);
+    let titles: Vec<&str> = rolled["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n["title"].as_str())
+        .collect();
+    assert!(
+        titles.contains(&"Registered via the CLI"),
+        "rollup must see a node registered via `wq register`, got {titles:?}"
     );
 }

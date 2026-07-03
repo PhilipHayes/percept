@@ -189,3 +189,44 @@ fn harness_origin_is_attributed_per_wq_5_0_mechanism() {
         "created nodes carry the server's per-process harness identity"
     );
 }
+
+#[test]
+fn wq_register_tool_adds_pointer_and_rollup_sees_it() {
+    let project = TempDir::new().unwrap();
+    let global_dir = TempDir::new().unwrap();
+    let global_db = global_dir.path().join("global.db");
+
+    let mut project_state = state_in(&project);
+    create_ticket(&mut project_state, "Registered via wq_register");
+    let child_db = project.path().join(".agents").join("wq.db");
+
+    std::env::set_var("WQ_GLOBAL_DB_PATH", &global_db);
+
+    let entry = handle_tool_call(
+        &mut project_state,
+        "wq_register",
+        &json!({
+            "project_name": "testproj",
+            "db_path": child_db.to_str().unwrap(),
+            "global": true
+        }),
+    )
+    .expect("register succeeds");
+    assert_eq!(entry["project_name"], "testproj");
+
+    let rolled = handle_tool_call(&mut project_state, "wq_rollup", &json!({"global": true}))
+        .expect("rollup succeeds");
+
+    std::env::remove_var("WQ_GLOBAL_DB_PATH");
+
+    let titles: Vec<&str> = rolled["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n["title"].as_str())
+        .collect();
+    assert!(
+        titles.contains(&"Registered via wq_register"),
+        "rollup must see a node registered via wq_register, got {titles:?}"
+    );
+}
