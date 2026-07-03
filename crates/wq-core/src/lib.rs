@@ -4,6 +4,8 @@ mod embed;
 pub mod error;
 pub mod node;
 pub mod path;
+pub mod registry;
+pub mod rollup;
 pub mod search;
 pub mod traverse;
 
@@ -16,4 +18,6 @@ pub use db::WqDb;
 pub use edge::{Edge, NewEdge};
 pub use error::{Error, Result};
 pub use node::{NewNode, Node, UpdateNode};
-pub use path::resolve_project_db_path;
+pub use path::{resolve_global_db_path, resolve_project_db_path, resolve_write_target};
+pub use registry::RegistryEntry;
+pub use rollup::{RollupResult, RollupWarning};

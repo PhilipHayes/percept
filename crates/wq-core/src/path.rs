@@ -18,6 +18,23 @@ pub fn resolve_project_db_path(start_dir: &Path) -> PathBuf {
     start_dir.join(".agents").join("wq.db")
 }
 
+/// The global rollup DB: `~/.agents/wq/global.db` (ADR-038 §Federation).
+///
+/// Overridable via the `WQ_GLOBAL_DB_PATH` env var — the seam wq-cli's
+/// tests use to avoid touching the real global DB (phase wq-4 plan).
+pub fn resolve_global_db_path() -> PathBuf {
+    todo!("wq-3.2 GREEN")
+}
+
+/// Where a write should land: the cwd-resolved project DB by default,
+/// or the global DB when explicitly requested (D-wq-3-3). The --global
+/// FLAG lives in wq-cli; this function is the single source of the
+/// dispatch logic so wq-mcp inherits it unchanged.
+pub fn resolve_write_target(cwd: &Path, explicit_global: bool) -> PathBuf {
+    let _ = (cwd, explicit_global);
+    todo!("wq-3.2 GREEN")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
