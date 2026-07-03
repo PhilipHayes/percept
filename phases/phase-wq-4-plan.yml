@@ -1,7 +1,7 @@
 sprint: wq-4
 phase: "wq-4 (percept new-crate-family, phase 4 of 5)"
 title: "wq-cli — CLI surface over wq-core (ticket/query/search/edge/traverse/rollup)"
-status: planned
+status: complete  # closed 2026-07-03 — 369f0e4 RED (8), ad64524 GREEN; all gates + jq smoke test green. Error contract pinned: JSON on stderr, exit 1. --harness on ticket create only (schema has no harness field on update/edge).
 authored: 2026-07-03
 upstream_plan: "phase-wq-3-plan.yml (registry + rollup — must be GREEN first)"
 adr_refs:
@@ -244,6 +244,18 @@ follow_ups:
       requests it after real usage — do not speculatively build a SQL
       statement classifier now.
     blocking_for: "nothing — deliberate v1 scope cut"
+  - id: FU-wq-4-2
+    title: "`wq register <name> <path>` CLI command — surface gap discovered during wq-4.1"
+    rationale: >
+      ADR-038's draft CLI surface has no registration command, but
+      register_child (wq-3) has no user-facing entry point without one —
+      today the only way to build a federation is raw SQL or library
+      code. wq-4.1's rollup test registers via wq-core as a dev-dep to
+      keep the ADR surface verbatim. Needs an ADR-038 amendment (small)
+      before adding: the surface is an accepted decision, not something
+      a sprint silently grows. Same gap applies to wq-mcp's tool list
+      (phase wq-5) — fix both together when amended.
+    blocking_for: "real-world federation usability (not any planned sprint)"
 
 # ──────────────────────────────────────────────────────────────────────
 # Sprint-close acceptance
