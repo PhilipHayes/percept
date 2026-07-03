@@ -1,0 +1,25 @@
+[package]
+name = "wq-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "wq — CLI over the wq work-graph store (ADR-038)"
+
+[[bin]]
+name = "wq"
+path = "src/main.rs"
+
+[dependencies]
+wq-core = { path = "../wq-core" }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+tempfile = { workspace = true }
