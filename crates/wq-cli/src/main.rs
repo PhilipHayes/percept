@@ -57,6 +57,11 @@ enum Command {
         #[arg(long)]
         global: bool,
     },
+    /// Check the DB for silent integrity drift (never loads a model)
+    Doctor {
+        #[arg(long)]
+        global: bool,
+    },
     /// Backfill embeddings for nodes that have none, making them searchable
     Reindex {
         /// Report what would be indexed without loading a model or writing
@@ -182,6 +187,22 @@ fn run(cli: Cli) -> Result<Value> {
         }
         Command::Search { text, k } => {
             let db = open_db(false)?;
+            // Warn on stderr rather than wrapping stdout: a caller piping
+            // `wq search` into jq must keep getting a bare array. An unindexed
+            // node is invisible to this query, so the result is short by an
+            // unknown amount and nothing else would ever say so.
+            let unindexed = db.unindexed_count()?;
+            if unindexed > 0 {
+                eprintln!(
+                    "{}",
+                    json!({
+                        "warning": format!(
+                            "{unindexed} node(s) have no embedding and cannot be \
+                             returned by search; run `wq reindex`"
+                        )
+                    })
+                );
+            }
             let results = db.search(&mut engine()?, &text, k)?;
             let rows: Vec<Value> = results
                 .into_iter()
@@ -219,6 +240,10 @@ fn run(cli: Cli) -> Result<Value> {
         Command::Rollup { global } => {
             let db = open_db(global)?;
             Ok(serde_json::to_value(db.rollup()?)?)
+        }
+        Command::Doctor { global } => {
+            let db = open_db(global)?;
+            Ok(serde_json::to_value(db.doctor()?)?)
         }
         Command::Reindex { dry_run, global } => {
             let db = open_db(global)?;

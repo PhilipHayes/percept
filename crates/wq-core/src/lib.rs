@@ -1,4 +1,5 @@
 pub mod db;
+pub mod doctor;
 pub mod edge;
 mod embed;
 pub mod error;
@@ -16,6 +17,7 @@ pub use mq_embed::engine::EmbedEngine;
 pub use mq_embed::model::ModelKind;
 
 pub use db::WqDb;
+pub use doctor::{DoctorFinding, DoctorReport};
 pub use edge::{Edge, NewEdge};
 pub use error::{Error, Result};
 pub use node::{NewNode, Node, UpdateNode};

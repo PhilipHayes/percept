@@ -152,6 +152,17 @@ pub fn tool_definitions() -> Value {
                 }
             },
             {
+                "name": "wq_doctor",
+                "description": "Check the work graph for silent integrity drift: nodes with no embedding (invisible to search), embeddings whose node was deleted (shorten search results), and edges referencing missing nodes (truncate traversals). Never loads the embedding model. Returns {total_nodes, total_edges, total_embeddings, findings[]}.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "global": {"type": "boolean"},
+                        "project_root": {"type": "string", "description": "override which project this call targets (default: server's launch directory)"}
+                    }
+                }
+            },
+            {
                 "name": "wq_reindex",
                 "description": "Backfill embeddings for nodes that have none, so `wq_search` can see them. Nodes inserted outside wq_ticket_create (seeds, restored dumps, raw wq_query INSERTs) have no embedding and are silently invisible to search. Pass dry_run=true to report how many are missing without loading a model or writing.",
                 "inputSchema": {
@@ -300,6 +311,11 @@ pub fn handle_tool_call(
             let db = open_db(state, args, arg_bool(args, "global"))?;
             let result = db.rollup().map_err(|e| e.to_string())?;
             serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "wq_doctor" => {
+            let db = open_db(state, args, arg_bool(args, "global"))?;
+            let report = db.doctor().map_err(|e| e.to_string())?;
+            serde_json::to_value(report).map_err(|e| e.to_string())
         }
         "wq_reindex" => {
             let db = open_db(state, args, arg_bool(args, "global"))?;
