@@ -62,7 +62,7 @@ fn test_log() {
     let entries: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(entries.len(), 3);
     assert_eq!(entries[0]["message"], "Third commit");
-    assert!(entries[0]["files"].as_array().unwrap().len() > 0);
+    assert!(!entries[0]["files"].as_array().unwrap().is_empty());
 }
 
 #[test]

@@ -562,7 +562,7 @@ pub(crate) fn build_conflict_graph(interactions: &[OpposingInteraction]) -> Vec<
         .collect();
 
     // Sort by interaction_count descending
-    edges.sort_by(|a, b| b.interaction_count.cmp(&a.interaction_count));
+    edges.sort_by_key(|e| std::cmp::Reverse(e.interaction_count));
     edges
 }
 
@@ -638,7 +638,7 @@ pub(crate) fn detect_setup_payoff(
                     } else {
                         ""
                     },
-                    &arc_suffix,
+                    arc_suffix,
                 ),
                 confidence: if in_climactic_conflict && has_rising_peak {
                     0.90

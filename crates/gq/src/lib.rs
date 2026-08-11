@@ -219,7 +219,7 @@ fn diff_numstat(diff: &Diff<'_>) -> Result<Vec<DiffEntry>> {
         }
     }
 
-    entries.sort_by(|a, b| (b.insertions + b.deletions).cmp(&(a.insertions + a.deletions)));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.insertions + e.deletions));
     Ok(entries)
 }
 
@@ -340,7 +340,7 @@ pub fn cmd_churn(
         })
         .collect();
 
-    entries.sort_by(|a, b| b.commits.cmp(&a.commits));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.commits));
     Ok(entries)
 }
 
@@ -417,7 +417,7 @@ pub fn cmd_changed_since(
         })
         .collect();
 
-    entries.sort_by(|a, b| b.change_count.cmp(&a.change_count));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.change_count));
     Ok(entries)
 }
 

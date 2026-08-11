@@ -153,7 +153,7 @@ fn pipeline_count_by_level() {
         .unwrap();
     assert!(out.status.success());
     let v: serde_json::Value =
-        serde_json::from_str(&String::from_utf8(out.stdout).unwrap().trim()).unwrap();
+        serde_json::from_str(String::from_utf8(out.stdout).unwrap().trim()).unwrap();
     assert_eq!(v["aggregation"], "count");
     assert_eq!(v["total"], 5);
     assert_eq!(v["groups"]["error"], 2);
@@ -167,7 +167,7 @@ fn pipeline_filter_then_count() {
         .unwrap();
     assert!(out.status.success());
     let v: serde_json::Value =
-        serde_json::from_str(&String::from_utf8(out.stdout).unwrap().trim()).unwrap();
+        serde_json::from_str(String::from_utf8(out.stdout).unwrap().trim()).unwrap();
     assert_eq!(v["total"], 2);
 }
 

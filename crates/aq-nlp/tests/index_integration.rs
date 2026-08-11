@@ -31,7 +31,7 @@ fn test_index_single_file() {
     fs::write(&file, "Joseph dreamed a dream and told it to his brothers.").unwrap();
 
     let options = make_options(cache_dir.path());
-    let results = index::index_files(&[file.clone()], &options);
+    let results = index::index_files(std::slice::from_ref(&file), &options);
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].status, IndexStatus::Indexed);
@@ -117,7 +117,7 @@ fn test_index_md_preprocessing() {
     .unwrap();
 
     let options = make_options(cache_dir.path());
-    let results = index::index_files(&[file.clone()], &options);
+    let results = index::index_files(std::slice::from_ref(&file), &options);
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].status, IndexStatus::Indexed);

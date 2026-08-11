@@ -33,7 +33,7 @@ pub(crate) fn merge_coref_chains(
         .filter_map(|k| merged_map.remove(&k))
         .collect();
 
-    result.sort_by(|a, b| a.canonical.to_lowercase().cmp(&b.canonical.to_lowercase()));
+    result.sort_by_key(|a| a.canonical.to_lowercase());
     result
 }
 

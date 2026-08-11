@@ -393,7 +393,7 @@ fn print_summary(name: &str, lines: &[&str], format: Format) -> anyhow::Result<(
 
     // Top 5 errors by frequency
     let mut top_errors: Vec<_> = error_messages.into_iter().collect();
-    top_errors.sort_by(|a, b| b.1.cmp(&a.1));
+    top_errors.sort_by_key(|e| std::cmp::Reverse(e.1));
     top_errors.truncate(5);
 
     let summary = serde_json::json!({

@@ -422,7 +422,7 @@ fn e2e_group_by() {
         "[desc:function_item | {name: .name | @text, big: @end - @start > 2}] | group_by(.big)",
     );
     let groups = results[0].as_array().unwrap();
-    assert!(groups.len() >= 1);
+    assert!(!groups.is_empty());
 }
 
 // ---------------------------------------------------------------------------

@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn since_until_filters() {
-        let entries = vec![
+        let entries = [
             make_entry(
                 Some("2026-03-11T08:00:00Z"),
                 Some(Level::Info),

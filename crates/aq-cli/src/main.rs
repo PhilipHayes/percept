@@ -521,7 +521,7 @@ fn format_corpus_skeleton(
 
     // Build characters list sorted by mention count.
     let mut characters: Vec<_> = entity_counts.into_iter().collect();
-    characters.sort_by(|a, b| b.1.cmp(&a.1));
+    characters.sort_by_key(|e| std::cmp::Reverse(e.1));
     let characters_json: Vec<serde_json::Value> = characters
         .iter()
         .map(|(name, mentions)| serde_json::json!({"name": name, "mentions": mentions}))
@@ -1283,7 +1283,7 @@ fn format_nlp_skeleton(root: &aq_core::OwnedNode, file_path: &str, format: &str)
     }
 
     // Sort entity_details by mention count descending
-    entity_details.sort_by(|a, b| b.2.cmp(&a.2));
+    entity_details.sort_by_key(|e| std::cmp::Reverse(e.2));
 
     // Build top_entities (top 10)
     let top_entities: Vec<serde_json::Value> = entity_details

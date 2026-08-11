@@ -543,14 +543,13 @@ pub(crate) fn extract_interactions_from_sentence(
                         data.agent = Some(agent_text);
                     }
                 }
-                "prep" => {
+                "prep"
                     // Two-hop: preposition → pobj
-                    if dep_token.lemma == "with" || dep_token.text.to_lowercase() == "with" {
+                    if (dep_token.lemma == "with" || dep_token.text.to_lowercase() == "with") => {
                         if let Some(inst_text) = find_pobj_text(dep_idx, tokens) {
                             data.instrument = Some(inst_text);
                         }
                     }
-                }
                 _ => {}
             }
         }
@@ -1970,10 +1969,8 @@ pub fn spacy_doc_to_owned_tree(
                                         location_entities.push(ent.text.clone());
                                     }
                                 }
-                                "DATE" | "TIME" => {
-                                    if !temporal_entities.contains(&ent.text) {
-                                        temporal_entities.push(ent.text.clone());
-                                    }
+                                "DATE" | "TIME" if !temporal_entities.contains(&ent.text) => {
+                                    temporal_entities.push(ent.text.clone());
                                 }
                                 _ => {}
                             }
@@ -3947,7 +3944,7 @@ mod tests {
         // Starts at offset 52 (after "\n")
         let s2_start = 52;
         let s2_tokens = vec![
-            make_token_with_head("After", "ADP", "prep", "", "O", s2_start + 0, 7),
+            make_token_with_head("After", "ADP", "prep", "", "O", s2_start, 7),
             make_token_with_head("Jane", "PROPN", "nsubj", "PERSON", "B", s2_start + 6, 2),
             make_token_with_head("came", "VERB", "advcl", "", "O", s2_start + 11, 7),
             make_token_with_head("back", "ADV", "advmod", "", "O", s2_start + 16, 2),
@@ -4080,7 +4077,7 @@ mod tests {
         ];
         let s2_start = 20; // after "David was punched.\n\n"
         let s2_tokens = vec![
-            make_token_with_head("She", "PRON", "nsubj", "", "O", s2_start + 0, 1),
+            make_token_with_head("She", "PRON", "nsubj", "", "O", s2_start, 1),
             make_token_with_head("arrived", "VERB", "ROOT", "", "O", s2_start + 4, 1),
             make_token_with_head(".", "PUNCT", "punct", "", "O", s2_start + 11, 1),
         ];
@@ -4142,7 +4139,7 @@ mod tests {
 
         let s2_start = 44; // after "\n"
         let s2_tokens = vec![
-            make_token_with_head("She", "PRON", "nsubj", "", "O", s2_start + 0, 1),
+            make_token_with_head("She", "PRON", "nsubj", "", "O", s2_start, 1),
             make_token_with_head("examined", "VERB", "ROOT", "", "O", s2_start + 4, 1),
             make_token_with_head("the", "DET", "det", "", "O", s2_start + 13, 3),
             make_token_with_head("evidence", "NOUN", "dobj", "", "O", s2_start + 17, 1),
@@ -5092,7 +5089,7 @@ mod tests {
         let tree = spacy_doc_to_owned_tree(&doc, source, None);
         let r = run_tree_query(&tree, r#"desc:interaction[.agent | @text == "Joey"]"#);
         assert!(
-            r.len() >= 1,
+            !r.is_empty(),
             "at least 1 interaction with agent=Joey: {:?}",
             r
         );
@@ -5438,7 +5435,7 @@ mod tests {
         assert!(patient_movement_verbs.contains("delivered"));
 
         // Simulate the patient movement logic for a "brought" interaction
-        let scenes = vec![
+        let scenes = [
             SceneBoundary {
                 scene_index: 0,
                 start_para_idx: 0,

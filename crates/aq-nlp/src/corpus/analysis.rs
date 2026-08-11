@@ -53,10 +53,8 @@ pub(crate) fn extract_paragraph_entity_data(
                             location_entities.push(name.to_string());
                         }
                     }
-                    "DATE" | "TIME" => {
-                        if !temporal_entities.contains(&name.to_string()) {
-                            temporal_entities.push(name.to_string());
-                        }
+                    "DATE" | "TIME" if !temporal_entities.contains(&name.to_string()) => {
+                        temporal_entities.push(name.to_string());
                     }
                     _ => {}
                 }
@@ -427,7 +425,7 @@ mod tests {
         // entities should trigger a break even without 2 signals.
         // However, exact behavior depends on the algorithm.
         // At minimum, we should have ≥ 1 scene.
-        assert!(scenes.len() >= 1);
+        assert!(!scenes.is_empty());
     }
 
     // ── test: no artificial boundary scenes ──────────────────────────────────
