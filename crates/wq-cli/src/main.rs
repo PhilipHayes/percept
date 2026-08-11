@@ -57,6 +57,14 @@ enum Command {
         #[arg(long)]
         global: bool,
     },
+    /// Backfill embeddings for nodes that have none, making them searchable
+    Reindex {
+        /// Report what would be indexed without loading a model or writing
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        global: bool,
+    },
     /// Register a child DB as a federation pointer (Amendment 2026-07-03, closes FU-wq-4-2)
     Register {
         project_name: String,
@@ -211,6 +219,17 @@ fn run(cli: Cli) -> Result<Value> {
         Command::Rollup { global } => {
             let db = open_db(global)?;
             Ok(serde_json::to_value(db.rollup()?)?)
+        }
+        Command::Reindex { dry_run, global } => {
+            let db = open_db(global)?;
+            // The dry run deliberately never calls engine(): asking whether the
+            // graph is fully searchable must not require loading an ONNX model.
+            let report = if dry_run {
+                db.reindex_dry_run()?
+            } else {
+                db.reindex(&mut engine()?)?
+            };
+            Ok(serde_json::to_value(report)?)
         }
         Command::Register {
             project_name,
