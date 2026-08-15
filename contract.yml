@@ -1,0 +1,259 @@
+schema_version: 1
+project: percept
+language: rust
+stale_after_days: 30
+
+# percept's first contract (2026-08-15). Written to test whether canopy's
+# contract substrate (ADR-025 / ADR-027) is substrate-neutral or canopy-shaped:
+# canopy verifies its own source, this file points the same engine at a second,
+# structurally different repo (18 crates + a bash tool, no GUI, no recipes).
+#
+# Verified externally for now — canopy's verifier reads one contract at a time,
+# so run it with `--contract <path-to-this-file>` from a canopy checkout, or via
+# Modii/scripts/contract-verify.py as canopy/contract.yml does today.
+#
+# EXPECTED RESULT IS MIXED, DELIBERATELY. A contract that comes back all-green
+# on its first run has taught nothing. Two features below are known-red and one
+# whole class is unknown; both are documented rather than removed, per ADR-025 D2
+# (no signal is not a pass) and this repo's own tension #14 (wrong count, real
+# concept). See the notes on F-DOCS-* and §behavioural below.
+#
+# NOT SET: test_record_path. percept has no test-record emitter, so every
+# `test_named` assertion resolves to `unknown` — 906 `#[test]` functions exist and
+# not one of them is a *verifiable claim* until a record is emitted. That is the
+# honest state and the most useful thing this contract reports on day one.
+
+phase_assertions:
+  - id: PHASE-wq-family-closed
+    kind: phase_tag
+    sprint_marker: "wq-5 sprint close"
+    description: "wq crate family (core/cli/mcp) closed — ADR-038 fully built"
+
+features:
+
+  # ── Structural: the crate family exists and exposes what the ADRs claim ──────
+
+  F-aq-grammars:
+    title: "aq-treesitter registers the grammar set ADR-028 Path A requires"
+    requirements_ref: "ADR-004, ADR-028 (Path A — TOML + YAML added to aq-treesitter)"
+    observed_state: shipped
+    assertions:
+      - id: aq-grammar-toml
+        kind: symbol_exists
+        pattern: "tree-sitter-toml"
+        path: crates/aq-treesitter/Cargo.toml
+        min: 1
+        description: "ADR-028 Path A: TOML grammar present so aq can parse Cargo.toml"
+      - id: aq-grammar-yaml
+        kind: symbol_exists
+        pattern: "tree-sitter-yaml"
+        path: crates/aq-treesitter/Cargo.toml
+        min: 1
+        description: "ADR-028 Path A: YAML grammar present so aq can parse pubspec/CI configs"
+      - id: aq-grammar-swift
+        kind: symbol_exists
+        pattern: "tree-sitter-swift"
+        path: crates/aq-treesitter/Cargo.toml
+        min: 1
+
+  F-gq-surface:
+    title: "gq exposes the git query surface ADR-005 describes"
+    requirements_ref: "ADR-005"
+    observed_state: shipped
+    assertions:
+      - id: gq-cmd-log
+        kind: symbol_exists
+        pattern: "pub fn cmd_log"
+        path: crates/gq/src/lib.rs
+        min: 1
+      - id: gq-cmd-blame
+        kind: symbol_exists
+        pattern: "pub fn cmd_blame"
+        path: crates/gq/src/lib.rs
+        min: 1
+      - id: gq-cmd-churn
+        kind: symbol_exists
+        pattern: "pub fn cmd_churn"
+        path: crates/gq/src/lib.rs
+        min: 1
+      - id: gq-churn-entry
+        kind: symbol_exists
+        pattern: "pub struct ChurnEntry"
+        path: crates/gq/src/lib.rs
+        min: 1
+
+  F-wq-doctor:
+    title: "wq doctor — integrity checking (ADR-038 Amendment 2026-08-11 (2))"
+    requirements_ref: "ADR-038 Amendment (2); ADR-040 D4 extends this to semantic checks"
+    observed_state: shipped
+    assertions:
+      - id: wq-doctor-report
+        kind: symbol_exists
+        pattern: "pub struct DoctorReport"
+        path: crates/wq-core/src/doctor.rs
+        min: 1
+      - id: wq-doctor-finding
+        kind: symbol_exists
+        pattern: "pub struct DoctorFinding"
+        path: crates/wq-core/src/doctor.rs
+        min: 1
+      - id: wq-doctor-fn
+        kind: symbol_exists
+        pattern: "pub fn doctor"
+        path: crates/wq-core/src/doctor.rs
+        min: 1
+      - id: wq-doctor-no-fix
+        kind: symbol_exists
+        pattern: "pub fn healthy"
+        path: crates/wq-core/src/doctor.rs
+        min: 1
+        description: "D-wq-9-1: doctor reports, never repairs — `healthy()` is the whole verdict surface"
+
+  F-wq-reindex:
+    title: "wq reindex — embedding backfill (ADR-038 Amendment 2026-08-11)"
+    requirements_ref: "ADR-038 Amendment (1)"
+    observed_state: shipped
+    assertions:
+      - id: wq-reindex-report
+        kind: symbol_exists
+        pattern: "pub struct ReindexReport"
+        path: crates/wq-core/src/reindex.rs
+        min: 1
+      - id: wq-reindex-dry-run
+        kind: symbol_exists
+        pattern: "pub fn reindex_dry_run"
+        path: crates/wq-core/src/reindex.rs
+        min: 1
+        description: "D-wq-8-1: the dry run never constructs an EmbedEngine — must be callable where ONNX cannot load"
+      - id: wq-unindexed-count
+        kind: symbol_exists
+        pattern: "pub fn unindexed_count"
+        path: crates/wq-core/src/reindex.rs
+        min: 1
+
+  F-wq-federation:
+    title: "wq registry — federation pointers, never copies (ADR-038)"
+    requirements_ref: "ADR-038 §Federation model; Amendment (2) — wq register"
+    observed_state: shipped
+    assertions:
+      - id: wq-registry-entry
+        kind: symbol_exists
+        pattern: "pub struct RegistryEntry"
+        path: crates/wq-core/src/registry.rs
+        min: 1
+      - id: wq-register-child
+        kind: symbol_exists
+        pattern: "pub fn register_child"
+        path: crates/wq-core/src/registry.rs
+        min: 1
+      - id: wq-list-children
+        kind: symbol_exists
+        pattern: "pub fn list_registered_children"
+        path: crates/wq-core/src/registry.rs
+        min: 1
+
+  F-wq-schema-invariants:
+    title: "wq schema carries the indexes and vec0 table ADR-038 requires at scale"
+    requirements_ref: "ADR-038 §Schema; Q3 (10,000s of nodes confirmed)"
+    observed_state: shipped
+    assertions:
+      - id: wq-idx-edges-from
+        kind: symbol_exists
+        pattern: "idx_edges_from"
+        path: crates/wq-core/src/schema.sql
+        min: 1
+        description: "Not optional past prototype size — ADR-038 states this explicitly"
+      - id: wq-idx-edges-to
+        kind: symbol_exists
+        pattern: "idx_edges_to"
+        path: crates/wq-core/src/schema.sql
+        min: 1
+      - id: wq-vec0-384
+        kind: symbol_exists
+        pattern: "embedding FLOAT\\[384\\]"
+        path: crates/wq-core/src/schema.sql
+        min: 1
+        description: "Dimension coupled to mq-embed's BgeSmall default; create_node asserts dims match"
+
+  # ── Known drift, recorded rather than hidden ────────────────────────────────
+  #
+  # Both features below are expected RED. They are in this contract precisely
+  # because ADR-025's premise is that drift is worthless unless it is observable.
+  # Deleting them to get a green board would be the exact failure the contract
+  # substrate exists to prevent.
+
+  F-DOCS-benchmarks:
+    title: "README's headline token-reduction claim has reachable evidence"
+    requirements_ref: "README.md:66 — 'See benchmarks/ for detailed comparison data'"
+    observed_state: drifted
+    assertions:
+      - id: docs-benchmarks-dir-exists
+        kind: symbol_exists
+        pattern: "."
+        path: benchmarks/README.md
+        min: 1
+        description: >
+          EXPECTED RED as of 2026-08-15. README.md links to benchmarks/ as the
+          evidence for '90-95% token reduction, no loss of task accuracy' — the
+          project's central claim — and no such directory exists in the repo.
+          The claim may well be true; it is currently unverifiable by a reader,
+          which under this model makes it `unknown` presented as `green`.
+          Remedy is either to restore the benchmark data or to soften the claim.
+
+  F-DOCS-language-count:
+    title: "Language-support count is stated consistently"
+    requirements_ref: "README.md:26 vs README.md:70 vs aq-treesitter/Cargo.toml"
+    observed_state: drifted
+    assertions:
+      - id: docs-lang-count-consistent
+        kind: symbol_exists
+        pattern: "Rust, TypeScript, JavaScript, Python, Go, Java, C, C\\+\\+, Dart, Swift, JSON, TSX, TOML, YAML"
+        path: README.md
+        min: 1
+        description: >
+          EXPECTED RED as of 2026-08-15. Three counts disagree: README.md:26 says
+          '15 languages', README.md:70 lists 12, and aq-treesitter/Cargo.toml
+          declares 13 grammar dependencies including toml-ng and yaml (added under
+          ADR-028 Path A, never reflected in either README claim). This assertion
+          asserts the Cargo.toml-derived list and will stay red until the README
+          agrees with the manifest. Instance of this project's own operating
+          tension #14 — wrong count, real concept: the tool support is real, the
+          number is unreliable, and the manifest is the source of truth.
+
+  # ── Behavioural: unknown until an emitter exists ────────────────────────────
+  #
+  # 906 #[test] functions across the workspace. Every assertion below resolves to
+  # `unknown` because test_record_path is unset — there is no emitted record to
+  # look them up in. Per ADR-025 D2 these roll the feature up to `unknown`, NOT to
+  # green. Closing this gap means running tq (ADR-011) over `cargo test` output to
+  # produce an ADR-025 D6 test-record.json — which percept already has the parser
+  # for and does not yet wire up. That is the single highest-value follow-up this
+  # contract surfaces.
+
+  F-BEHAV-wq-path-resolution:
+    title: "wq resolves its DB by walking up from cwd"
+    requirements_ref: "ADR-038 Q2 — .agents/wq.db per repo"
+    observed_state: shipped
+    assertions:
+      - id: behav-wq-walk-up
+        kind: test_named
+        target: finds_wq_db_planted_in_a_grandparent_dir
+        description: "UNKNOWN until a test record is emitted — the test exists and passes locally; that is not the same as verified"
+      - id: behav-wq-fallback
+        kind: test_named
+        target: falls_back_to_start_dir_when_nothing_found
+
+  F-BEHAV-tq-flaky-detection:
+    title: "tq detects flaky and always-failing tests across runs"
+    requirements_ref: "ADR-011"
+    observed_state: shipped
+    assertions:
+      - id: behav-tq-flaky
+        kind: test_named
+        target: detect_flaky_test
+      - id: behav-tq-always-failing
+        kind: test_named
+        target: detect_always_failing
+      - id: behav-tq-no-false-flaky
+        kind: test_named
+        target: no_failures_means_no_flaky
