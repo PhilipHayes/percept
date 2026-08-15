@@ -18,6 +18,12 @@ stale_after_days: 30
 # (no signal is not a pass) and this repo's own tension #14 (wrong count, real
 # concept). See the notes on F-DOCS-* and §behavioural below.
 #
+# TEST TARGET FORM: `target` uses the URI-native `/` form (module path + tests +
+# name), never `::` — canopy's compiler rejects `::` outright (D-S-UU-1) and, when a
+# target has no `/` at all, emits a suite-less URI that canopy's own URI parser then
+# rejects with `missing required param: suite`. Filed as a canopy finding; the `/`
+# form is correct regardless and is what canopy/contract.yml itself uses.
+#
 # NOT SET: test_record_path. percept has no test-record emitter, so every
 # `test_named` assertion resolves to `unknown` — 906 `#[test]` functions exist and
 # not one of them is a *verifiable claim* until a record is emitted. That is the
@@ -237,11 +243,11 @@ features:
     assertions:
       - id: behav-wq-walk-up
         kind: test_named
-        target: finds_wq_db_planted_in_a_grandparent_dir
+        target: "wq_core/path/tests/finds_wq_db_planted_in_a_grandparent_dir"
         description: "UNKNOWN until a test record is emitted — the test exists and passes locally; that is not the same as verified"
       - id: behav-wq-fallback
         kind: test_named
-        target: falls_back_to_start_dir_when_nothing_found
+        target: "wq_core/path/tests/falls_back_to_start_dir_when_nothing_found"
 
   F-BEHAV-tq-flaky-detection:
     title: "tq detects flaky and always-failing tests across runs"
@@ -250,10 +256,10 @@ features:
     assertions:
       - id: behav-tq-flaky
         kind: test_named
-        target: detect_flaky_test
+        target: "tq_core/flaky/tests/detect_flaky_test"
       - id: behav-tq-always-failing
         kind: test_named
-        target: detect_always_failing
+        target: "tq_core/flaky/tests/detect_always_failing"
       - id: behav-tq-no-false-flaky
         kind: test_named
-        target: no_failures_means_no_flaky
+        target: "tq_core/flaky/tests/no_failures_means_no_flaky"
