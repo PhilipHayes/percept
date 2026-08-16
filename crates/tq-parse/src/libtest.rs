@@ -12,13 +12,44 @@ static TEST_LINE: LazyLock<Regex> = LazyLock::new(|| {
 static FAILURE_HEADER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^---- (\S+) stdout ----$").unwrap());
 
+// Binary header naming the crate under test. cargo emits one before each
+// target's block, and the crate name only appears here — never on the
+// `test …` lines — so without it every result from every crate in a
+// workspace run is indistinguishable. Two forms:
+//   "     Running unittests src/lib.rs (target/debug/deps/wq_core-8a63511)"
+//   "   Doc-tests wq-core"
+static RUNNING_HEADER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*Running\s+.*\(.*[/\\]deps[/\\]([A-Za-z0-9_]+)-[0-9a-f]+").unwrap());
+static DOC_TESTS_HEADER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*Doc-tests\s+(\S+)$").unwrap());
+
 /// Parse cargo test (libtest) text output.
 pub fn parse_libtest(input: &str) -> TestRun {
     let mut results: Vec<TestResult> = Vec::new();
     let mut failure_outputs: Vec<(String, String)> = Vec::new();
     let mut current_failure: Option<(String, Vec<String>)> = None;
+    // Crate named by the most recent binary header; every subsequent test
+    // belongs to it until the next header. None until the first one is seen,
+    // so output that lacks headers still parses exactly as before.
+    let mut current_suite: Option<String> = None;
 
     for line in input.lines() {
+        // Binary headers are only meaningful outside a failure block — a
+        // captured stdout could legitimately contain a line like "Running …".
+        if current_failure.is_none() {
+            if let Some(caps) = RUNNING_HEADER.captures(line) {
+                current_suite = Some(caps[1].to_string());
+                continue;
+            }
+            if let Some(caps) = DOC_TESTS_HEADER.captures(line) {
+                // cargo prints the package name here (hyphens), while the
+                // deps path uses the crate name (underscores). Normalise so a
+                // crate's unit and doc tests share one suite.
+                current_suite = Some(caps[1].replace('-', "_"));
+                continue;
+            }
+        }
+
         // Check for failure block start
         if let Some(caps) = FAILURE_HEADER.captures(line) {
             // Save previous failure block
@@ -63,7 +94,7 @@ pub fn parse_libtest(input: &str) -> TestRun {
                 message: None,
                 stdout: None,
                 stderr: None,
-                suite: None,
+                suite: current_suite.clone(),
             });
         }
     }
@@ -215,5 +246,117 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
         assert_eq!(run.failed, 1);
         let failures = run.failures();
         assert_eq!(failures[0].name, "core::tests::test_c");
+    }
+
+    #[test]
+    fn running_header_assigns_crate_as_suite() {
+        let input = r#"
+     Running unittests src/lib.rs (target/debug/deps/tq_core-8a635111c9254a31)
+
+running 2 tests
+test diff::tests::diff_new_pass ... ok
+test flaky::tests::detect_flaky_test ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+"#;
+        let run = parse_libtest(input);
+        assert_eq!(run.total, 2);
+        assert!(run.tests.iter().all(|t| t.suite.as_deref() == Some("tq_core")));
+    }
+
+    #[test]
+    fn suite_switches_at_each_binary_header() {
+        let input = r#"
+     Running unittests src/lib.rs (target/debug/deps/wq_core-1111111111111111)
+
+running 1 test
+test path::tests::walks_up ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (target/debug/deps/wq_cli-2222222222222222)
+
+running 1 test
+test emits_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+"#;
+        let run = parse_libtest(input);
+        assert_eq!(run.tests[0].suite.as_deref(), Some("wq_core"));
+        assert_eq!(run.tests[1].suite.as_deref(), Some("wq_cli"));
+    }
+
+    #[test]
+    fn doc_tests_header_normalises_package_name_to_crate_name() {
+        // cargo prints the *package* name (hyphens) on this header, unlike the
+        // deps path which carries the crate name (underscores).
+        let input = r#"
+   Doc-tests tq-parse
+
+running 1 test
+test lib::tests::a_normal_looking_test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+"#;
+        let run = parse_libtest(input);
+        assert_eq!(run.tests[0].suite.as_deref(), Some("tq_parse"));
+    }
+
+    #[test]
+    fn doc_test_result_lines_are_not_parsed() {
+        // Documents a pre-existing limitation rather than asserting it is good:
+        // TEST_LINE requires a whitespace-free name, and libtest prints doc
+        // tests as "src/lib.rs - item (line N)". They are silently dropped, so
+        // a doc test can never back a `test_named` claim. Recognising the
+        // Doc-tests header is still worthwhile — it stops the previous crate's
+        // suite from leaking onto anything that follows.
+        let input = r#"
+   Doc-tests tq-parse
+
+running 1 test
+test src/lib.rs - parse_output (line 12) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+"#;
+        let run = parse_libtest(input);
+        assert_eq!(run.total, 0, "doc-test result lines are not yet parsed");
+    }
+
+    #[test]
+    fn suite_is_none_when_output_has_no_binary_header() {
+        // Pre-existing behaviour: bare libtest output still parses, with no suite.
+        let input = r#"
+running 1 test
+test core::tests::test_c ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+"#;
+        let run = parse_libtest(input);
+        assert_eq!(run.tests[0].suite, None);
+    }
+
+    #[test]
+    fn running_line_inside_failure_output_does_not_change_suite() {
+        // A test that prints "Running ..." must not be mistaken for a header.
+        let input = r#"
+     Running unittests src/lib.rs (target/debug/deps/wq_core-1111111111111111)
+
+running 1 test
+test exec::tests::spawns ... FAILED
+
+failures:
+
+---- exec::tests::spawns stdout ----
+     Running unittests src/lib.rs (target/debug/deps/impostor-9999999999999999)
+assertion failed
+
+failures:
+    exec::tests::spawns
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+"#;
+        let run = parse_libtest(input);
+        assert_eq!(run.tests.len(), 1);
+        assert_eq!(run.tests[0].suite.as_deref(), Some("wq_core"));
     }
 }
