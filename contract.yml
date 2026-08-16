@@ -25,10 +25,10 @@ test_record_path: test-record.json
 # concept). See the notes on F-DOCS-* and §behavioural below.
 #
 # TEST TARGET FORM: `target` uses the URI-native `/` form (module path + tests +
-# name), never `::` — canopy's compiler rejects `::` outright (D-S-UU-1) and, when a
-# target has no `/` at all, emits a suite-less URI that canopy's own URI parser then
-# rejects with `missing required param: suite`. Filed as a canopy finding; the `/`
-# form is correct regardless and is what canopy/contract.yml itself uses.
+# name), never `::` — canopy's compiler rejects `::` outright (D-S-UU-1). A target
+# with no `/` at all used to abort the whole verify run (`missing required param:
+# suite`); fixed in canopy 2026-08-15, and a bare name now resolves by name across
+# suites. The `/` form remains correct and is what canopy/contract.yml itself uses.
 #
 # TEST RECORD: test-record.json is emitted by `tq --record` (ADR-025 D6) from
 # `cargo test` output — see README/CONTRIBUTING. Before it existed every
