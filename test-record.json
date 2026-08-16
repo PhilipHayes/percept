@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-08-16T15:48:52Z",
-  "head": "f1639a4d640d2969c094394427f2536300fba0a1",
+  "schema_version": 2,
+  "generated_at": "2026-08-16T16:55:08Z",
+  "head": "2cf6ff1f15d0a036b177ca2bdaa4177c8f3984b3",
   "language": "rust",
   "runner": "cargo-test",
   "runner_completed": true,

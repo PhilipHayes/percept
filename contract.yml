@@ -221,24 +221,33 @@ features:
           Remedy is either to restore the benchmark data or to soften the claim.
 
   F-DOCS-language-count:
-    title: "Language-support count is stated consistently"
-    requirements_ref: "README.md:26 vs README.md:70 vs aq-treesitter/Cargo.toml"
-    observed_state: drifted
+    title: "Language-support count and list agree with the Language enum"
+    requirements_ref: "README.md vs crates/aq-treesitter/src/langs.rs"
+    observed_state: shipped
     assertions:
-      - id: docs-lang-count-consistent
+      - id: docs-lang-count-number
         kind: symbol_exists
-        pattern: "Rust, TypeScript, JavaScript, Python, Go, Java, C, C\\+\\+, Dart, Swift, JSON, TSX, TOML, YAML"
+        pattern: "Source code AST \\(14 languages\\)"
         path: README.md
         min: 1
         description: >
-          EXPECTED RED as of 2026-08-15. Three counts disagree: README.md:26 says
-          '15 languages', README.md:70 lists 12, and aq-treesitter/Cargo.toml
-          declares 13 grammar dependencies including toml-ng and yaml (added under
-          ADR-028 Path A, never reflected in either README claim). This assertion
-          asserts the Cargo.toml-derived list and will stay red until the README
-          agrees with the manifest. Instance of this project's own operating
-          tension #14 — wrong count, real concept: the tool support is real, the
-          number is unreliable, and the manifest is the source of truth.
+          Was RED until 2026-08-15. README claimed 15 in one place and listed 12
+          in another, while the Language enum declared 14 — so both prose claims
+          were wrong and neither was recoverable from the other. Resolved by
+          deriving from the enum rather than arbitrating between stale claims.
+      - id: docs-lang-list-matches-enum
+        kind: symbol_exists
+        pattern: "Rust, JavaScript, TypeScript, TSX, Python, JSON, Go, Java, C, C\\+\\+, Dart, Swift, TOML, YAML"
+        path: README.md
+        min: 1
+      - id: lang-enum-has-14-variants
+        kind: symbol_exists
+        pattern: "Rust|JavaScript|TypeScript|TypeScriptTsx|Python|Json|Go|Java|C|Cpp|Dart|Swift|Toml|Yaml"
+        path: crates/aq-treesitter/src/langs.rs
+        min: 14
+        description: >
+          The other side of the pair. If a grammar is added or removed, this goes
+          red before the README does, naming the manifest as the thing that moved.
 
   # ── Behavioural: unknown until an emitter exists ────────────────────────────
   #

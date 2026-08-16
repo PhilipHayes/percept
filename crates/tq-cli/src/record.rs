@@ -127,7 +127,11 @@ pub fn build_record(
         .collect();
 
     TestRecord {
-        schema_version: 1,
+        // v2, not v1: this emitter can produce `errored`, which a v1 consumer
+        // rejects. Adding a value to an interchange enum is forward-breaking,
+        // and declaring the version is what makes that visible rather than a
+        // parse failure at the far end (ADR-025 D6).
+        schema_version: 2,
         generated_at: generated_at.to_string(),
         head: head.to_string(),
         language: language
@@ -274,11 +278,11 @@ mod tests {
             Format::Libtest,
         );
         let rec = build_record(&run, "deadbeef", "2026-08-15T00:00:00Z", false, None, None);
-        assert_eq!(rec.schema_version, 1);
+        assert_eq!(rec.schema_version, 2);
         assert_eq!(rec.head, "deadbeef");
         assert!(!rec.runner_completed);
         let json = serde_json::to_string(&rec).unwrap();
-        assert!(json.contains("\"schema_version\":1"));
+        assert!(json.contains("\"schema_version\":2"));
         // runner_exit_code omitted rather than null when unknown
         assert!(!json.contains("runner_exit_code"));
     }
