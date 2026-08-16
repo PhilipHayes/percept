@@ -10,7 +10,7 @@
 //! formats (the duplication ADR-028 flagged).
 
 use serde::Serialize;
-use tq_parse::{TestRun, TestStatus};
+use tq_parse::{Format, TestRun, TestStatus};
 
 #[derive(Debug, Serialize)]
 pub struct TestRecord {
@@ -60,13 +60,40 @@ pub fn split_suite_and_name(crate_name: Option<&str>, qualified: &str) -> (Strin
 }
 
 fn status_str(s: TestStatus) -> &'static str {
-    // The record vocabulary is ADR-025 D6's, not tq's: a verifier distinguishes
-    // ok / failed / ignored only. `errored` collapses to `failed` — from a
-    // claim's point of view a test that blew up did not pass.
+    // The record vocabulary is ADR-025 D6's, not tq's.
+    //
+    // `errored` is emitted verbatim rather than collapsed into `failed`. An
+    // earlier version of this function mapped it to `failed` because the record
+    // had no fourth value; that was wrong. A failed assertion is a verdict —
+    // known false. A test that errored (panicked in setup, OOM-killed, harness
+    // crash) ran and produced *no verdict*, which under the four-valued status
+    // model is `unknown`, not `red`. Collapsing the two is exactly the
+    // boolean-flattening the model exists to prevent.
     match s {
         TestStatus::Passed => "ok",
-        TestStatus::Failed | TestStatus::Errored => "failed",
+        TestStatus::Failed => "failed",
+        TestStatus::Errored => "errored",
         TestStatus::Skipped => "ignored",
+    }
+}
+
+/// Best-effort language tag for the record, from the runner format.
+///
+/// `language` is a claim about the corpus the record describes, and hardcoding
+/// it made this emitter silently Rust-only — wrong the moment tq is pointed at
+/// a JUnit, pytest or Flutter run. Formats that serve several languages resolve
+/// to "unknown" rather than guessing; pass `--language` to be explicit.
+pub fn infer_language(format: Format) -> &'static str {
+    match format {
+        Format::Libtest | Format::LibtestJson => "rust",
+        Format::Pytest => "python",
+        Format::GoTest | Format::GoTestJson => "go",
+        Format::Jest => "javascript",
+        Format::Flutter => "dart",
+        // JUnit XML and TAP are interchange formats, not language markers —
+        // .NET, Java, Kotlin and others all emit JUnit. `Unknown` is tq's own
+        // "could not detect the runner" value and is likewise not a language.
+        Format::Junit | Format::Tap | Format::Unknown => "unknown",
     }
 }
 
@@ -83,6 +110,7 @@ pub fn build_record(
     generated_at: &str,
     runner_completed: bool,
     runner_exit_code: Option<i32>,
+    language: Option<&str>,
 ) -> TestRecord {
     let tests = run
         .tests
@@ -102,7 +130,9 @@ pub fn build_record(
         schema_version: 1,
         generated_at: generated_at.to_string(),
         head: head.to_string(),
-        language: "rust".to_string(),
+        language: language
+            .map(|l| l.to_string())
+            .unwrap_or_else(|| infer_language(run.format).to_string()),
         runner: run.runner.clone().unwrap_or_else(|| "libtest".to_string()),
         runner_completed,
         runner_exit_code,
@@ -113,7 +143,7 @@ pub fn build_record(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tq_parse::{Format, TestResult};
+    use tq_parse::TestResult;
 
     fn result(name: &str, suite: Option<&str>, status: TestStatus) -> TestResult {
         TestResult {
@@ -159,14 +189,65 @@ mod tests {
     }
 
     #[test]
-    fn errored_collapses_to_failed() {
+    fn errored_is_distinct_from_failed() {
+        // Regression: this previously collapsed to "failed", making a test that
+        // produced no verdict indistinguishable from one that produced a false
+        // verdict. A verifier reads the first as unknown and the second as red.
         let run = TestRun::from_results(
             vec![result("m::tests::t", Some("k"), TestStatus::Errored)],
             None,
             Format::Libtest,
         );
-        let rec = build_record(&run, "abc123", "2026-08-15T00:00:00Z", true, Some(101));
-        assert_eq!(rec.tests[0].status, "failed");
+        let rec = build_record(&run, "abc123", "2026-08-15T00:00:00Z", true, Some(101), None);
+        assert_eq!(rec.tests[0].status, "errored");
+    }
+
+    #[test]
+    fn language_is_inferred_from_the_runner_format() {
+        let mk = |f: Format| {
+            let run = TestRun::from_results(
+                vec![result("t", Some("s"), TestStatus::Passed)],
+                None,
+                f,
+            );
+            build_record(&run, "h", "2026-08-15T00:00:00Z", true, Some(0), None).language
+        };
+        assert_eq!(mk(Format::Libtest), "rust");
+        assert_eq!(mk(Format::Pytest), "python");
+        assert_eq!(mk(Format::Flutter), "dart");
+        assert_eq!(mk(Format::GoTest), "go");
+        // JUnit and TAP are emitted by many ecosystems — guessing would be worse
+        // than admitting we do not know.
+        assert_eq!(mk(Format::Junit), "unknown");
+        assert_eq!(mk(Format::Tap), "unknown");
+    }
+
+    #[test]
+    fn explicit_language_overrides_inference() {
+        let run = TestRun::from_results(
+            vec![result("MyTests.TestAdd", Some("MyTests"), TestStatus::Passed)],
+            None,
+            Format::Junit,
+        );
+        let rec = build_record(
+            &run,
+            "h",
+            "2026-08-15T00:00:00Z",
+            true,
+            Some(0),
+            Some("vb.net"),
+        );
+        assert_eq!(rec.language, "vb.net");
+    }
+
+    #[test]
+    fn non_rust_names_without_double_colon_keep_the_runner_suite() {
+        // JUnit-style: the runner already supplies a real suite and the name has
+        // no module path. The `::` split is a Rust-specific enhancement that
+        // must degrade to a no-op, not corrupt the pair.
+        let (suite, name) = split_suite_and_name(Some("MyProject.CalculatorTests"), "TestAddition");
+        assert_eq!(suite, "MyProject.CalculatorTests");
+        assert_eq!(name, "TestAddition");
     }
 
     #[test]
@@ -180,7 +261,7 @@ mod tests {
             None,
             Format::Libtest,
         );
-        let rec = build_record(&run, "abc123", "2026-08-15T00:00:00Z", true, Some(0));
+        let rec = build_record(&run, "abc123", "2026-08-15T00:00:00Z", true, Some(0), None);
         let got: Vec<&str> = rec.tests.iter().map(|t| t.status).collect();
         assert_eq!(got, vec!["ok", "failed", "ignored"]);
     }
@@ -192,7 +273,7 @@ mod tests {
             None,
             Format::Libtest,
         );
-        let rec = build_record(&run, "deadbeef", "2026-08-15T00:00:00Z", false, None);
+        let rec = build_record(&run, "deadbeef", "2026-08-15T00:00:00Z", false, None, None);
         assert_eq!(rec.schema_version, 1);
         assert_eq!(rec.head, "deadbeef");
         assert!(!rec.runner_completed);

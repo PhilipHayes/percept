@@ -52,6 +52,12 @@ struct Cli {
     #[arg(long)]
     runner_exit_code: Option<i32>,
 
+    /// Language tag for the record. Inferred from the runner format when
+    /// omitted; formats shared across ecosystems (JUnit, TAP) infer "unknown"
+    /// rather than guessing, so set this explicitly for those.
+    #[arg(long)]
+    language: Option<String>,
+
     /// Input file(s). Reads stdin if omitted.
     files: Vec<String>,
 }
@@ -133,6 +139,7 @@ fn main() -> Result<()> {
             &generated_at,
             completed,
             cli.runner_exit_code,
+            cli.language.as_deref(),
         );
         let output = serde_json::to_string_pretty(&rec)?;
         println!("{}", output);
