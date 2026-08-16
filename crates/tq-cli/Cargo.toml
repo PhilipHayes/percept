@@ -13,7 +13,9 @@ tq-parse = { path = "../tq-parse" }
 tq-core = { path = "../tq-core" }
 clap = { workspace = true }
 anyhow = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+chrono = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

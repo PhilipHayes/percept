@@ -2,6 +2,7 @@ schema_version: 1
 project: percept
 language: rust
 stale_after_days: 30
+test_record_path: test-record.json
 
 # percept's first contract (2026-08-15). Written to test whether canopy's
 # contract substrate (ADR-025 / ADR-027) is substrate-neutral or canopy-shaped:
@@ -9,8 +10,14 @@ stale_after_days: 30
 # structurally different repo (18 crates + a bash tool, no GUI, no recipes).
 #
 # Verified externally for now — canopy's verifier reads one contract at a time,
-# so run it with `--contract <path-to-this-file>` from a canopy checkout, or via
+# so run it with `--contract <path-to-this-file>`, or via
 # Modii/scripts/contract-verify.py as canopy/contract.yml does today.
+#
+# RUN IT FROM THIS DIRECTORY. canopy's verifier currently returns different
+# verdicts depending on the process cwd: assertions on files the corpus does not
+# hold as parsed source (here, Cargo.toml and schema.sql) go red when cwd is not
+# the corpus root, which is indistinguishable from real drift. Reported upstream;
+# not a defect in this contract.
 #
 # EXPECTED RESULT IS MIXED, DELIBERATELY. A contract that comes back all-green
 # on its first run has taught nothing. Two features below are known-red and one
@@ -24,10 +31,18 @@ stale_after_days: 30
 # rejects with `missing required param: suite`. Filed as a canopy finding; the `/`
 # form is correct regardless and is what canopy/contract.yml itself uses.
 #
-# NOT SET: test_record_path. percept has no test-record emitter, so every
-# `test_named` assertion resolves to `unknown` — 906 `#[test]` functions exist and
-# not one of them is a *verifiable claim* until a record is emitted. That is the
-# honest state and the most useful thing this contract reports on day one.
+# TEST RECORD: test-record.json is emitted by `tq --record` (ADR-025 D6) from
+# `cargo test` output — see README/CONTRIBUTING. Before it existed every
+# `test_named` assertion resolved to `unknown`: 906 `#[test]` functions and not
+# one of them a *verifiable claim*.
+#
+# The committed record is PARTIAL — 843 tests across 12 crates. wq-* and mq-*
+# are absent because they depend on mq-embed's ONNX stack, which cannot fetch
+# its prebuilt binaries in a restricted-egress environment. Their assertions
+# therefore report `test not registered` rather than green, which is the correct
+# answer: the record is the evidence, and evidence that was never collected is
+# not a pass. Regenerate locally, where the full workspace builds, to close
+# F-BEHAV-wq-path-resolution.
 
 phase_assertions:
   - id: PHASE-wq-family-closed

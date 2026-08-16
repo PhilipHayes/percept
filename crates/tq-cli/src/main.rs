@@ -6,6 +6,8 @@ use tq_core::diff::diff_runs;
 use tq_core::flaky::detect_flaky;
 use tq_parse::{detect_format, parse_output};
 
+mod record;
+
 #[derive(Parser)]
 #[command(
     name = "tq",
@@ -35,6 +37,20 @@ struct Cli {
     /// Detect flaky tests across multiple saved TestRun JSON files
     #[arg(long, num_args = 1..)]
     flaky: Option<Vec<String>>,
+
+    /// Emit an ADR-025 D6 test-record.json for a contract verifier
+    #[arg(long)]
+    record: bool,
+
+    /// Commit SHA to stamp into the record (default: `git rev-parse HEAD`)
+    #[arg(long)]
+    head: Option<String>,
+
+    /// Exit code of the test runner. Omit it and the record is marked
+    /// incomplete, so a verifier reports absent tests as unknown rather than
+    /// treating a truncated run as a clean one.
+    #[arg(long)]
+    runner_exit_code: Option<i32>,
 
     /// Input file(s). Reads stdin if omitted.
     files: Vec<String>,
@@ -95,6 +111,32 @@ fn main() -> Result<()> {
         let json = serde_json::to_string_pretty(&run)?;
         std::fs::write(save_path, &json)?;
         eprintln!("tq: saved to {}", save_path);
+    }
+
+    // --record: emit an ADR-025 D6 test-record.json instead of a TestRun.
+    if cli.record {
+        let head = match cli.head {
+            Some(h) => h,
+            None => std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+        };
+        let completed = cli.runner_exit_code.is_some();
+        let generated_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let rec = record::build_record(
+            &run,
+            &head,
+            &generated_at,
+            completed,
+            cli.runner_exit_code,
+        );
+        let output = serde_json::to_string_pretty(&rec)?;
+        println!("{}", output);
+        return Ok(());
     }
 
     if cli.summary {
