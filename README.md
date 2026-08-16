@@ -23,7 +23,7 @@ mq match bills.json transactions.json \
 
 | Tool | What it queries | Output |
 |------|----------------|--------|
-| [`aq`](crates/aq-cli/) | Source code AST (15 languages) | Functions, classes, signatures, skeletons |
+| [`aq`](crates/aq-cli/) | Source code AST (14 languages) | Functions, classes, signatures, skeletons |
 | [`nq`](crates/aq-nlp/) | Natural language text | Entities, relations, narrative structure |
 | [`gq`](crates/gq/) | Git history | Commits, blame, churn, changed files |
 | [`oq`](crates/oq/) | Observation cache | Cached `aq` results, git-hash invalidated |
@@ -67,7 +67,11 @@ See [`benchmarks/`](benchmarks/) for detailed comparison data. Summary: across a
 
 ## Language support (aq)
 
-Rust, TypeScript, JavaScript, Python, Go, Java, C, C++, Dart, Swift, JSON, TSX.
+Rust, JavaScript, TypeScript, TSX, Python, JSON, Go, Java, C, C++, Dart, Swift, TOML, YAML.
+
+Count and list are derived from the `Language` enum in `crates/aq-treesitter/src/langs.rs`,
+which is the only authority on what `aq` can parse. `contract.yml`'s
+`F-DOCS-language-count` asserts this list against that file.
 
 ## License
 
