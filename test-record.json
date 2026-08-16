@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-16T15:17:48Z",
-  "head": "e0313df165d79d98a37b426baa3b728aad478d77",
+  "generated_at": "2026-08-16T15:48:52Z",
+  "head": "f1639a4d640d2969c094394427f2536300fba0a1",
   "language": "rust",
   "runner": "cargo-test",
   "runner_completed": true,
@@ -9,22 +9,7 @@
   "tests": [
     {
       "suite": "cli_nq",
-      "name": "aq_does_not_have_index",
-      "status": "ok"
-    },
-    {
-      "suite": "cli_nq",
-      "name": "nq_existing_query_unchanged",
-      "status": "ok"
-    },
-    {
-      "suite": "cli_nq",
       "name": "nq_corpus_without_flag_independent",
-      "status": "ok"
-    },
-    {
-      "suite": "cli_nq",
-      "name": "nq_corpus_skeleton_has_corpus_fields",
       "status": "ok"
     },
     {
@@ -34,7 +19,12 @@
     },
     {
       "suite": "cli_nq",
-      "name": "nq_index_no_args_errors",
+      "name": "nq_corpus_skeleton_has_corpus_fields",
+      "status": "ok"
+    },
+    {
+      "suite": "cli_nq",
+      "name": "nq_existing_query_unchanged",
       "status": "ok"
     },
     {
@@ -49,12 +39,17 @@
     },
     {
       "suite": "cli_nq",
-      "name": "nq_index_status_empty",
+      "name": "nq_index_dry_run_json",
       "status": "ok"
     },
     {
       "suite": "cli_nq",
-      "name": "nq_index_prune",
+      "name": "nq_index_no_args_errors",
+      "status": "ok"
+    },
+    {
+      "suite": "cli_nq",
+      "name": "nq_index_status_empty",
       "status": "ok"
     },
     {
@@ -64,22 +59,27 @@
     },
     {
       "suite": "cli_nq",
+      "name": "nq_index_prune",
+      "status": "ok"
+    },
+    {
+      "suite": "cli_nq",
       "name": "nq_index_status_json",
       "status": "ok"
     },
     {
       "suite": "cli_nq",
-      "name": "nq_index_dry_run_json",
-      "status": "ok"
-    },
-    {
-      "suite": "cli_nq",
-      "name": "nq_signatures_returns_nlp_not_implemented_error",
+      "name": "aq_does_not_have_index",
       "status": "ok"
     },
     {
       "suite": "cli_nq",
       "name": "nq_skeleton_returns_nlp_not_implemented_error",
+      "status": "ok"
+    },
+    {
+      "suite": "cli_nq",
+      "name": "nq_signatures_returns_nlp_not_implemented_error",
       "status": "ok"
     },
     {
@@ -89,22 +89,17 @@
     },
     {
       "suite": "cli_signatures",
-      "name": "signatures_always_has_name_field_dart",
+      "name": "signatures_name_values_are_correct_dart",
       "status": "ok"
     },
     {
       "suite": "cli_signatures",
-      "name": "signatures_name_values_are_correct_dart",
+      "name": "signatures_always_has_name_field_dart",
       "status": "ok"
     },
     {
       "suite": "aq_core/node/tests",
       "name": "test_owned_node_leaf_roundtrip",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/node/tests",
-      "name": "test_owned_node_with_children_roundtrip",
       "status": "ok"
     },
     {
@@ -118,18 +113,23 @@
       "status": "ok"
     },
     {
+      "suite": "aq_core/node/tests",
+      "name": "test_owned_node_with_children_roundtrip",
+      "status": "ok"
+    },
+    {
       "suite": "aq_core/query/eval/tests/tests",
       "name": "alternative_uses_fallback",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "alternative_uses_first",
+      "name": "ancestors_of_root_is_empty",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "ancestors_from_leaf",
+      "name": "alternative_uses_first",
       "status": "ok"
     },
     {
@@ -144,7 +144,7 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "ancestors_of_root_is_empty",
+      "name": "ancestors_from_leaf",
       "status": "ok"
     },
     {
@@ -204,12 +204,7 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_first_last",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_flatten",
+      "name": "builtin_group_by",
       "status": "ok"
     },
     {
@@ -219,12 +214,17 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_group_by",
+      "name": "builtin_flatten",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_keys",
+      "name": "builtin_join",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "builtin_first_last",
       "status": "ok"
     },
     {
@@ -234,7 +234,7 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_join",
+      "name": "builtin_keys",
       "status": "ok"
     },
     {
@@ -269,27 +269,17 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_startswith",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
       "name": "builtin_split",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_to_number",
+      "name": "builtin_startswith",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
       "name": "builtin_sort_by",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_to_string",
       "status": "ok"
     },
     {
@@ -304,12 +294,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "children_all",
+      "name": "builtin_to_string",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "builtin_test",
+      "name": "builtin_to_number",
       "status": "ok"
     },
     {
@@ -319,12 +309,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "children_last",
+      "name": "children_all",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "comparison_eq_false",
+      "name": "children_last",
       "status": "ok"
     },
     {
@@ -334,7 +324,17 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
+      "name": "comparison_eq_false",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
       "name": "collect_sort_limit",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "comparison_regex_match",
       "status": "ok"
     },
     {
@@ -354,17 +354,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "depth_of_leaf",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
-      "name": "comparison_regex_match",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
       "name": "desc_type_filter",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "depth_of_leaf",
       "status": "ok"
     },
     {
@@ -379,12 +374,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "format_csv",
+      "name": "field_missing",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "field_missing",
+      "name": "format_csv",
       "status": "ok"
     },
     {
@@ -399,17 +394,7 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "if_then_else_false",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
       "name": "identity_returns_self",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
-      "name": "if_then_else_true",
       "status": "ok"
     },
     {
@@ -419,12 +404,27 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "iterate_array",
+      "name": "if_then_else_true",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "builtin_test",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "if_then_else_false",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
       "name": "index_array",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "iterate_array",
       "status": "ok"
     },
     {
@@ -439,7 +439,7 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "match_single_type",
+      "name": "match_descendant_pattern",
       "status": "ok"
     },
     {
@@ -449,12 +449,17 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "match_descendant_pattern",
+      "name": "meta_line",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "meta_line",
+      "name": "meta_file",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "match_single_type",
       "status": "ok"
     },
     {
@@ -474,17 +479,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "next_sibling_of_last_is_empty",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
-      "name": "meta_file",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
       "name": "next_sibling",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
+      "name": "next_sibling_of_last_is_empty",
       "status": "ok"
     },
     {
@@ -504,11 +504,6 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "parent_of_root_is_empty",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/eval/tests/tests",
       "name": "parent_of_deep_node",
       "status": "ok"
     },
@@ -524,6 +519,11 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
+      "name": "parent_of_root_is_empty",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/eval/tests/tests",
       "name": "prev_sibling",
       "status": "ok"
     },
@@ -534,12 +534,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "select_filter",
+      "name": "select_arithmetic",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "select_arithmetic",
+      "name": "select_filter",
       "status": "ok"
     },
     {
@@ -549,17 +549,12 @@
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "string_interp_in_pipeline",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/lexer/tests/tests",
-      "name": "bare_equals",
+      "name": "string_interpolation",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/eval/tests/tests",
-      "name": "string_interpolation",
+      "name": "string_interp_in_pipeline",
       "status": "ok"
     },
     {
@@ -574,17 +569,17 @@
     },
     {
       "suite": "aq_core/query/lexer/tests/tests",
+      "name": "bare_equals",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/lexer/tests/tests",
       "name": "booleans_and_null",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/lexer/tests/tests",
       "name": "decimal_number",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/lexer/tests/tests",
-      "name": "dot_not_decimal",
       "status": "ok"
     },
     {
@@ -599,17 +594,17 @@
     },
     {
       "suite": "aq_core/query/lexer/tests/tests",
+      "name": "dot_not_decimal",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/lexer/tests/tests",
       "name": "field_access",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/lexer/tests/tests",
       "name": "identifiers",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/lexer/tests/tests",
-      "name": "integer",
       "status": "ok"
     },
     {
@@ -624,12 +619,17 @@
     },
     {
       "suite": "aq_core/query/lexer/tests/tests",
-      "name": "multi_char_operators",
+      "name": "pipe_expression",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/lexer/tests/tests",
-      "name": "pipe_expression",
+      "name": "integer",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/lexer/tests/tests",
+      "name": "multi_char_operators",
       "status": "ok"
     },
     {
@@ -640,11 +640,6 @@
     {
       "suite": "aq_core/query/lexer/tests/tests",
       "name": "simple_string",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/lexer/tests/tests",
-      "name": "single_punctuation",
       "status": "ok"
     },
     {
@@ -660,6 +655,11 @@
     {
       "suite": "aq_core/query/lexer/tests/tests",
       "name": "string_interpolation_nested_parens",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/lexer/tests/tests",
+      "name": "single_punctuation",
       "status": "ok"
     },
     {
@@ -719,12 +719,12 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "arithmetic_mul_precedence",
+      "name": "array_collect",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "array_collect",
+      "name": "arithmetic_mul_precedence",
       "status": "ok"
     },
     {
@@ -744,12 +744,12 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "bracket_filter_desc_type",
+      "name": "builtin_multiple_args",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "builtin_multiple_args",
+      "name": "builtin_with_args",
       "status": "ok"
     },
     {
@@ -759,22 +759,12 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
+      "name": "bracket_filter_desc_type",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/parser/tests/tests",
       "name": "children_no_index",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/parser/tests/tests",
-      "name": "children_type_filter",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/parser/tests/tests",
-      "name": "comparison_eq",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/parser/tests/tests",
-      "name": "builtin_with_args",
       "status": "ok"
     },
     {
@@ -789,12 +779,17 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "complex_pipeline",
+      "name": "children_type_filter",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "desc_type_filter",
+      "name": "comparison_eq",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/parser/tests/tests",
+      "name": "complex_pipeline",
       "status": "ok"
     },
     {
@@ -804,12 +799,12 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "descendants_with_depth",
+      "name": "desc_type_filter",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "descendants",
+      "name": "descendants_with_depth",
       "status": "ok"
     },
     {
@@ -819,7 +814,7 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "identity",
+      "name": "descendants",
       "status": "ok"
     },
     {
@@ -829,7 +824,7 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "if_then_no_else",
+      "name": "identity",
       "status": "ok"
     },
     {
@@ -839,12 +834,12 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "index",
+      "name": "if_then_no_else",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "iterate",
+      "name": "index",
       "status": "ok"
     },
     {
@@ -914,6 +909,16 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
+      "name": "meta_file",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/parser/tests/tests",
+      "name": "iterate",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/parser/tests/tests",
       "name": "meta_line",
       "status": "ok"
     },
@@ -924,17 +929,17 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
+      "name": "meta_type",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/parser/tests/tests",
       "name": "meta_subtree_text",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
       "name": "meta_text",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/parser/tests/tests",
-      "name": "meta_type",
       "status": "ok"
     },
     {
@@ -950,11 +955,6 @@
     {
       "suite": "aq_core/query/parser/tests/tests",
       "name": "nested_field_access",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/parser/tests/tests",
-      "name": "object_construction",
       "status": "ok"
     },
     {
@@ -989,27 +989,27 @@
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "trailing_token_error",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_core/query/parser/tests/tests",
       "name": "string_interpolation",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "meta_file",
+      "name": "object_construction",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
-      "name": "zero_arg_builtin",
+      "name": "trailing_token_error",
       "status": "ok"
     },
     {
       "suite": "aq_core/query/parser/tests/tests",
       "name": "unknown_meta_field",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_core/query/parser/tests/tests",
+      "name": "zero_arg_builtin",
       "status": "ok"
     },
     {
@@ -1358,6 +1358,11 @@
       "status": "ok"
     },
     {
+      "suite": "aq_nlp/backend/tests",
+      "name": "nlp_backend_entities_present",
+      "status": "ok"
+    },
+    {
       "suite": "aq_nlp/discourse/tests",
       "name": "display_sequence",
       "status": "ok"
@@ -1374,12 +1379,12 @@
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "lookup_as_a_result",
+      "name": "lookup_because",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "lookup_because",
+      "name": "lookup_as_a_result",
       "status": "ok"
     },
     {
@@ -1409,12 +1414,12 @@
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "scan_as_a_result",
+      "name": "scan_empty_string",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "scan_empty_string",
+      "name": "scan_as_a_result",
       "status": "ok"
     },
     {
@@ -1424,12 +1429,12 @@
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "scan_furthermore",
+      "name": "scan_however_sentence",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "scan_however_sentence",
+      "name": "scan_furthermore",
       "status": "ok"
     },
     {
@@ -1454,17 +1459,12 @@
     },
     {
       "suite": "aq_nlp/discourse/tests",
-      "name": "scan_previously",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/discourse/tests",
       "name": "scan_studies_show",
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/index/tests",
-      "name": "test_discover_files_glob",
+      "suite": "aq_nlp/discourse/tests",
+      "name": "scan_previously",
       "status": "ok"
     },
     {
@@ -1474,12 +1474,7 @@
     },
     {
       "suite": "aq_nlp/index/tests",
-      "name": "test_discover_files_recursive",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/backend/tests",
-      "name": "nlp_backend_parses_empty_text",
+      "name": "test_discover_files_glob",
       "status": "ok"
     },
     {
@@ -1489,12 +1484,22 @@
     },
     {
       "suite": "aq_nlp/index/tests",
-      "name": "test_dry_run_estimates",
+      "name": "test_discover_files_recursive",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/index/tests",
-      "name": "test_expand_globs_directory",
+      "name": "test_dry_run_estimates",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/backend/tests",
+      "name": "nlp_backend_parses_empty_text",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/backend/tests",
+      "name": "nlp_backend_parses_english_text",
       "status": "ok"
     },
     {
@@ -1504,12 +1509,12 @@
     },
     {
       "suite": "aq_nlp/index/tests",
-      "name": "test_prune_deferred",
+      "name": "test_expand_globs_directory",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/index/tests",
-      "name": "test_status_all_indexed",
+      "name": "test_prune_deferred",
       "status": "ok"
     },
     {
@@ -1518,8 +1523,13 @@
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/backend/tests",
-      "name": "nlp_backend_entities_present",
+      "suite": "aq_nlp/index/tests",
+      "name": "test_status_no_cache",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/markdown/tests",
+      "name": "test_empty_input",
       "status": "ok"
     },
     {
@@ -1528,8 +1538,8 @@
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/markdown/tests",
-      "name": "test_empty_input",
+      "suite": "aq_nlp/index/tests",
+      "name": "test_status_all_indexed",
       "status": "ok"
     },
     {
@@ -1543,28 +1553,23 @@
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/markdown/tests",
-      "name": "test_strip_code_blocks",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/index/tests",
-      "name": "test_status_no_cache",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/markdown/tests",
-      "name": "test_strip_frontmatter_mid_document",
-      "status": "ok"
-    },
-    {
       "suite": "aq_nlp/index/tests",
       "name": "test_status_some_stale",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/markdown/tests",
+      "name": "test_strip_code_blocks",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/markdown/tests",
       "name": "test_strip_frontmatter",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/markdown/tests",
+      "name": "test_strip_frontmatter_mid_document",
       "status": "ok"
     },
     {
@@ -1594,17 +1599,17 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
+      "name": "arc_falling",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/narrative/tests",
       "name": "arc_flat",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
       "name": "arc_insufficient_data",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/narrative/tests",
-      "name": "arc_falling",
       "status": "ok"
     },
     {
@@ -1624,17 +1629,17 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
+      "name": "arc_shape_display",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/narrative/tests",
       "name": "arc_transformative",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
       "name": "conflict_brief",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/narrative/tests",
-      "name": "arc_shape_display",
       "status": "ok"
     },
     {
@@ -1654,6 +1659,11 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
+      "name": "conflict_opposing_pair",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/narrative/tests",
       "name": "conflict_pair_canonicalization",
       "status": "ok"
     },
@@ -1669,17 +1679,12 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
-      "name": "conflict_opposing_pair",
+      "name": "conflict_trend_display",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
       "name": "conflict_stable",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/narrative/tests",
-      "name": "conflict_trend_display",
       "status": "ok"
     },
     {
@@ -1694,12 +1699,17 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
+      "name": "foreshadowing_detected",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/narrative/tests",
       "name": "consistency_no_location_data",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
-      "name": "foreshadowing_detected",
+      "name": "foreshadowing_not_triggered_balanced",
       "status": "ok"
     },
     {
@@ -1714,22 +1724,17 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
-      "name": "foreshadowing_not_triggered_balanced",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/narrative/tests",
       "name": "jaccard_disjoint",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
-      "name": "jaccard_partial",
+      "name": "jaccard_identical",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
-      "name": "jaccard_identical",
+      "name": "jaccard_partial",
       "status": "ok"
     },
     {
@@ -1774,17 +1779,17 @@
     },
     {
       "suite": "aq_nlp/narrative/tests",
+      "name": "scene_no_entities_fallback",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/narrative/tests",
       "name": "scene_same_entities_no_break",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/narrative/tests",
       "name": "scene_single_paragraph",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/narrative/tests",
-      "name": "scene_no_entities_fallback",
       "status": "ok"
     },
     {
@@ -1834,22 +1839,7 @@
     },
     {
       "suite": "aq_nlp/nq_cache/tests",
-      "name": "test_merge_roundtrip",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/nq_cache/tests",
       "name": "test_miss",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/nq_cache/tests",
-      "name": "test_pipeline_version_not_empty",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/nq_cache/tests",
-      "name": "test_pipeline_version_stable",
       "status": "ok"
     },
     {
@@ -1859,22 +1849,32 @@
     },
     {
       "suite": "aq_nlp/nq_cache/tests",
-      "name": "test_roundtrip",
+      "name": "test_pipeline_version_stable",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/nq_cache/tests",
-      "name": "test_status_hit",
+      "name": "test_pipeline_version_not_empty",
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/roles/tests",
-      "name": "classify_action_verb_kick",
+      "suite": "aq_nlp/nq_cache/tests",
+      "name": "test_merge_roundtrip",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/nq_cache/tests",
       "name": "test_status_miss",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/nq_cache/tests",
+      "name": "test_roundtrip",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
+      "name": "classify_action_verb_kick",
       "status": "ok"
     },
     {
@@ -1889,17 +1889,17 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "classify_creation_verb_bake",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/roles/tests",
       "name": "classify_ergative_door_opened",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "classify_ergative_ice_melted",
+      "name": "classify_creation_verb_bake",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/nq_cache/tests",
+      "name": "test_status_hit",
       "status": "ok"
     },
     {
@@ -1915,6 +1915,11 @@
     {
       "suite": "aq_nlp/roles/tests",
       "name": "classify_motion_verb_run",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
+      "name": "classify_ergative_ice_melted",
       "status": "ok"
     },
     {
@@ -1939,17 +1944,7 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "classify_prep_to_goal",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/roles/tests",
       "name": "classify_transfer_verb_give",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/roles/tests",
-      "name": "ergative_detection",
       "status": "ok"
     },
     {
@@ -1959,7 +1954,17 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "role_frame_action_dobj",
+      "name": "classify_unknown_verb",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
+      "name": "ergative_detection",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
+      "name": "classify_prep_to_goal",
       "status": "ok"
     },
     {
@@ -1969,12 +1974,17 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
+      "name": "role_frame_creation_dobj",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
       "name": "role_frame_change_of_state_passive",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "role_frame_creation_dobj",
+      "name": "role_frame_perception_nsubj",
       "status": "ok"
     },
     {
@@ -1984,17 +1994,12 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "classify_unknown_verb",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/roles/tests",
       "name": "role_frame_stative_nsubj",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "role_frame_perception_nsubj",
+      "name": "role_frame_action_dobj",
       "status": "ok"
     },
     {
@@ -2029,17 +2034,7 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
-      "name": "verb_class_communication",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/roles/tests",
       "name": "verb_class_consumption",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/roles/tests",
-      "name": "verb_class_coverage_spot_check",
       "status": "ok"
     },
     {
@@ -2049,7 +2044,17 @@
     },
     {
       "suite": "aq_nlp/roles/tests",
+      "name": "verb_class_coverage_spot_check",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
       "name": "verb_class_emotion",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/roles/tests",
+      "name": "verb_class_communication",
       "status": "ok"
     },
     {
@@ -2083,16 +2088,6 @@
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/backend/tests",
-      "name": "nlp_backend_parses_english_text",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/spacy/tests",
-      "name": "parse_hello_world",
-      "status": "ok"
-    },
-    {
       "suite": "aq_nlp/spacy/tests",
       "name": "parse_entities",
       "status": "ok"
@@ -2104,17 +2099,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "backward_compat_agent_query",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
       "name": "adr_sarah_detective_aliases_query",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "contribute_david_him",
+      "name": "backward_compat_agent_query",
       "status": "ok"
     },
     {
@@ -2124,17 +2114,22 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
+      "name": "contribute_david_him",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
       "name": "contribute_jane_she_her",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/spacy/tests",
+      "name": "parse_multi_sentence",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
       "name": "contribute_joey_kristy_no_coref",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "contribute_paragraph_boundary",
       "status": "ok"
     },
     {
@@ -2148,8 +2143,8 @@
       "status": "ok"
     },
     {
-      "suite": "aq_nlp/spacy/tests",
-      "name": "parse_multi_sentence",
+      "suite": "aq_nlp/tree/tests",
+      "name": "contribute_paragraph_boundary",
       "status": "ok"
     },
     {
@@ -2174,17 +2169,17 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
+      "name": "e2e_passive_with_roles",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
       "name": "empty_document",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
       "name": "entity_dedup_case_insensitive",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "e2e_passive_with_roles",
       "status": "ok"
     },
     {
@@ -2204,12 +2199,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "entity_mention_count",
+      "name": "entity_node_has_aliases",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "integration_action_roles",
+      "name": "entity_mention_count",
       "status": "ok"
     },
     {
@@ -2219,7 +2214,7 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "entity_node_has_aliases",
+      "name": "integration_action_roles",
       "status": "ok"
     },
     {
@@ -2249,17 +2244,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "integration_prep_goal_source",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
       "name": "integration_transfer_roles",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "interaction_active_simple",
+      "name": "integration_prep_goal_source",
       "status": "ok"
     },
     {
@@ -2270,6 +2260,11 @@
     {
       "suite": "aq_nlp/tree/tests",
       "name": "interaction_agentless_passive",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "interaction_active_simple",
       "status": "ok"
     },
     {
@@ -2308,6 +2303,11 @@
       "status": "ok"
     },
     {
+      "suite": "aq_nlp/spacy/tests",
+      "name": "token_fields_populated",
+      "status": "ok"
+    },
+    {
       "suite": "aq_nlp/tree/tests",
       "name": "interaction_goal_child",
       "status": "ok"
@@ -2319,12 +2319,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "interaction_passive_participle_contribute",
+      "name": "interaction_passive_by_agent",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "interaction_passive_by_agent",
+      "name": "interaction_passive_participle_contribute",
       "status": "ok"
     },
     {
@@ -2334,17 +2334,17 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "interaction_text_is_summary",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
       "name": "interaction_role_children",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "multi_sentence",
+      "name": "interaction_verb_class",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "interaction_text_is_summary",
       "status": "ok"
     },
     {
@@ -2359,27 +2359,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "interaction_verb_class",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "normalize_dep_idempotent",
+      "name": "multi_sentence",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
       "name": "no_questions_in_statements",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/spacy/tests",
-      "name": "token_fields_populated",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "paragraph_detection",
       "status": "ok"
     },
     {
@@ -2389,12 +2374,27 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "passive_verb_phrase_voice",
+      "name": "normalize_dep_idempotent",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "paragraph_detection",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
       "name": "patient_movement_tracked",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "passive_verb_phrase_voice",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "person_aliased_gpe_rescued",
       "status": "ok"
     },
     {
@@ -2414,27 +2414,17 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "query_beneficiary_filter",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "person_aliased_gpe_rescued",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "query_ergative_patient_child",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
       "name": "query_entity_interaction_count",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "query_experiencer_filter",
+      "name": "query_beneficiary_filter",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "query_ergative_patient_child",
       "status": "ok"
     },
     {
@@ -2449,12 +2439,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "query_role_agent_filter",
+      "name": "query_experiencer_filter",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "query_tier2_regression",
+      "name": "query_role_agent_filter",
       "status": "ok"
     },
     {
@@ -2469,12 +2459,12 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "query_verb_class_filter",
+      "name": "query_tier2_regression",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "question_how_detected",
+      "name": "query_verb_class_filter",
       "status": "ok"
     },
     {
@@ -2484,7 +2474,7 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "requirement_must_detected",
+      "name": "question_how_detected",
       "status": "ok"
     },
     {
@@ -2494,12 +2484,7 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "requirement_shall_detected",
-      "status": "ok"
-    },
-    {
-      "suite": "aq_nlp/tree/tests",
-      "name": "requirement_should_is_recommended",
+      "name": "requirement_must_detected",
       "status": "ok"
     },
     {
@@ -2509,12 +2494,22 @@
     },
     {
       "suite": "aq_nlp/tree/tests",
-      "name": "source_file_propagated",
+      "name": "requirement_should_is_recommended",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "requirement_shall_detected",
       "status": "ok"
     },
     {
       "suite": "aq_nlp/tree/tests",
       "name": "single_sentence",
+      "status": "ok"
+    },
+    {
+      "suite": "aq_nlp/tree/tests",
+      "name": "source_file_propagated",
       "status": "ok"
     },
     {
@@ -2543,6 +2538,16 @@
       "status": "ok"
     },
     {
+      "suite": "aq_nlp/spacy/tests",
+      "name": "parse_hello_world",
+      "status": "ok"
+    },
+    {
+      "suite": "contribute_examples",
+      "name": "contribute_joey_battled",
+      "status": "ok"
+    },
+    {
       "suite": "contribute_examples",
       "name": "compound_subject_enters",
       "status": "ok"
@@ -2550,11 +2555,6 @@
     {
       "suite": "contribute_examples",
       "name": "contribute_came_back_to_life",
-      "status": "ok"
-    },
-    {
-      "suite": "contribute_examples",
-      "name": "contribute_joey_battled",
       "status": "ok"
     },
     {
@@ -2569,17 +2569,17 @@
     },
     {
       "suite": "contribute_examples",
-      "name": "long_narrative_no_panic",
-      "status": "ok"
-    },
-    {
-      "suite": "contribute_examples",
       "name": "copula_no_panic",
       "status": "ok"
     },
     {
       "suite": "contribute_examples",
       "name": "contribute_ran_away",
+      "status": "ok"
+    },
+    {
+      "suite": "contribute_examples",
+      "name": "long_narrative_no_panic",
       "status": "ok"
     },
     {
@@ -2594,17 +2594,17 @@
     },
     {
       "suite": "discourse_e2e",
-      "name": "e2e_discourse_plus_entities_plus_roles",
+      "name": "e2e_cross_paragraph_multi",
+      "status": "ok"
+    },
+    {
+      "suite": "discourse_e2e",
+      "name": "e2e_argument_essay",
       "status": "ok"
     },
     {
       "suite": "discourse_e2e",
       "name": "e2e_dense_connectives",
-      "status": "ok"
-    },
-    {
-      "suite": "discourse_e2e",
-      "name": "e2e_cross_paragraph_multi",
       "status": "ok"
     },
     {
@@ -2619,22 +2619,7 @@
     },
     {
       "suite": "discourse_e2e",
-      "name": "e2e_argument_essay",
-      "status": "ok"
-    },
-    {
-      "suite": "discourse_query_integration",
-      "name": "adr_contrast_query",
-      "status": "ok"
-    },
-    {
-      "suite": "discourse_query_integration",
-      "name": "adr_nucleus_line_query",
-      "status": "ok"
-    },
-    {
-      "suite": "discourse_query_integration",
-      "name": "adr_evidence_query",
+      "name": "e2e_discourse_plus_entities_plus_roles",
       "status": "ok"
     },
     {
@@ -2644,12 +2629,27 @@
     },
     {
       "suite": "discourse_query_integration",
-      "name": "connective_filter_query",
+      "name": "adr_nucleus_line_query",
+      "status": "ok"
+    },
+    {
+      "suite": "discourse_query_integration",
+      "name": "adr_contrast_query",
+      "status": "ok"
+    },
+    {
+      "suite": "discourse_query_integration",
+      "name": "adr_evidence_query",
       "status": "ok"
     },
     {
       "suite": "discourse_query_integration",
       "name": "desc_discourse_enumeration",
+      "status": "ok"
+    },
+    {
+      "suite": "discourse_query_integration",
+      "name": "connective_filter_query",
       "status": "ok"
     },
     {
@@ -2709,27 +2709,12 @@
     },
     {
       "suite": "discourse_query_integration",
-      "name": "tier1_regression_entity",
-      "status": "ok"
-    },
-    {
-      "suite": "discourse_query_integration",
       "name": "tier2_regression_interaction",
       "status": "ok"
     },
     {
-      "suite": "index_integration",
-      "name": "test_incremental_detects_pipeline_change",
-      "status": "ok"
-    },
-    {
-      "suite": "index_integration",
-      "name": "test_index_directory",
-      "status": "ok"
-    },
-    {
-      "suite": "index_integration",
-      "name": "test_incremental_skips_unchanged",
+      "suite": "discourse_query_integration",
+      "name": "tier1_regression_entity",
       "status": "ok"
     },
     {
@@ -2739,17 +2724,32 @@
     },
     {
       "suite": "index_integration",
+      "name": "test_incremental_detects_pipeline_change",
+      "status": "ok"
+    },
+    {
+      "suite": "index_integration",
+      "name": "test_incremental_skips_unchanged",
+      "status": "ok"
+    },
+    {
+      "suite": "index_integration",
+      "name": "test_index_directory",
+      "status": "ok"
+    },
+    {
+      "suite": "index_integration",
       "name": "test_index_error_handling",
       "status": "ok"
     },
     {
       "suite": "index_integration",
-      "name": "test_index_result_structure",
+      "name": "test_index_md_preprocessing",
       "status": "ok"
     },
     {
       "suite": "index_integration",
-      "name": "test_index_md_preprocessing",
+      "name": "test_index_result_structure",
       "status": "ok"
     },
     {
@@ -2769,12 +2769,12 @@
     },
     {
       "suite": "interaction_query_integration",
-      "name": "query_all_interactions",
+      "name": "query_interaction_pipe_agent",
       "status": "ok"
     },
     {
       "suite": "interaction_query_integration",
-      "name": "query_interaction_pipe_agent",
+      "name": "query_all_verb_phrases",
       "status": "ok"
     },
     {
@@ -2784,7 +2784,7 @@
     },
     {
       "suite": "interaction_query_integration",
-      "name": "query_all_verb_phrases",
+      "name": "query_passive_interaction_has_correct_agent",
       "status": "ok"
     },
     {
@@ -2799,17 +2799,12 @@
     },
     {
       "suite": "interaction_query_integration",
-      "name": "query_passive_interaction_has_correct_agent",
+      "name": "query_all_interactions",
       "status": "ok"
     },
     {
       "suite": "interaction_query_integration",
       "name": "tier1_token_queries_still_work",
-      "status": "ok"
-    },
-    {
-      "suite": "query_integration",
-      "name": "query_all_entities",
       "status": "ok"
     },
     {
@@ -2829,12 +2824,17 @@
     },
     {
       "suite": "query_integration",
-      "name": "query_on_empty_document",
+      "name": "query_all_entities",
       "status": "ok"
     },
     {
       "suite": "query_integration",
       "name": "query_person_entities",
+      "status": "ok"
+    },
+    {
+      "suite": "query_integration",
+      "name": "query_on_empty_document",
       "status": "ok"
     },
     {
@@ -2854,22 +2854,22 @@
     },
     {
       "suite": "technical_docs_regression",
-      "name": "technical_adr_corpus_merges_three_parts",
-      "status": "ok"
-    },
-    {
-      "suite": "technical_docs_regression",
       "name": "technical_adr_detects_person_entities",
       "status": "ok"
     },
     {
       "suite": "technical_docs_regression",
-      "name": "technical_adr_entity_type_distribution",
+      "name": "technical_adr_corpus_merges_three_parts",
       "status": "ok"
     },
     {
       "suite": "technical_docs_regression",
       "name": "technical_adr_detects_tool_names_as_entities",
+      "status": "ok"
+    },
+    {
+      "suite": "technical_docs_regression",
+      "name": "technical_adr_entity_type_distribution",
       "status": "ok"
     },
     {
@@ -2884,12 +2884,12 @@
     },
     {
       "suite": "aq_treesitter/backend/tests",
-      "name": "treesitter_backend_lists_languages",
+      "name": "treesitter_backend_rejects_unknown_language",
       "status": "ok"
     },
     {
       "suite": "aq_treesitter/backend/tests",
-      "name": "treesitter_backend_rejects_unknown_language",
+      "name": "treesitter_backend_lists_languages",
       "status": "ok"
     },
     {
@@ -2919,6 +2919,11 @@
     },
     {
       "suite": "integration",
+      "name": "cpp_find_functions",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
       "name": "cpp_find_classes",
       "status": "ok"
     },
@@ -2929,17 +2934,12 @@
     },
     {
       "suite": "integration",
-      "name": "cpp_find_functions",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "dart3_enhanced_enum",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "dart3_no_error_nodes",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "dart3_mixin_declaration",
       "status": "ok"
     },
     {
@@ -2949,7 +2949,12 @@
     },
     {
       "suite": "integration",
-      "name": "dart3_mixin_declaration",
+      "name": "dart3_enhanced_enum",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "dart3_sealed_class_parses",
       "status": "ok"
     },
     {
@@ -2969,17 +2974,12 @@
     },
     {
       "suite": "integration",
-      "name": "dart3_sealed_class_parses",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "dart_top_level_types",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "e2e_csv_format",
+      "name": "e2e_tech_debt_big_functions",
       "status": "ok"
     },
     {
@@ -2994,7 +2994,7 @@
     },
     {
       "suite": "integration",
-      "name": "e2e_tech_debt_big_functions",
+      "name": "e2e_csv_format",
       "status": "ok"
     },
     {
@@ -3004,17 +3004,12 @@
     },
     {
       "suite": "integration",
-      "name": "go_find_methods",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "go_find_functions",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "go_find_structs",
+      "name": "go_find_methods",
       "status": "ok"
     },
     {
@@ -3024,12 +3019,7 @@
     },
     {
       "suite": "integration",
-      "name": "java_find_classes",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "java_find_methods",
+      "name": "go_find_structs",
       "status": "ok"
     },
     {
@@ -3039,32 +3029,17 @@
     },
     {
       "suite": "integration",
+      "name": "java_find_classes",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
       "name": "java_method_count",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "js_children_count",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "js_find_classes",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "js_find_functions",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "metrics_empty_source",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "json_root_type",
+      "name": "java_find_methods",
       "status": "ok"
     },
     {
@@ -3074,7 +3049,32 @@
     },
     {
       "suite": "integration",
+      "name": "json_root_type",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
       "name": "metrics_broken_rust_detects_errors",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "metrics_empty_source",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "js_find_functions",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "js_find_classes",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "js_children_count",
       "status": "ok"
     },
     {
@@ -3089,17 +3089,17 @@
     },
     {
       "suite": "integration",
+      "name": "python_find_functions",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
       "name": "python_find_classes",
       "status": "ok"
     },
     {
       "suite": "integration",
       "name": "python_import_statements",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "python_find_functions",
       "status": "ok"
     },
     {
@@ -3139,11 +3139,6 @@
     },
     {
       "suite": "integration",
-      "name": "rust_find_functions",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "rust_find_structs",
       "status": "ok"
     },
@@ -3159,12 +3154,12 @@
     },
     {
       "suite": "integration",
-      "name": "rust_impl_functions",
+      "name": "rust_find_functions",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "rust_match_pattern",
+      "name": "rust_impl_functions",
       "status": "ok"
     },
     {
@@ -3174,22 +3169,7 @@
     },
     {
       "suite": "integration",
-      "name": "rust_object_construction",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "rust_root_type",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "rust_parent_navigation",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "rust_select_filter",
+      "name": "rust_match_pattern",
       "status": "ok"
     },
     {
@@ -3199,7 +3179,22 @@
     },
     {
       "suite": "integration",
-      "name": "rust_siblings",
+      "name": "rust_object_construction",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "rust_parent_navigation",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "rust_root_type",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "rust_select_filter",
       "status": "ok"
     },
     {
@@ -3209,17 +3204,17 @@
     },
     {
       "suite": "integration",
+      "name": "rust_siblings",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
       "name": "rust_use_declarations",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "swift_find_classes",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "swift_find_functions",
+      "name": "swift_top_level_types",
       "status": "ok"
     },
     {
@@ -3229,7 +3224,12 @@
     },
     {
       "suite": "integration",
-      "name": "toml_find_dep_by_name",
+      "name": "swift_find_functions",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "swift_find_classes",
       "status": "ok"
     },
     {
@@ -3244,32 +3244,22 @@
     },
     {
       "suite": "integration",
-      "name": "toml_find_specific_feature_key",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "swift_top_level_types",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "toml_find_top_level_keys",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "toml_parses_without_error_nodes",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "yaml_from_extension_yaml_returns_yaml",
+      "name": "toml_find_dep_by_name",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "yaml_from_extension_yml_returns_yaml",
+      "name": "toml_find_specific_feature_key",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "toml_find_top_level_keys",
       "status": "ok"
     },
     {
@@ -3284,12 +3274,12 @@
     },
     {
       "suite": "integration",
-      "name": "yaml_find_top_level_keys",
+      "name": "yaml_from_extension_yml_returns_yaml",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "yaml_in_supported_languages",
+      "name": "yaml_from_extension_yaml_returns_yaml",
       "status": "ok"
     },
     {
@@ -3299,12 +3289,12 @@
     },
     {
       "suite": "integration",
-      "name": "test_changed_since",
+      "name": "yaml_in_supported_languages",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "test_at_previous_rev",
+      "name": "yaml_find_top_level_keys",
       "status": "ok"
     },
     {
@@ -3314,12 +3304,17 @@
     },
     {
       "suite": "integration",
-      "name": "test_blame",
+      "name": "test_at_previous_rev",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "test_churn",
+      "name": "test_changed_since",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "test_blame",
       "status": "ok"
     },
     {
@@ -3330,6 +3325,11 @@
     {
       "suite": "integration",
       "name": "test_diff",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "test_churn",
       "status": "ok"
     },
     {
@@ -3354,12 +3354,12 @@
     },
     {
       "suite": "integration",
-      "name": "auto_detect_json_passthrough",
+      "name": "budget_truncates_output",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "budget_truncates_output",
+      "name": "auto_detect_json_passthrough",
       "status": "ok"
     },
     {
@@ -3374,12 +3374,12 @@
     },
     {
       "suite": "integration",
-      "name": "logfmt_level_filter",
+      "name": "bracket_source_filter",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "no_input_exits_error",
+      "name": "bracket_level_filter",
       "status": "ok"
     },
     {
@@ -3389,12 +3389,7 @@
     },
     {
       "suite": "integration",
-      "name": "bracket_source_filter",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "bracket_level_filter",
+      "name": "no_input_exits_error",
       "status": "ok"
     },
     {
@@ -3414,17 +3409,12 @@
     },
     {
       "suite": "integration",
-      "name": "summary_mode",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "summary_includes_top_errors",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "pipeline_filter_then_count",
+      "name": "summary_mode",
       "status": "ok"
     },
     {
@@ -3434,7 +3424,17 @@
     },
     {
       "suite": "integration",
+      "name": "pipeline_filter_then_count",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
       "name": "timeline_merges_files",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "logfmt_level_filter",
       "status": "ok"
     },
     {
@@ -3449,11 +3449,6 @@
     },
     {
       "suite": "lq_core/drain/tests",
-      "name": "keeps_samples",
-      "status": "ok"
-    },
-    {
-      "suite": "lq_core/drain/tests",
       "name": "groups_similar_messages",
       "status": "ok"
     },
@@ -3463,13 +3458,18 @@
       "status": "ok"
     },
     {
+      "suite": "lq_core/filter/tests",
+      "name": "filter_level",
+      "status": "ok"
+    },
+    {
       "suite": "lq_core/drain/tests",
       "name": "sorted_by_frequency",
       "status": "ok"
     },
     {
-      "suite": "lq_core/filter/tests",
-      "name": "filter_level",
+      "suite": "lq_core/drain/tests",
+      "name": "keeps_samples",
       "status": "ok"
     },
     {
@@ -3488,11 +3488,6 @@
       "status": "ok"
     },
     {
-      "suite": "lq_core/pipeline/tests",
-      "name": "context_lines",
-      "status": "ok"
-    },
-    {
       "suite": "lq_core/filter/tests",
       "name": "parse_query_stops_at_pipe",
       "status": "ok"
@@ -3504,7 +3499,17 @@
     },
     {
       "suite": "lq_core/pipeline/tests",
-      "name": "parse_simple_pipeline",
+      "name": "count_by_source_with_filter",
+      "status": "ok"
+    },
+    {
+      "suite": "lq_core/pipeline/tests",
+      "name": "context_lines",
+      "status": "ok"
+    },
+    {
+      "suite": "lq_core/pipeline/tests",
+      "name": "parse_context_pipeline",
       "status": "ok"
     },
     {
@@ -3514,7 +3519,7 @@
     },
     {
       "suite": "lq_core/pipeline/tests",
-      "name": "count_by_source_with_filter",
+      "name": "parse_simple_pipeline",
       "status": "ok"
     },
     {
@@ -3529,17 +3534,12 @@
     },
     {
       "suite": "lq_core/pipeline/tests",
-      "name": "timeline_sorts_by_timestamp",
-      "status": "ok"
-    },
-    {
-      "suite": "lq_core/pipeline/tests",
-      "name": "parse_context_pipeline",
-      "status": "ok"
-    },
-    {
-      "suite": "lq_core/pipeline/tests",
       "name": "rate_buckets",
+      "status": "ok"
+    },
+    {
+      "suite": "lq_core/pipeline/tests",
+      "name": "timeline_sorts_by_timestamp",
       "status": "ok"
     },
     {
@@ -3564,22 +3564,22 @@
     },
     {
       "suite": "lq_parse/access_log/tests",
-      "name": "parse_combined_log",
-      "status": "ok"
-    },
-    {
-      "suite": "lq_parse/access_log/tests",
       "name": "parse_500",
       "status": "ok"
     },
     {
-      "suite": "lq_parse/bracket/tests",
-      "name": "parse_bracketed_timestamp_level_source",
+      "suite": "lq_parse/access_log/tests",
+      "name": "parse_combined_log",
       "status": "ok"
     },
     {
       "suite": "lq_parse/bracket/tests",
       "name": "parse_bracketed_timestamp_level_no_source",
+      "status": "ok"
+    },
+    {
+      "suite": "lq_parse/bracket/tests",
+      "name": "parse_bracketed_timestamp_level_source",
       "status": "ok"
     },
     {
@@ -3613,18 +3613,13 @@
       "status": "ok"
     },
     {
-      "suite": "lq_parse/build_tool/tests",
-      "name": "parse_cargo_location",
+      "suite": "lq_parse/bracket/tests",
+      "name": "parse_bare_level",
       "status": "ok"
     },
     {
       "suite": "lq_parse/bracket/tests",
       "name": "parse_fallback_plain_text",
-      "status": "ok"
-    },
-    {
-      "suite": "lq_parse/bracket/tests",
-      "name": "parse_bare_level",
       "status": "ok"
     },
     {
@@ -3634,12 +3629,17 @@
     },
     {
       "suite": "lq_parse/detect/tests",
-      "name": "detect_bracket_timestamp_source_level",
+      "name": "detect_bracket",
+      "status": "ok"
+    },
+    {
+      "suite": "lq_parse/build_tool/tests",
+      "name": "parse_cargo_location",
       "status": "ok"
     },
     {
       "suite": "lq_parse/detect/tests",
-      "name": "detect_bracket",
+      "name": "detect_bracket_timestamp_source_level",
       "status": "ok"
     },
     {
@@ -3669,12 +3669,12 @@
     },
     {
       "suite": "lq_parse/detect/tests",
-      "name": "detect_plain_text_is_unknown",
+      "name": "detect_syslog",
       "status": "ok"
     },
     {
       "suite": "lq_parse/detect/tests",
-      "name": "detect_syslog",
+      "name": "detect_plain_text_is_unknown",
       "status": "ok"
     },
     {
@@ -3684,22 +3684,22 @@
     },
     {
       "suite": "lq_parse/docker_cri/tests",
-      "name": "parse_cri_with_level_in_message",
-      "status": "ok"
-    },
-    {
-      "suite": "lq_parse/docker_cri/tests",
       "name": "parse_cri_stdout",
       "status": "ok"
     },
     {
-      "suite": "lq_parse/json/tests",
-      "name": "parse_generic_json",
+      "suite": "lq_parse/docker_cri/tests",
+      "name": "parse_cri_with_level_in_message",
       "status": "ok"
     },
     {
       "suite": "lq_parse/json/tests",
       "name": "parse_invalid_json_fallback",
+      "status": "ok"
+    },
+    {
+      "suite": "lq_parse/json/tests",
+      "name": "parse_generic_json",
       "status": "ok"
     },
     {
@@ -3713,13 +3713,13 @@
       "status": "ok"
     },
     {
-      "suite": "lq_parse/logfmt/tests",
-      "name": "parse_pairs_handles_escaped_quotes",
+      "suite": "lq_parse/json/tests",
+      "name": "parse_zap_float_timestamp",
       "status": "ok"
     },
     {
-      "suite": "lq_parse/json/tests",
-      "name": "parse_zap_float_timestamp",
+      "suite": "lq_parse/logfmt/tests",
+      "name": "parse_pairs_handles_escaped_quotes",
       "status": "ok"
     },
     {
@@ -3733,13 +3733,13 @@
       "status": "ok"
     },
     {
-      "suite": "lq_parse/model/tests",
-      "name": "level_ordering",
+      "suite": "lq_parse/logfmt/tests",
+      "name": "parse_unquoted_values",
       "status": "ok"
     },
     {
-      "suite": "lq_parse/logfmt/tests",
-      "name": "parse_unquoted_values",
+      "suite": "lq_parse/model/tests",
+      "name": "level_ordering",
       "status": "ok"
     },
     {
@@ -3754,12 +3754,12 @@
     },
     {
       "suite": "lq_parse/build_tool/tests",
-      "name": "parse_gradle_failed",
+      "name": "parse_xcode_error",
       "status": "ok"
     },
     {
       "suite": "lq_parse/build_tool/tests",
-      "name": "parse_xcode_error",
+      "name": "parse_gradle_failed",
       "status": "ok"
     },
     {
@@ -3794,12 +3794,12 @@
     },
     {
       "suite": "oq/tests",
-      "name": "test_content_hash_different_content",
+      "name": "test_clear_removes_by_hash_entries",
       "status": "ok"
     },
     {
       "suite": "oq/tests",
-      "name": "test_clear_removes_by_hash_entries",
+      "name": "test_content_hash_different_content",
       "status": "ok"
     },
     {
@@ -3834,12 +3834,12 @@
     },
     {
       "suite": "oq/tests",
-      "name": "test_file_hash_nonexistent",
+      "name": "test_file_hash_non_git",
       "status": "ok"
     },
     {
       "suite": "oq/tests",
-      "name": "test_file_hash_non_git",
+      "name": "test_file_hash_nonexistent",
       "status": "ok"
     },
     {
@@ -3849,12 +3849,12 @@
     },
     {
       "suite": "integration",
-      "name": "test_stats",
+      "name": "test_version",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "test_version",
+      "name": "test_stats",
       "status": "ok"
     },
     {
@@ -3869,12 +3869,27 @@
     },
     {
       "suite": "tq/record/tests",
-      "name": "maps_each_status_to_the_record_vocabulary",
+      "name": "language_is_inferred_from_the_runner_format",
       "status": "ok"
     },
     {
       "suite": "tq/record/tests",
       "name": "bare_test_name_keeps_crate_as_suite",
+      "status": "ok"
+    },
+    {
+      "suite": "tq/record/tests",
+      "name": "explicit_language_overrides_inference",
+      "status": "ok"
+    },
+    {
+      "suite": "tq/record/tests",
+      "name": "errored_is_distinct_from_failed",
+      "status": "ok"
+    },
+    {
+      "suite": "tq/record/tests",
+      "name": "maps_each_status_to_the_record_vocabulary",
       "status": "ok"
     },
     {
@@ -3889,12 +3904,12 @@
     },
     {
       "suite": "tq/record/tests",
-      "name": "record_carries_schema_version_one_and_completion_flag",
+      "name": "non_rust_names_without_double_colon_keep_the_runner_suite",
       "status": "ok"
     },
     {
       "suite": "tq/record/tests",
-      "name": "errored_collapses_to_failed",
+      "name": "record_carries_schema_version_one_and_completion_flag",
       "status": "ok"
     },
     {
@@ -3904,12 +3919,12 @@
     },
     {
       "suite": "integration",
-      "name": "budget_truncates_output",
+      "name": "full_output_without_summary",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "full_output_without_summary",
+      "name": "budget_truncates_output",
       "status": "ok"
     },
     {
@@ -3924,17 +3939,12 @@
     },
     {
       "suite": "integration",
-      "name": "summary_flutter",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
       "name": "flaky_detection",
       "status": "ok"
     },
     {
       "suite": "integration",
-      "name": "summary_gotest",
+      "name": "summary_flutter",
       "status": "ok"
     },
     {
@@ -3949,12 +3959,7 @@
     },
     {
       "suite": "integration",
-      "name": "summary_jest",
-      "status": "ok"
-    },
-    {
-      "suite": "integration",
-      "name": "summary_libtest_json",
+      "name": "summary_gotest",
       "status": "ok"
     },
     {
@@ -3964,7 +3969,17 @@
     },
     {
       "suite": "integration",
-      "name": "summary_junit",
+      "name": "summary_libtest_json",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "summary_jest",
+      "status": "ok"
+    },
+    {
+      "suite": "integration",
+      "name": "summary_tap",
       "status": "ok"
     },
     {
@@ -3974,7 +3989,7 @@
     },
     {
       "suite": "integration",
-      "name": "summary_tap",
+      "name": "summary_junit",
       "status": "ok"
     },
     {
@@ -3984,7 +3999,7 @@
     },
     {
       "suite": "tq_core/diff/tests",
-      "name": "diff_new_failure",
+      "name": "diff_new_pass",
       "status": "ok"
     },
     {
@@ -3994,7 +4009,7 @@
     },
     {
       "suite": "tq_core/diff/tests",
-      "name": "diff_new_pass",
+      "name": "diff_new_failure",
       "status": "ok"
     },
     {
@@ -4013,8 +4028,8 @@
       "status": "ok"
     },
     {
-      "suite": "tq_parse/detect/regression_tests",
-      "name": "detect_libtest_after_cargo_warnings",
+      "suite": "tq_parse/detect/tests",
+      "name": "detect_pytest",
       "status": "ok"
     },
     {
@@ -4023,13 +4038,8 @@
       "status": "ok"
     },
     {
-      "suite": "tq_parse/detect/tests",
-      "name": "detect_pytest",
-      "status": "ok"
-    },
-    {
-      "suite": "tq_parse/detect/tests",
-      "name": "detect_unknown_empty",
+      "suite": "tq_parse/detect/regression_tests",
+      "name": "detect_libtest_after_cargo_warnings",
       "status": "ok"
     },
     {
@@ -4039,17 +4049,12 @@
     },
     {
       "suite": "tq_parse/detect/tests",
+      "name": "detect_unknown_empty",
+      "status": "ok"
+    },
+    {
+      "suite": "tq_parse/detect/tests",
       "name": "detect_tap",
-      "status": "ok"
-    },
-    {
-      "suite": "tq_parse/gotest/tests",
-      "name": "parse_go_failure",
-      "status": "ok"
-    },
-    {
-      "suite": "tq_parse/flutter/tests",
-      "name": "parse_flutter_passing",
       "status": "ok"
     },
     {
@@ -4058,8 +4063,8 @@
       "status": "ok"
     },
     {
-      "suite": "tq_parse/gotest/tests",
-      "name": "parse_go_skip",
+      "suite": "tq_parse/flutter/tests",
+      "name": "parse_flutter_passing",
       "status": "ok"
     },
     {
@@ -4074,7 +4079,7 @@
     },
     {
       "suite": "tq_parse/gotest/tests",
-      "name": "parse_passing_go",
+      "name": "parse_go_failure",
       "status": "ok"
     },
     {
@@ -4083,8 +4088,13 @@
       "status": "ok"
     },
     {
-      "suite": "tq_parse/jest/tests",
-      "name": "parse_passing_jest",
+      "suite": "tq_parse/gotest/tests",
+      "name": "parse_go_skip",
+      "status": "ok"
+    },
+    {
+      "suite": "tq_parse/gotest/tests",
+      "name": "parse_passing_go",
       "status": "ok"
     },
     {
@@ -4094,7 +4104,17 @@
     },
     {
       "suite": "tq_parse/jest/tests",
+      "name": "parse_passing_jest",
+      "status": "ok"
+    },
+    {
+      "suite": "tq_parse/jest/tests",
       "name": "parse_jest_with_failure",
+      "status": "ok"
+    },
+    {
+      "suite": "tq_parse/junit/tests",
+      "name": "parse_passing_junit",
       "status": "ok"
     },
     {
@@ -4108,23 +4128,13 @@
       "status": "ok"
     },
     {
-      "suite": "tq_parse/junit/tests",
-      "name": "parse_with_error_and_skip",
-      "status": "ok"
-    },
-    {
-      "suite": "tq_parse/junit/tests",
-      "name": "parse_passing_junit",
-      "status": "ok"
-    },
-    {
       "suite": "tq_parse/libtest/tests",
       "name": "doc_tests_header_normalises_package_name_to_crate_name",
       "status": "ok"
     },
     {
-      "suite": "tq_parse/libtest/tests",
-      "name": "parse_with_failures",
+      "suite": "tq_parse/junit/tests",
+      "name": "parse_with_error_and_skip",
       "status": "ok"
     },
     {
@@ -4139,12 +4149,12 @@
     },
     {
       "suite": "tq_parse/libtest/tests",
-      "name": "parse_with_ignored",
+      "name": "parse_with_failures",
       "status": "ok"
     },
     {
       "suite": "tq_parse/libtest/tests",
-      "name": "suite_is_none_when_output_has_no_binary_header",
+      "name": "parse_with_ignored",
       "status": "ok"
     },
     {
@@ -4158,6 +4168,11 @@
       "status": "ok"
     },
     {
+      "suite": "tq_parse/libtest/tests",
+      "name": "suite_is_none_when_output_has_no_binary_header",
+      "status": "ok"
+    },
+    {
       "suite": "tq_parse/libtest_json/tests",
       "name": "parse_json_with_failure",
       "status": "ok"
@@ -4165,11 +4180,6 @@
     {
       "suite": "tq_parse/libtest/tests",
       "name": "running_line_inside_failure_output_does_not_change_suite",
-      "status": "ok"
-    },
-    {
-      "suite": "tq_parse/model/tests",
-      "name": "test_run_from_results",
       "status": "ok"
     },
     {
@@ -4188,18 +4198,18 @@
       "status": "ok"
     },
     {
+      "suite": "tq_parse/model/tests",
+      "name": "test_run_from_results",
+      "status": "ok"
+    },
+    {
       "suite": "tq_parse/tap/tests",
       "name": "parse_tap_bail",
       "status": "ok"
     },
     {
-      "suite": "tq_parse/pytest/tests",
-      "name": "parse_with_skipped",
-      "status": "ok"
-    },
-    {
-      "suite": "tq_parse/pytest/tests",
-      "name": "parse_with_failures",
+      "suite": "tq_parse/tap/tests",
+      "name": "parse_tap_passing",
       "status": "ok"
     },
     {
@@ -4208,13 +4218,18 @@
       "status": "ok"
     },
     {
+      "suite": "tq_parse/pytest/tests",
+      "name": "parse_with_skipped",
+      "status": "ok"
+    },
+    {
       "suite": "tq_parse/tap/tests",
       "name": "parse_tap_skip_todo",
       "status": "ok"
     },
     {
-      "suite": "tq_parse/tap/tests",
-      "name": "parse_tap_passing",
+      "suite": "tq_parse/pytest/tests",
+      "name": "parse_with_failures",
       "status": "ok"
     },
     {
