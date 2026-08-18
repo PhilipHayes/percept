@@ -43,13 +43,20 @@ test_record_path: test-record.json
 # not a pass. Regenerate locally, where the full workspace builds, to close
 # F-BEHAV-wq-path-resolution.
 
-phase_assertions:
-  - id: PHASE-wq-family-closed
-    kind: phase_tag
-    sprint_marker: "wq-5 sprint close"
-    description: "wq crate family (core/cli/mcp) closed — ADR-038 fully built"
-
 features:
+
+  # Relocated from a top-level `phase_assertions:` block on 2026-08-17. That
+  # block validated and was then never compiled, run or emitted — this assertion
+  # had never once been evaluated, and the `green=8 red=2` verdict quoted
+  # throughout that work never included it (gestalt#15).
+  F-PHASE:
+    title: "wq crate family closed"
+    observed_state: shipped
+    assertions:
+      - id: PHASE-wq-family-closed
+        kind: phase_tag
+        sprint_marker: "wq-5 sprint close"
+        description: "wq crate family (core/cli/mcp) closed — ADR-038 fully built"
 
   # ── Structural: the crate family exists and exposes what the ADRs claim ──────
 
