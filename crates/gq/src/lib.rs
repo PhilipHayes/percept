@@ -340,7 +340,9 @@ pub fn cmd_churn(
         })
         .collect();
 
-    entries.sort_by(|a, b| b.commits.cmp(&a.commits));
+    // Ties in path order: the map above iterates in a per-process order,
+    // and callers keep the top N.
+    entries.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.path.cmp(&b.path)));
     Ok(entries)
 }
 

@@ -170,6 +170,36 @@ fn test_churn() {
     assert_eq!(hello["commits"], 3);
 }
 
+/// Files with the same commit count come back in path order. They used to
+/// keep HashMap order, which differs per process, so a caller that keeps
+/// the top N (canopy keeps 50 for co-change edges) kept a different set of
+/// tied files each run.
+#[test]
+fn test_churn_ties_are_in_path_order() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path();
+    run_git(path, &["init"]);
+    run_git(path, &["config", "user.email", "test@test.com"]);
+    run_git(path, &["config", "user.name", "Test User"]);
+    for i in 0..24 {
+        std::fs::write(path.join(format!("f{i:02}.txt")), "x\n").unwrap();
+    }
+    std::fs::write(path.join("hot.txt"), "1\n").unwrap();
+    run_git(path, &["add", "."]);
+    run_git(path, &["commit", "-m", "all"]);
+    std::fs::write(path.join("hot.txt"), "2\n").unwrap();
+    run_git(path, &["commit", "-am", "hot again"]);
+
+    let output = gq_cmd().args(["--churn", "-C"]).arg(path).output().unwrap();
+    assert!(output.status.success());
+    let entries: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
+    let paths: Vec<&str> = entries.iter().map(|e| e["path"].as_str().unwrap()).collect();
+
+    let mut expected: Vec<String> = (0..24).map(|i| format!("f{i:02}.txt")).collect();
+    expected.insert(0, "hot.txt".to_string());
+    assert_eq!(paths, expected);
+}
+
 #[test]
 fn test_changed_since() {
     let repo = setup_test_repo();
