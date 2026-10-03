@@ -960,6 +960,199 @@ fn swift_top_level_types() {
 }
 
 // ---------------------------------------------------------------------------
+// Kotlin
+// ---------------------------------------------------------------------------
+
+const KOTLIN_SOURCE: &str = r#"
+package sample
+
+import kotlin.collections.List
+
+val APP_NAME: String = "sample"
+var counter: Int = 0
+
+class AppConfig(val name: String, var value: Int) {
+    val label: String = name
+
+    fun describe(): String = "$name=$value"
+}
+
+object Registry {
+    fun register(item: String) {}
+}
+
+interface Serviceable {
+    fun start()
+}
+
+enum class AppState {
+    LOADING,
+    READY
+}
+
+fun process(config: AppConfig): String {
+    return config.describe()
+}
+"#;
+
+#[test]
+fn kotlin_from_extension_maps_kt_and_kts() {
+    assert_eq!(Language::from_extension("kt"), Some(Language::Kotlin));
+    assert_eq!(Language::from_extension("kts"), Some(Language::Kotlin));
+    assert_eq!(
+        Language::from_path(std::path::Path::new("src/Main.kt")),
+        Some(Language::Kotlin)
+    );
+    assert_eq!(
+        Language::from_path(std::path::Path::new("build.gradle.kts")),
+        Some(Language::Kotlin)
+    );
+}
+
+#[test]
+fn kotlin_from_name_accepts_kotlin_and_kt() {
+    assert_eq!(Language::from_name("kotlin"), Some(Language::Kotlin));
+    assert_eq!(Language::from_name("Kotlin"), Some(Language::Kotlin));
+    assert_eq!(Language::from_name("kt"), Some(Language::Kotlin));
+    assert_eq!(Language::Kotlin.name(), "Kotlin");
+}
+
+#[test]
+fn kotlin_in_supported_languages() {
+    use aq_core::backend::Backend;
+    use aq_treesitter::TreeSitterBackend;
+    let langs = TreeSitterBackend.supported_languages();
+    assert!(
+        langs.contains(&"kotlin"),
+        "expected \"kotlin\" in supported_languages, got {:?}",
+        langs
+    );
+}
+
+#[test]
+fn kotlin_find_functions() {
+    let results = query_source(
+        KOTLIN_SOURCE,
+        Language::Kotlin,
+        "desc:function_declaration | .name | @text",
+    );
+    assert_eq!(
+        results,
+        vec![
+            serde_json::json!("describe"),
+            serde_json::json!("register"),
+            serde_json::json!("start"),
+            serde_json::json!("process"),
+        ]
+    );
+}
+
+/// Kotlin `interface` and `enum class` are both `class_declaration` — only the
+/// keyword / modifier tells them apart, so all three are listed here.
+#[test]
+fn kotlin_find_class_declarations() {
+    let results = query_source(
+        KOTLIN_SOURCE,
+        Language::Kotlin,
+        "desc:class_declaration | .name | @text",
+    );
+    assert_eq!(
+        results,
+        vec![
+            serde_json::json!("AppConfig"),
+            serde_json::json!("Serviceable"),
+            serde_json::json!("AppState"),
+        ]
+    );
+}
+
+#[test]
+fn kotlin_find_objects() {
+    let results = query_source(
+        KOTLIN_SOURCE,
+        Language::Kotlin,
+        "desc:object_declaration | .name | @text",
+    );
+    assert_eq!(results, vec![serde_json::json!("Registry")]);
+}
+
+#[test]
+fn kotlin_top_level_types() {
+    let results = query_source(KOTLIN_SOURCE, Language::Kotlin, "children | @type");
+    let types: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    for expected in [
+        "import",
+        "property_declaration",
+        "class_declaration",
+        "object_declaration",
+        "function_declaration",
+    ] {
+        assert!(types.contains(&expected), "missing {expected} in {types:?}");
+    }
+}
+
+/// A Kotlin property has no `name` field: its identifier sits one level down,
+/// inside a `variable_declaration`. Consumers that want a name must look there.
+#[test]
+fn kotlin_property_name_is_inside_variable_declaration() {
+    let results = query_source(
+        KOTLIN_SOURCE,
+        Language::Kotlin,
+        "desc:property_declaration | desc:variable_declaration | desc:identifier | @text",
+    );
+    let names: Vec<&str> = results.iter().map(|v| v.as_str().unwrap()).collect();
+    for expected in ["APP_NAME", "counter", "label"] {
+        assert!(names.contains(&expected), "missing {expected} in {names:?}");
+    }
+}
+
+/// How `interface` and `enum class` are told apart from `class`: an
+/// anonymous `interface` keyword child and a `modifiers > class_modifier`
+/// of `enum`. The named-only tree (to_owned_node) drops the keyword, but its
+/// `subtree_text` still carries it.
+#[test]
+fn kotlin_interface_and_enum_are_distinguishable_from_class() {
+    let tree =
+        ParsedTree::parse(KOTLIN_SOURCE.to_string(), Language::Kotlin, None).unwrap();
+    let root = tree.to_owned_node_all();
+    fn find<'a>(n: &'a aq_core::OwnedNode, name: &str, out: &mut Vec<&'a aq_core::OwnedNode>) {
+        if n.node_type == "class_declaration"
+            && n.field_indices
+                .get("name")
+                .and_then(|i| n.children.get(i[0]))
+                .and_then(|c| c.text.as_deref())
+                == Some(name)
+        {
+            out.push(n);
+        }
+        for c in &n.children {
+            find(c, name, out);
+        }
+    }
+    let kinds = |name: &str| -> Vec<String> {
+        let mut found = Vec::new();
+        find(&root, name, &mut found);
+        assert_eq!(found.len(), 1, "expected one class_declaration {name}");
+        found[0]
+            .children
+            .iter()
+            .map(|c| c.node_type.clone())
+            .collect()
+    };
+    assert!(kinds("Serviceable").contains(&"interface".to_string()));
+    assert!(kinds("AppConfig").contains(&"class".to_string()));
+    assert!(!kinds("AppConfig").contains(&"interface".to_string()));
+    let enum_kinds = kinds("AppState");
+    assert!(enum_kinds.contains(&"modifiers".to_string()), "{enum_kinds:?}");
+    let enum_mods = query_source(
+        KOTLIN_SOURCE,
+        Language::Kotlin,
+        "desc:class_declaration | select(.name | @text == \"AppState\") | desc:class_modifier | @text",
+    );
+    assert_eq!(enum_mods, vec![serde_json::json!("enum")]);
+}
+
+// ---------------------------------------------------------------------------
 // Parent / Ancestors / Siblings (cross-language)
 // ---------------------------------------------------------------------------
 

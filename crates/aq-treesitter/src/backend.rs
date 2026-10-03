@@ -32,6 +32,7 @@ impl Backend for TreeSitterBackend {
             "java",
             "javascript",
             "json",
+            "kotlin",
             "python",
             "rust",
             "swift",

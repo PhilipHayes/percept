@@ -82,6 +82,11 @@ features:
         pattern: "tree-sitter-swift"
         path: crates/aq-treesitter/Cargo.toml
         min: 1
+      - id: aq-grammar-kotlin
+        kind: symbol_exists
+        pattern: "tree-sitter-kotlin-ng"
+        path: crates/aq-treesitter/Cargo.toml
+        min: 1
 
   F-gq-surface:
     title: "gq exposes the git query surface ADR-005 describes"
@@ -234,7 +239,7 @@ features:
     assertions:
       - id: docs-lang-count-number
         kind: symbol_exists
-        pattern: "Source code AST \\(14 languages\\)"
+        pattern: "Source code AST \\(15 languages\\)"
         path: README.md
         min: 1
         description: >
@@ -244,14 +249,14 @@ features:
           deriving from the enum rather than arbitrating between stale claims.
       - id: docs-lang-list-matches-enum
         kind: symbol_exists
-        pattern: "Rust, JavaScript, TypeScript, TSX, Python, JSON, Go, Java, C, C\\+\\+, Dart, Swift, TOML, YAML"
+        pattern: "Rust, JavaScript, TypeScript, TSX, Python, JSON, Go, Java, C, C\\+\\+, Dart, Swift, Kotlin, TOML, YAML"
         path: README.md
         min: 1
-      - id: lang-enum-has-14-variants
+      - id: lang-enum-has-15-variants
         kind: symbol_exists
-        pattern: "Rust|JavaScript|TypeScript|TypeScriptTsx|Python|Json|Go|Java|C|Cpp|Dart|Swift|Toml|Yaml"
+        pattern: "Rust|JavaScript|TypeScript|TypeScriptTsx|Python|Json|Go|Java|C|Cpp|Dart|Swift|Kotlin|Toml|Yaml"
         path: crates/aq-treesitter/src/langs.rs
-        min: 14
+        min: 15
         description: >
           The other side of the pair. If a grammar is added or removed, this goes
           red before the README does, naming the manifest as the thing that moved.
