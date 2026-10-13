@@ -24,7 +24,8 @@ pub enum Expr {
     /// `desc`, `desc(n)` — recursive descent, optional max depth
     Descendants(Option<usize>),
 
-    /// `desc:type_name` or `children:type_name` — type-filtered traversal
+    /// `desc:type_name` or `children:type_name` — type-filtered traversal.
+    /// `desc:*` / `children:*` (any kind) is `types == [ANY_KIND]`.
     TypeFilter {
         axis: Axis,
         types: Vec<String>,
@@ -89,6 +90,11 @@ pub enum Expr {
     /// `.[n]` — index into array
     Index(isize),
 }
+
+/// The type a `desc:*` / `children:*` filter names: every node kind matches.
+/// `*` can never be a real node kind (a type name is an identifier), so it is
+/// unambiguous inside `TypeFilter::types`.
+pub const ANY_KIND: &str = "*";
 
 #[derive(Debug, Clone)]
 pub enum MetaField {
@@ -969,10 +975,14 @@ impl<'a> Parser<'a> {
         Ok(PatternPredicate { field, op, value })
     }
 
-    /// Parse type filter after seeing `:` — e.g., `:function_declaration` or `:(a | b)`
+    /// Parse type filter after seeing `:` — e.g., `:function_declaration`, `:(a | b)` or `:*`
     fn parse_type_filter(&mut self, axis: Axis) -> Result<Expr, ParseError> {
         self.expect(&Token::Colon)?;
-        let types = if matches!(self.peek(), Token::LParen) {
+        let types = if matches!(self.peek(), Token::Star) {
+            // `desc:*` — any kind (`desc` / `children` alone say the same)
+            self.advance();
+            vec![ANY_KIND.to_string()]
+        } else if matches!(self.peek(), Token::LParen) {
             // Multi-type: (type1 | type2 | ...)
             self.advance();
             let mut types = vec![self.parse_type_name()?];

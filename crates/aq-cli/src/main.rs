@@ -235,6 +235,10 @@ fn run_query_str(
     let sources = collect_sources(cli)?;
     let backend = resolve_backend(cli.lang.as_deref());
 
+    // A query naming a node kind or field the grammar lacks can only select
+    // nothing: say so (with suggestions) instead of printing nothing.
+    check_query_against_grammars(&expr, &sources, cli.all_nodes)?;
+
     // Process each source
     for (source, lang, file_path) in sources {
         let (root, _metrics) =
@@ -249,6 +253,49 @@ fn run_query_str(
 
     budget_tracker.print_truncation_metadata();
     Ok(())
+}
+
+/// Validate `expr` against the grammar of every tree-sitter language among
+/// `sources` (AQ-2). Sources in a language without a grammar (`nq`'s English)
+/// are not checked. The run is refused only when the query can match in *none*
+/// of the checked languages: `aq 'desc:function_item' src/**/*` over Rust and
+/// Dart files is fine, because it selects something in the Rust ones.
+fn check_query_against_grammars(
+    expr: &aq_core::Expr,
+    sources: &[(String, String, String)],
+    all_nodes: bool,
+) -> anyhow::Result<()> {
+    use aq_core::query::check::{check, Scope};
+    let scope = if all_nodes { Scope::All } else { Scope::Named };
+    let mut langs: Vec<aq_treesitter::langs::Language> = Vec::new();
+    if !is_nq_binary() {
+        for (_, lang, _) in sources {
+            if let Some(l) = aq_treesitter::langs::Language::from_name(lang) {
+                if !langs.contains(&l) {
+                    langs.push(l);
+                }
+            }
+        }
+    }
+    let mut errors = Vec::new();
+    for lang in &langs {
+        match check(expr, lang, scope) {
+            Ok(()) => return Ok(()),
+            Err(e) => errors.push(e),
+        }
+    }
+    match errors.len() {
+        0 => Ok(()),
+        1 => anyhow::bail!("{}", errors[0]),
+        _ => anyhow::bail!(
+            "the query matches nothing in any of the languages queried:\n{}",
+            errors
+                .iter()
+                .map(|e| format!("  - {e}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ),
+    }
 }
 
 // ---------------------------------------------------------------------------

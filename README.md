@@ -73,6 +73,33 @@ Count and list are derived from the `Language` enum in `crates/aq-treesitter/src
 which is the only authority on what `aq` can parse. `contract.yml`'s
 `F-DOCS-language-count` asserts this list against that file.
 
+## Queries that cannot match (aq)
+
+`aq` checks a query against the grammar of the files it runs on before searching,
+so a mistyped selector is an error with suggestions rather than an empty result:
+
+```
+$ aq 'desc:class_definition' lib/main.dart
+Error: unknown node kind `class_definition` for Dart (in `desc:class_definition`); did you mean `class_declaration`? — nothing was searched. ...
+$ aq 'desc:function_item | .nme' src/main.rs
+Error: unknown field `nme` for Rust (in `.nme`); did you mean `name`? — nothing was searched. ...
+```
+
+- **Node kinds** — `desc:K`, `children:K`, `desc:(A | B)`, `match(K ... field:(K))`, `@type == "K"`
+  and `@type =~ "re"` must name kinds the grammar can produce. `aq` only sees *named* nodes, so an
+  anonymous token (`class`, `(`) is refused unless `--all-nodes` is given. `ERROR` is always allowed.
+- **Fields** — `.name` and `field:(K)` must be fields of the grammar. The check uses the grammar's
+  whole field table, not the fields of each node kind (tree-sitter's runtime API does not expose
+  that), so `.nme` is caught but `desc:identifier | .body` is not. A `.name` after `{...}`, `@meta`,
+  or a builtin is left alone: it may read an object key.
+- **`desc:*` / `children:*`** mean any kind (the same as `desc` / `children`).
+- Over several languages (`aq Q src/**/*`) the query is refused only if it can match in *none* of
+  them. `nq` (natural language) has no grammar and is not checked.
+
+The checker is a library function: `aq_core::query::check::check(&expr, &grammar, Scope::Named)`.
+A backend describes its grammar by implementing `aq_core::query::check::Grammar`;
+`aq-treesitter` does it for `Language` (`node_kinds()`, `anonymous_kinds()`, `field_names()`).
+
 ## License
 
 MIT

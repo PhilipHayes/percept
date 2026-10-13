@@ -94,6 +94,47 @@ impl Language {
         }
     }
 
+    /// Named, visible node kinds of this grammar: the kinds `aq`'s trees contain
+    /// (anonymous tokens such as `class` or `(` are not among them, and `ERROR`
+    /// is not either — it is added by the query checker). Sorted, unique.
+    pub fn node_kinds(&self) -> Vec<String> {
+        self.kinds_where(|ts, id| ts.node_kind_is_named(id) && ts.node_kind_is_visible(id))
+    }
+
+    /// Kinds that exist in the grammar only as anonymous tokens (`class`, `(`):
+    /// present with `--all-nodes`, never in the default tree. Sorted, unique.
+    /// A name that is also a named kind (JS `string`) is listed by `node_kinds`
+    /// and may be listed here too; callers treat a node kind as a node.
+    pub fn anonymous_kinds(&self) -> Vec<String> {
+        self.kinds_where(|ts, id| !ts.node_kind_is_named(id))
+    }
+
+    /// Every field name of the grammar (`name`, `body`, ...). tree-sitter
+    /// exposes this global table, not which kinds carry which fields. Sorted, unique.
+    pub fn field_names(&self) -> Vec<String> {
+        let ts = self.ts_language();
+        let mut names: Vec<String> = (1..=ts.field_count() as u16)
+            .filter_map(|id| ts.field_name_for_id(id))
+            .map(str::to_string)
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    fn kinds_where(&self, keep: impl Fn(&tree_sitter::Language, u16) -> bool) -> Vec<String> {
+        let ts = self.ts_language();
+        let mut kinds: Vec<String> = (0..ts.node_kind_count() as u16)
+            .filter(|&id| keep(&ts, id))
+            .filter_map(|id| ts.node_kind_for_id(id))
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+            .collect();
+        kinds.sort();
+        kinds.dedup();
+        kinds
+    }
+
     /// Get the display name for this language.
     pub fn name(&self) -> &'static str {
         match self {
@@ -113,5 +154,21 @@ impl Language {
             Self::Toml => "toml",
             Self::Yaml => "yaml",
         }
+    }
+}
+
+/// What `aq_core::query::check` needs to validate a query against this grammar.
+impl aq_core::query::check::Grammar for Language {
+    fn name(&self) -> &str {
+        Language::name(self)
+    }
+    fn node_kinds(&self) -> Vec<String> {
+        Language::node_kinds(self)
+    }
+    fn anonymous_kinds(&self) -> Vec<String> {
+        Language::anonymous_kinds(self)
+    }
+    fn field_names(&self) -> Vec<String> {
+        Language::field_names(self)
     }
 }

@@ -1,6 +1,6 @@
 use super::parser::{
     ArithOp, Axis, CmpOp, Combinator, Expr, LogicOp, MetaField, Pattern, PatternPredicate,
-    PatternStep, SiblingKind, StringPart, Value,
+    PatternStep, SiblingKind, StringPart, Value, ANY_KIND,
 };
 use crate::node::AqNode;
 use std::collections::HashMap;
@@ -532,7 +532,11 @@ fn eval_type_filter<'a>(
         };
         Ok(candidates
             .into_iter()
-            .filter(|c| types.iter().any(|t| c.node_type() == t.as_str()))
+            .filter(|c| {
+                types
+                    .iter()
+                    .any(|t| t == ANY_KIND || c.node_type() == t.as_str())
+            })
             .map(EvalResult::Node)
             .collect())
     } else {
