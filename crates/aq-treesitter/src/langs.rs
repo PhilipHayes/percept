@@ -16,6 +16,7 @@ pub enum Language {
     Dart,
     Swift,
     Kotlin,
+    CSharp,
     Toml,
     Yaml,
 }
@@ -37,6 +38,7 @@ impl Language {
             "dart" => Some(Self::Dart),
             "swift" => Some(Self::Swift),
             "kt" | "kts" => Some(Self::Kotlin),
+            "cs" | "csx" => Some(Self::CSharp),
             "toml" => Some(Self::Toml),
             "yml" => Some(Self::Yaml),
             "yaml" => Some(Self::Yaml),
@@ -60,6 +62,7 @@ impl Language {
             "dart" => Some(Self::Dart),
             "swift" => Some(Self::Swift),
             "kotlin" | "kt" => Some(Self::Kotlin),
+            "csharp" | "c#" | "cs" => Some(Self::CSharp),
             "toml" => Some(Self::Toml),
             "yaml" => Some(Self::Yaml),
             _ => None,
@@ -89,6 +92,7 @@ impl Language {
             Self::Dart => tree_sitter_dart::LANGUAGE.into(),
             Self::Swift => tree_sitter_swift::LANGUAGE.into(),
             Self::Kotlin => tree_sitter_kotlin_ng::LANGUAGE.into(),
+            Self::CSharp => tree_sitter_c_sharp::LANGUAGE.into(),
             Self::Toml => tree_sitter_toml_ng::LANGUAGE.into(),
             Self::Yaml => tree_sitter_yaml::LANGUAGE.into(),
         }
@@ -151,6 +155,7 @@ impl Language {
             Self::Dart => "Dart",
             Self::Swift => "Swift",
             Self::Kotlin => "Kotlin",
+            Self::CSharp => "C#",
             Self::Toml => "toml",
             Self::Yaml => "yaml",
         }

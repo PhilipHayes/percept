@@ -27,6 +27,7 @@ impl Backend for TreeSitterBackend {
         vec![
             "c",
             "cpp",
+            "csharp",
             "dart",
             "go",
             "java",

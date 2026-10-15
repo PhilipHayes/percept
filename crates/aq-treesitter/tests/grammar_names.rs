@@ -4,7 +4,7 @@ use aq_core::query::check::{check, Scope};
 use aq_core::{lex, parse};
 use aq_treesitter::langs::Language;
 
-const ALL: [Language; 15] = [
+const ALL: [Language; 16] = [
     Language::Rust,
     Language::JavaScript,
     Language::TypeScript,
@@ -18,6 +18,7 @@ const ALL: [Language; 15] = [
     Language::Dart,
     Language::Swift,
     Language::Kotlin,
+    Language::CSharp,
     Language::Toml,
     Language::Yaml,
 ];
@@ -120,4 +121,30 @@ fn the_checker_uses_the_real_grammar() {
 fn language_display_name_appears_in_the_message() {
     let e = verdict(Language::TypeScriptTsx, "desc:nope", Scope::Named).unwrap_err();
     assert!(e.message.contains("for TypeScript (TSX)"), "{}", e.message);
+}
+
+/// The kinds a Python/Java-shaped guess names are refused with the C# spelling.
+#[test]
+fn csharp_kinds_are_known_and_near_misses_suggest_them() {
+    assert!(verdict(
+        Language::CSharp,
+        "desc:class_declaration | desc:method_declaration | .name",
+        Scope::Named
+    )
+    .is_ok());
+    for (guess, want) in [
+        ("class_definition", "class_declaration"),
+        ("interface_definition", "interface_declaration"),
+        ("method_definition", "method_declaration"),
+        ("namespace_definition", "namespace_declaration"),
+    ] {
+        let e = verdict(Language::CSharp, &format!("desc:{guess}"), Scope::Named).unwrap_err();
+        assert_eq!(e.kind, "unknown-node-kind");
+        assert_eq!(e.language.as_deref(), Some("C#"));
+        assert!(
+            e.suggestions.contains(&want.to_string()),
+            "{guess}: {:?}",
+            e.suggestions
+        );
+    }
 }

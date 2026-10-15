@@ -651,6 +651,7 @@ fn lang_from_path(path: &std::path::Path) -> Option<String> {
         "cpp" | "cc" | "cxx" | "hpp" | "hxx" | "hh" => Some("cpp".into()),
         "swift" => Some("swift".into()),
         "kt" | "kts" => Some("kotlin".into()),
+        "cs" | "csx" => Some("csharp".into()),
         "toml" => Some("toml".into()),
         "yml" => Some("yaml".into()),
         "yaml" => Some("yaml".into()),
